@@ -1,0 +1,22 @@
+services:
+    {{name}}_development:
+        build:
+            context: .
+            dockerfile: Dockerfile
+        image: {{docker_image}}
+        container_name: {{docker_container}}
+        deploy:
+            resources:
+                reservations:
+                    devices:
+                        - driver: nvidia
+                          count: all
+                          capabilities: [ gpu ]
+        volumes:
+            - ./:/home/workspace/
+            - /var/run/docker.sock:/var/run/docker.sock
+        command: {{entry_command}} -c "tail -f /dev/null"
+        entrypoint: /root/container-first-startup.sh
+        environment:
+            - GIT_USER_NAME=${HOST_GIT_NAME}
+            - GIT_USER_EMAIL=${HOST_GIT_EMAIL}

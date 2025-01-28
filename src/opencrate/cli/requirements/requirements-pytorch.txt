@@ -1,0 +1,23 @@
+torch
+torchvision
+torchtext
+torchaudio
+torch-tensorrt
+tensorrt==10.3.0
+
+--extra-index-url https://pypi.org/simple
+torchinfo
+torchmetrics
+pytorch-lightning 
+kornia
+torchio
+huggingface
+datasets
+diffusers
+accelerate
+captum
+
+nvidia-modelopt[all]==0.15.0
+
+docker
+{{logging_package}}

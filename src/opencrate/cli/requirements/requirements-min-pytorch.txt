@@ -1,0 +1,11 @@
+torch
+torchvision
+torchtext
+
+--extra-index-url https://pypi.org/simple
+torchinfo
+torchmetrics
+pytorch-lightning
+
+{{logging_package}}
+docker

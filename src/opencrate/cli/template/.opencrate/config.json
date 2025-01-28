@@ -1,0 +1,18 @@
+{
+    "title": "",
+    "name": "",
+    "version": "",
+    "description": "",
+    "datatypes": "",
+    "task": "",
+    "framework": "",
+    "logging": "",
+    "python_version": "",
+    "docker_image": "",
+    "entry_command": "",
+    "docker_container": "",
+    "runtime": "",
+    "framework_runtime": "",
+    "git_name": "",
+    "git_email": ""
+}

@@ -1,0 +1,7 @@
+tensorflow[and-cuda]
+tensorflow-datasets
+tensorflow-hub
+tensorflow-io
+
+docker
+{{logging_package}}
