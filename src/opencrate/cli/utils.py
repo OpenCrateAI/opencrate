@@ -39,11 +39,11 @@ def handle_exceptions(console: Console) -> Callable:
             except Exception as e:
                 if str(e) == "'NoneType' object is not subscriptable":
                     console.print(f" ⊝ [ERROR]: This is not a OpenCrate project directory", style="bold red")
-                    console.print(
-                        f" [yellow]●[/yellow] Use `[bold blue]oc init[/bold blue]` to initialize the project"
-                    )
+                    # console.print(
+                    #     f" [yellow]●[/yellow] Use `[bold blue]oc init[/bold blue]` to initialize the project"
+                    # )
                 else:
-                    console.print(f" ⊝ [ERROR]: {e}", style="bold red")
+                    console.print(f" ⊝ [ERROR] > {type(e).__name__}: {e}", style="bold red")
                 sys.exit(1)
 
         return wrapper

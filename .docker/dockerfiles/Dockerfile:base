@@ -1,0 +1,42 @@
+FROM nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Kolkata
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
+
+RUN apt update -y &&\
+    apt upgrade -y &&\
+    apt install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gcc wget curl vim git &&\
+    echo $TZ > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata
+
+RUN apt update -y &&\
+    apt install -y --no-install-recommends fontconfig btop unrar make tree htop bat tldr zoxide cpufetch jq nvtop
+
+RUN mkdir -p /etc/apt/keyrings &&\
+    wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg &&\
+    echo 'deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main' | tee /etc/apt/sources.list.d/gierens.list &&\
+    chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list &&\
+    add-apt-repository ppa:zhangsongcui3371/fastfetch -y &&\
+    apt update -y &&\
+    apt install -y --no-install-recommends eza fastfetch
+
+COPY .docker/cli/ /home/
+COPY .docker/fonts/ /home/
+RUN apt install -y --no-install-recommends zsh &&\
+    chsh -s $(which zsh) &&\
+    wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O - | zsh || true &&\
+    git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k &&\
+    git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions &&\
+    git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting &&\
+    git clone https://github.com/marlonrichert/zsh-autocomplete.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autocomplete &&\
+    curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh &&\
+    mv /home/zsh/.zshrc ~/.zshrc && mv /home/zsh/.p10k.zsh ~/.p10k.zsh && mv /home/zsh/.aliases.sh ~/ && mv /home/zsh/.exports.sh ~/ &&\
+    mkdir -p ~/.config/btop/ && mkdir -p ~/.config/atuin/ && mkdir -p ~/.config/fastfetch/ &&\
+    cp -r /home/btop/ ~/.config/ &&\
+    cp -r /home/atuin/ ~/.config/ &&\
+    cp -r /home/fastfetch/ ~/.config/ &&\
+    rm -rf /home/zsh/ &&\
+    mkdir -p ~/.local/share/fonts &&\
+    cp /home/*ttf ~/.local/share/fonts/ &&\
+    fc-cache -f -v &&\
+    rm /home/*ttf

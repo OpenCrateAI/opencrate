@@ -1,6 +1,6 @@
 #!/bin/sh
 
-# Check if the file exists
+# Check if the file exists and run once if file does not exist
 if [ ! -f "/tmp/first_run_completed" ]; then
     echo "Running first-time setup..."
 

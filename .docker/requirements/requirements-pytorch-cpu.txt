@@ -1,0 +1,19 @@
+--index-url https://download.pytorch.org/whl/cpu
+torch
+torchvision
+torchtext
+torchaudio
+
+--extra-index-url https://pypi.org/simple
+torchinfo
+torchmetrics
+pytorch-lightning 
+huggingface
+datasets
+diffusers
+accelerate
+safetensors
+captum
+albumentations
+
+docker

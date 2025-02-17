@@ -25,9 +25,9 @@ LOGGING_FRAMEWORKS = {
 }
 PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
-TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "src/opencrate_cli/template"
-REQUIREMENTS_DIR = Path(__file__).resolve().parent.parent.parent / "src/opencrate_cli/requirements"
-GIT_BASH_SCRIPT = Path(__file__).resolve().parent.parent.parent / "src/opencrate_cli/bash/git_init.sh"
+TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/template"
+REQUIREMENTS_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/requirements"
+GIT_BASH_SCRIPT = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
 
 EMOJIS = {
     "Image": "🐶",
@@ -86,25 +86,31 @@ def safe_prompt(prompt_func):
 
 
 def prompt_project_details():
-    project_title = safe_prompt(lambda: questionary.text(" ● ModelCrate Name:", qmark="").ask())
+    project_title = safe_prompt(
+        lambda: questionary.text(
+            "● Project Name:",
+            qmark="",
+            validate=lambda text: True if len(text) > 0 else "Please enter Project Name, can't be empty.",
+        ).ask()
+    )
     project_name = project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
 
     overwrite = True
 
     if os.path.exists(project_name):
         if not questionary.confirm(
-            f" ● OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
+            f"● OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
             qmark="",
         ).ask():
             sys.exit(0)
 
     project_description = safe_prompt(
-        lambda: questionary.text(" ● Give a brief description of your project:", multiline=True, qmark="").ask()
+        lambda: questionary.text("● Give a brief description of your project:", multiline=True, qmark="").ask()
     )
 
     project_datatypes = safe_prompt(
         lambda: questionary.checkbox(
-            " ● Select the types of datasets you're gonna be dealing with:",
+            "● Select the types of datasets you're gonna be dealing with:",
             choices=[
                 {"name": f"{data_type}", "value": data_type, "checked": data_type == "Image"}
                 for data_type in DATATYPES
@@ -115,7 +121,7 @@ def prompt_project_details():
 
     project_task = safe_prompt(
         lambda: questionary.select(
-            f" ● Select the specific task for your {' '.join(project_datatypes)} data type:",
+            f"● Select the specific task for your {' '.join(project_datatypes)} data type:",
             choices=reduce(lambda x, y: x + y, [DATATYPE_TASKS[datatype] for datatype in project_datatypes]),
             qmark="",
         ).ask()
@@ -123,7 +129,7 @@ def prompt_project_details():
 
     project_framework = safe_prompt(
         lambda: questionary.select(
-            " ● Select pre-baked opencrate containers for your framework:",
+            "● Select pre-baked opencrate containers for your framework:",
             choices=[{"name": f"{framework}", "value": framework} for framework in ML_FRAMEWORKS],
             qmark="",
             default={"name": f"{'PyTorch'}", "value": "PyTorch"},
@@ -132,7 +138,7 @@ def prompt_project_details():
 
     project_logging = safe_prompt(
         lambda: questionary.select(
-            " ● Select your logging framework of choice:",
+            "● Select your logging framework of choice:",
             choices=[{"name": f"{framework}", "value": framework} for framework in LOGGING_FRAMEWORKS.keys()],
             qmark="",
             default={"name": f"{'WandB'}", "value": "WandB"},
@@ -141,7 +147,7 @@ def prompt_project_details():
 
     project_python_version = safe_prompt(
         lambda: questionary.select(
-            " ● Select your python environment version:",
+            "● Select your python environment version:",
             choices=[{"name": f"{version}", "value": f"{version}"} for version in PYTHON_VERSIONS],
             qmark="",
             default={"name": "3.10", "value": "3.10"},
@@ -150,7 +156,7 @@ def prompt_project_details():
 
     project_runtime = safe_prompt(
         lambda: questionary.select(
-            " ● Select your runtime environment:",
+            "● Select your runtime environment:",
             choices=[{"name": "CUDA", "value": "cuda"}, {"name": "CPU", "value": "cpu"}],
             qmark="",
             default={"name": "CUDA", "value": "cuda"},
@@ -160,7 +166,7 @@ def prompt_project_details():
     if project_runtime == "cuda" and project_framework == "PyTorch":
         project_framework_runtime = safe_prompt(
             lambda: questionary.select(
-                " ● Select your cuda driver version",
+                "● Select your cuda driver version",
                 choices=[
                     {"name": "CUDA 12.4 [Latest]", "value": "12.4"},
                     {"name": "CUDA 12.1", "value": "12.1"},
@@ -176,29 +182,20 @@ def prompt_project_details():
     else:
         project_framework_runtime = "cpu"
 
-    project_image_type = safe_prompt(
-        lambda: questionary.select(
-            " ● Select your image type:",
-            choices=[{"name": "Default Image", "value": "default"}, {"name": "Min Image", "value": "min"}],
-            qmark="",
-            default={"name": "Default Image", "value": "default"},
-        ).ask()
-    )
-
     if not safe_prompt(
         lambda: questionary.confirm(
-            " ● Initialize project in current directory?",
+            "● Initialize project in current directory?",
             qmark="",
         ).ask()
     ):
         project_dir = os.path.join(
-            questionary.path(" ● Enter the path to the root project directory:", qmark="").ask(),
+            questionary.path("● Enter the path to the root project directory:", qmark="").ask(),
             project_name,
         )
     else:
         project_dir = project_name
 
-    git_remote_url = safe_prompt(lambda: questionary.path(" ● Set Git Remote URL:", qmark="", default="").ask())
+    git_remote_url = safe_prompt(lambda: questionary.path("● Set Git Remote URL:", qmark="", default="").ask())
 
     project_docker_image = f"oc-{project_name}:v0"
     project_docker_container = f"{project_docker_image.replace(':', '-')}-container"
@@ -213,7 +210,6 @@ def prompt_project_details():
         "project_framework": project_framework,
         "project_logging": project_logging,
         "project_python_version": project_python_version,
-        "project_image_type": project_image_type,
         "project_runtime": project_runtime,
         "project_framework_runtime": project_framework_runtime,
         "project_dir": project_dir,
@@ -226,26 +222,23 @@ def prompt_project_details():
 def create_project_structure(config):
     with utils.spinner(console, ">>"):
         if os.path.exists(config["project_name"]):
-            rmtree(config["project_name"])
+            rmtree(
+                config["project_name"],
+            )
 
-        pull_docker_image = "opencrate"
-
-        if config["project_image_type"] == "min":
-            pull_docker_image += "_min"
-            entry_command = "bash"
-        else:
-            entry_command = "zsh"
+        pull_docker_image = f"opencrate-{config['project_framework'].lower()}"
 
         if config["project_runtime"] == "cuda":
-            pull_docker_image += "_cuda"
+            pull_docker_image += "-cuda"
         else:
-            pull_docker_image += "_cpu"
+            pull_docker_image += "-cpu"
+        pull_docker_image += f"-py{config['project_python_version']}"
+
+        entry_command = "zsh"
 
         copytree(TEMPLATE_DIR, config["project_dir"])
 
         requirements_name = "requirements"
-        if config["project_image_type"] == "min":
-            requirements_name += "-min"
         requirements_name += f"-{config['project_framework'].lower()}.txt"
 
         copy(
@@ -272,33 +265,21 @@ def create_project_structure(config):
             framework_runtime=config["project_framework_runtime"],
             git_remote_url=config["git_remote_url"],
         )
-
-        config_path = os.path.join(config["project_dir"], ".opencrate", "config.json")
-        with open(config_path, "w") as json_file:
-            json_file.write(config_setting.model_dump_json(indent=4))
-
-        utils.write_template(os.path.join(config["project_dir"], "README.md"), config_setting)
-        utils.write_template(os.path.join(config["project_dir"], "Makefile"), config_setting)
-        # utils.write_template(
-        #     os.path.join(config["project_dir"], ".opencrate", "requirements.txt"), config_setting
-        # )
-        utils.write_template(
-            os.path.join(config["project_dir"], ".devcontainer/devcontainer.json"), config_setting
-        )
-        utils.write_template(
-            os.path.join(config["project_dir"], ".devcontainer/docker-compose.yml"), config_setting
-        )
-        utils.write_template(os.path.join(config["project_dir"], "docker-compose.yml"), config_setting)
-        utils.write_template(os.path.join(config["project_dir"], "Dockerfile"), config_setting)
-        utils.write_template(
-            os.path.join(config["project_dir"], ".opencrate", "requirements.txt"), config_setting
+        config_setting.write_template_settings(
+            config=config,
+            template_item_paths=[
+                ".devcontainer/devcontainer.json",
+                ".devcontainer/docker-compose.yml",
+                ".opencrate/requirements.txt",
+                "docker-compose.yml",
+                "Dockerfile",
+                "README.md",
+            ],
         )
 
 
 def setup_git_repository(project_dir, git_remote_url):
-    os.chdir(project_dir)
-    utils.run_command(f"bash {GIT_BASH_SCRIPT} {git_remote_url}", show_output=True)
-    os.chdir("..")
+    utils.run_command(f"cd {project_dir} && bash {GIT_BASH_SCRIPT} {git_remote_url} && cd ..", show_output=True)
 
 
 def display_summary(config):
@@ -325,7 +306,6 @@ def display_summary(config):
     )
     result_table.add_row("Python Version", f"🐍 {config['project_python_version']}")
     result_table.add_row("Runtime Environment", config["project_runtime"].upper())
-    result_table.add_row("Docker Image Type", config["project_image_type"].capitalize())
     result_table.add_row("Docker Image", f"🐳 {config['project_docker_image']}")
     result_table.add_row("Docker Container", config["project_docker_container"])
     result_table.add_row("Git Remote URL", config["git_remote_url"] or "Not Set")
@@ -334,10 +314,21 @@ def display_summary(config):
     console.print(result_table)
 
 
+def start_project(config):
+    utils.run_command(f"cd {config['project_dir']} && oc build", show_output=True)
+    utils.run_command(f"cd {config['project_dir']} && oc start", show_output=True)
+
+
 @app.command()
 @utils.handle_exceptions(console)
 def init():
     config = prompt_project_details()
-    create_project_structure(config)
-    setup_git_repository(config["project_dir"], config["git_remote_url"])
-    display_summary(config)
+    try:
+        create_project_structure(config)
+        setup_git_repository(config["project_dir"], config["git_remote_url"])
+        start_project(config)
+    except Exception as e:
+        rmtree(config["project_name"])
+        console.print(f" ⊝ [ERROR] > {type(e).__name__}: {e}", style="bold red")
+
+    # display_summary(config)

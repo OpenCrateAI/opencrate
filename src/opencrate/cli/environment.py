@@ -1,6 +1,6 @@
 import json
 import os
-import sys
+import re
 
 import docker
 from rich.console import Console
@@ -33,22 +33,34 @@ COMMANDS = {
     "get_git_name": "git config --get user.name",
     "get_git_email": "git config --get user.email",
 }
-NAME = os.environ["HOST_GIT_NAME"] = utils.run_command(command=COMMANDS["get_git_name"])
-EMAIL = os.environ["HOST_GIT_EMAIL"] = utils.run_command(command=COMMANDS["get_git_email"])
+os.environ["HOST_GIT_NAME"] = utils.run_command(command=COMMANDS["get_git_name"])
+os.environ["HOST_GIT_EMAIL"] = utils.run_command(command=COMMANDS["get_git_email"])
 
 
-def stream_docker_logs(command):
+def stream_docker_logs(command, is_build=False):
+    ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
+
     try:
         for line in command:
-            if "stream" in line:
-                console.print(f"{line['stream'].rstrip()}")
-            elif "status" in line:
-                console.print(f"{line['status']}")
-            elif "error" in line:
-                raise Exception(f"{line['error']}")
-        console.print(f"    >> ● Build successful for {CONFIG['docker_image']}")
+            if is_build:
+                if "stream" in line:
+                    clean_line = ansi_escape.sub("", line["stream"].rstrip())
+                    console.print(f"{clean_line}")
+                elif "status" in line:
+                    clean_line = ansi_escape.sub("", line["status"])
+                    console.print(f"{clean_line}")
+                elif "error" in line:
+                    raise Exception(f"{line['error']}")
+            else:
+                stdout, stderr = line
+                if stdout:
+                    clean_stdout = ansi_escape.sub("", stdout.decode("utf-8").strip())
+                    console.print(clean_stdout)
+                if stderr:
+                    clean_stderr = ansi_escape.sub("", stderr.decode("utf-8").strip())
+                    console.print(clean_stderr, style="bold red")
     except Exception as e:
-        console.print(f"\n    >> [red]●[red] Build failed:{e}", style="bold red")
+        console.print(f"\n    >> [red]●[red] Operation failed: {e}", style="bold red")
 
 
 @app.command()
@@ -61,7 +73,8 @@ def build():
     console.print(f"\n [blue]●[/blue] [[blue]Building[/blue]] > {CONFIG['title']}")
     with utils.spinner(console, ">>"):
         stream_docker_logs(
-            command=DOCKER_CLIENT.api.build(path="./", tag=CONFIG["docker_image"], rm=True, decode=True),
+            command=DOCKER_CLIENT.api.build(path=".", tag=CONFIG["docker_image"], rm=True, decode=True),
+            is_build=True,
         )
 
 
@@ -192,8 +205,8 @@ def kill():
     """
     Kill the OpenCrate environment.
     """
-
     console.print(f"\n [blue]●[/blue] [[blue]Killing[/blue]] > {CONFIG['title']}")
+
     stop(down=True)
     try:
         DOCKER_CLIENT.images.remove(CONFIG["docker_image"], force=True)
@@ -263,11 +276,17 @@ def status():
     """
 
     console.print(f"\n [blue]●[/blue] [[blue]Status[/blue]] > {CONFIG['title']}\n")
+    console.print(f" ● Task:\t{CONFIG['task']}")
+    console.print(f" ● Framework:\t{CONFIG['framework']}")
+    console.print(f" ● Python:\t{CONFIG['python_version']}")
+    console.print(f" ● Version:\t{CONFIG['version']}")
+    print()
+
     try:
         image = DOCKER_CLIENT.images.get(CONFIG["docker_image"])
-        console.print(f" ● Image name: {', '.join(image.tags)}")
-        console.print(f" ● Image Size: {image.attrs['Size'] / (1024 ** 2):.2f} MB")
-        console.print(f" ● Image ID: {image.id}")
+        console.print(f" ● Image name:\t{', '.join(image.tags)}")
+        console.print(f" ● Image Size:\t{image.attrs['Size'] / (1024 ** 2):.2f} MB")
+        console.print(f" ● Image ID:\t{image.id}")
         print()
     except docker.errors.ImageNotFound:
         console.print(f" ● Image {CONFIG['docker_image']} [bold red]not found[/bold red]")
@@ -279,9 +298,9 @@ def status():
 
     try:
         container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
-        console.print(f" ● Container Name: {container.name}")
-        console.print(f" ● Container Status: {container.status}")
-        console.print(f" ● Container ID: {container.id}")
+        console.print(f" ● Container Name:\t{container.name}")
+        console.print(f" ● Container Status:\t{container.status}")
+        console.print(f" ● Container ID:\t{container.id}")
         print()
     except docker.errors.NotFound:
         console.print(f" ● Container {CONFIG['docker_container']} [bold red]not found[/bold red]")
@@ -295,9 +314,44 @@ def status():
         git_remote_url = utils.run_command("git ls-remote --get-url origin", ignore_error=True)
         git_last_commit_date = utils.run_command("git log -1 --format=%cd", ignore_error=True)
         git_pull_requests_count = utils.run_command("git log --merges --oneline | wc -l", ignore_error=True)
-        console.print(f" ● Git Remote URL: {None if git_remote_url == 'origin' else git_remote_url}")
-        console.print(f" ● Last Commit Date: {git_last_commit_date}")
-        console.print(f" ● Pull Requests Count: {git_pull_requests_count}")
+        console.print(f" ● Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}")
+        console.print(f" ● Last Commit Date:\t{git_last_commit_date}")
+        console.print(f" ● Pull Requests Count:\t{git_pull_requests_count}")
     except Exception as e:
         console.print(f" ● [ERROR] with git: {e}")
         print()
+
+
+def execute_script(script_name: str):
+    if not CONFIG:
+        console.print("[red]Configuration not loaded. Exiting.[/red]")
+        return
+
+    is_exited = False
+    try:
+        container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
+        if container.status == "exited":
+            is_exited = True
+            container.start()
+    except docker.errors.NotFound:  # type: ignore
+        start()
+        container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
+
+    assert os.path.isfile(f"./{script_name}.py"), f"Script {script_name}.py not found in ./src"
+    script_path = os.path.join("/home/workspace", f"{script_name}.py")
+    command = f"python{CONFIG['python_version']} {script_path}"
+    console.print(f"\n [blue]●[/blue] [[blue]Launching[/blue]] > {script_name}.py")
+    result = container.exec_run(command, stream=True, demux=True)
+    stream_docker_logs(result.output)
+
+    if is_exited:
+        container.stop()
+
+
+@app.command()
+@utils.handle_exceptions(console)
+def launch(command: str):
+    """
+    Launch a specific command script from the ./src folder.
+    """
+    execute_script(command)

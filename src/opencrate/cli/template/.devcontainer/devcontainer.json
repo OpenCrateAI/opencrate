@@ -16,6 +16,9 @@
     "workspaceFolder": "/home/workspace/",
     "customizations": {
         "vscode": {
+            "settings": {
+                "python.pythonPath": "/bin/python{{python_version}}"
+            },
             "extensions": [
                 "donjayamanne.githistory",
                 "github.remotehub",
@@ -46,7 +49,6 @@
                 "ms-vsliveshare.vsliveshare",
                 "phplasma.csv-to-table",
                 "xelad0m.jupyter-toc",
-                "xyz.local-history"
             ]
         }
     }

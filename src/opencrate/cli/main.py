@@ -8,5 +8,4 @@ app.add_typer(auth_app, name="auth")
 app.add_typer(workflow_app, name="workflow")
 
 if __name__ == "__main__":
-    print(print([command.name for command in app.registered_commands]))
     app()
