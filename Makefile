@@ -5,15 +5,15 @@ SHELL := /bin/bash
 .ONESHELL:
 
 check_python = \
-    if [ -z "$(python)" ]; then \
-        echo "Using default Python version $(PYTHON_VERSION)"; \
-        python=$(PYTHON_VERSION); \
-    fi; \
-    if ! command -v python$$python >/dev/null 2>&1; then \
-        echo "Error: Python $$python is not installed on your system"; \
-        echo "Please install Python $$python or use a different version"; \
-        exit 1; \
-    fi
+	if [ -z "$(python)" ]; then \
+		echo "Using default Python version $(PYTHON_VERSION)"; \
+		python=$(PYTHON_VERSION); \
+	fi; \
+	if ! command -v python$$python >/dev/null 2>&1; then \
+		echo "Error: Python $$python is not installed on your system"; \
+		echo "Please install Python $$python or use a different version"; \
+		exit 1; \
+	fi
 
 install:
 	@$(check_python)
@@ -24,11 +24,11 @@ install:
 dev-install:
 	@$(check_python)
 	@if [ ! -d ".venv" ]; then \
-		python$(python) -m venv .venv; \
-		source .venv/bin/activate; \
-	fi
+        python$(python) -m venv .venv; \
+        source .venv/bin/activate; \
+    fi
 	@.venv/bin/python$(python) -m pip install --upgrade pip
-	@.venv/bin/python$(python) -m pip install -e . --no-cache-dir
+	@.venv/bin/python$(python) -m pip install -e .[testing] --no-cache-dir
 	@source .venv/bin/activate
 
 build:
@@ -40,3 +40,6 @@ build-all:
             .venv/bin/python3.9 .docker/dockerfile.py --python=$$python --runtime=$$runtime; \
         done \
     done
+
+test:
+	@PYTHONPATH=src .venv/bin/pytest
