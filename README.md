@@ -1,0 +1,1 @@
+<img src="docs/assets/images/intro.jpg">
