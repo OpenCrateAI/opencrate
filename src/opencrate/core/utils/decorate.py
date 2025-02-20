@@ -2,42 +2,83 @@ import time
 from functools import cache, wraps
 from typing import Any, Callable
 
+import numpy as np
 
-def timeit(func: Callable) -> Callable:
+
+def _took(elapsed_time: float) -> str:
+    if elapsed_time < 1:
+        took = f"{elapsed_time:.4f} secs"
+    elif elapsed_time < 60:
+        took = f"{elapsed_time:.3f} secs"
+    elif elapsed_time < 3600:
+        minutes, seconds = divmod(elapsed_time, 60)
+        took = f"{int(minutes)} mins {seconds:.3f} secs"
+    else:
+        hours, remainder = divmod(elapsed_time, 3600)
+        minutes, seconds = divmod(remainder, 60)
+        took = f"{int(hours)} hrs {int(minutes)} mins {seconds:.3f} secs"
+
+    return took
+
+
+def timeit(record: bool = False) -> Callable:
     """
-    Decorator to measure and log the execution time of a function.
+    Decorator to measure and log the execution time of a function, with optional accumulation.
 
     Args:
-        func (Callable): The function to be decorated.
+        record (bool): Whether to record the execution times.
 
     Returns:
         Callable: The wrapped function with timing functionality.
 
     Example:
-    >>> @timeit
+    >>> @timeit(record=True)
     ... def slow_function():
     ...     time.sleep(2)
     ...     return "Done"
     >>> slow_function()
-    `slow_function()` executed in 00:00:02
+    slow_function() executed in
     'Done'
+    >>> slow_function.finalize()
     """
 
-    @wraps(func)
-    def wrapper(*args, **kwargs) -> Any:
-        start_time = time.time()
-        result = func(*args, **kwargs)
-        end_time = time.time()
-        elapsed_time = end_time - start_time
+    def decorator(func: Callable) -> Callable:
+        times = []
 
-        hours, remainder = divmod(elapsed_time, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        took = f"{int(hours):02}:{int(minutes):02}:{int(seconds):02}"
+        @wraps(func)
+        def wrapper(*args, **kwargs) -> Any:
+            start_time = time.time()
+            result = func(*args, **kwargs)
+            end_time = time.time()
+            elapsed_time = end_time - start_time
 
-        print(f"`{func.__name__}()` executed in {took}")
-        return result
+            print(f"{func.__name__}() executed in {_took(elapsed_time)}")
 
-    return wrapper
+            if record:
+                times.append(elapsed_time)
+
+            return result
+
+        def summarize():
+            if not record:
+                raise Exception("Summarize is not enabled, set `record` argument to `True` to enable summary.")
+            acc = np.array(times)
+            mean_time = acc.mean()
+            median_time = float(np.median(acc))
+
+            print(f"Total executions  : {len(acc)}")
+            print(f"Mean time taken   : {_took(mean_time)}")
+            print(f"Median time taken : {_took(median_time)}")
+            print(f"Min time taken    : {_took(acc.min())}")
+            print(f"Max time taken    : {_took(acc.max())}")
+            print(f"Std deviation     : {_took(acc.std())}")
+            print(f"Total time taken  : {_took(acc.sum())}")
+
+        setattr(wrapper, "summarize", summarize)
+
+        return wrapper
+
+    return decorator
 
 
 def memoize(func: Callable) -> Callable:
@@ -94,7 +135,7 @@ def retry(max_retries: int = 3, delay: float = 2.0) -> Callable:
     ...     print(api_call())
     ... except Exception as e:
     ...     print(e)
-    `api_call()` failed after 5 retries
+    api_call() failed after 5 retries
     """
 
     def decorator(func):
@@ -108,7 +149,7 @@ def retry(max_retries: int = 3, delay: float = 2.0) -> Callable:
                 except Exception as e:
                     last_exception = e
                     time.sleep(delay)
-            raise Exception(f"`{func.__name__}()` failed after {max_retries} retries:\n{last_exception}")
+            raise Exception(f"{func.__name__}() failed after {max_retries} retries:\n{last_exception}")
 
         return wrapper
 
@@ -137,7 +178,7 @@ def rate_limit(calls: int, period: float) -> Callable:
     >>> for _ in range(5):
     ...     print(api_call())
     >>> print(api_call())
-    `api_call()` rate limit exceeded. Try again in 5.00 seconds...
+    api_call() rate limit exceeded. Try again in 5.00 seconds...
     """
 
     def decorator(func: Callable) -> Callable:
@@ -149,7 +190,7 @@ def rate_limit(calls: int, period: float) -> Callable:
             call_history[:] = [t for t in call_history if now - t < period]
             if len(call_history) >= calls:
                 wait_time = max(period - (now - call_history[0]), period)
-                raise Exception(f"{func.__name__}`() rate limit exceeded. Try again in {wait_time:.2f} seconds")
+                raise Exception(f"{func.__name__}() rate limit exceeded. Try again in {wait_time:.2f} seconds")
             call_history.append(now)
             return func(*args, **kwargs)
 

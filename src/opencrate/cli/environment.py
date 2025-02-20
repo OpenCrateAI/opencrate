@@ -322,7 +322,13 @@ def status():
         print()
 
 
-def execute_script(script_name: str):
+@app.command()
+@utils.handle_exceptions(console)
+def launch(script: str):
+    """
+    Launch a specific command script from the ./src folder.
+    """
+
     if not CONFIG:
         console.print("[red]Configuration not loaded. Exiting.[/red]")
         return
@@ -337,21 +343,12 @@ def execute_script(script_name: str):
         start()
         container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
 
-    assert os.path.isfile(f"./{script_name}.py"), f"Script {script_name}.py not found in ./src"
-    script_path = os.path.join("/home/workspace", f"{script_name}.py")
+    assert os.path.isfile(f"./{script}.py"), f"Script {script}.py not found in ./src"
+    script_path = os.path.join("/home/workspace", f"{script}.py")
     command = f"python{CONFIG['python_version']} {script_path}"
-    console.print(f"\n [blue]●[/blue] [[blue]Launching[/blue]] > {script_name}.py")
+    console.print(f"\n [blue]●[/blue] [[blue]Launching[/blue]] > {script}.py")
     result = container.exec_run(command, stream=True, demux=True)
     stream_docker_logs(result.output)
 
     if is_exited:
         container.stop()
-
-
-@app.command()
-@utils.handle_exceptions(console)
-def launch(command: str):
-    """
-    Launch a specific command script from the ./src folder.
-    """
-    execute_script(command)

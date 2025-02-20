@@ -1,4 +1,4 @@
-from .core import concurrency, io, snapshot  # type: ignore
+from .core import concurrency, decorate, io, snapshot  # type: ignore
  
 snapshot = snapshot.Snapshot()
 
