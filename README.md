@@ -1,1 +1,1 @@
-<img src="docs/assets/images/wallpaper.jpg">
+<img src="docs/assets/images/wallpaper.png">
