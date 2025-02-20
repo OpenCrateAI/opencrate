@@ -5,19 +5,27 @@ from opencrate.core.utils.concurrency import (
 )
 
 
-def _cube(x):
-    return x**3
+def _cube(value):
+    return value**3
+
+
+def x():
+    return list(range(100))
+
+
+def y():
+    return [i**3 for i in list(range(100))]
 
 
 class TestConcurrencyFunctions:
     def test_parallelize_with_threads(self):
-        results = parallelize_with_threads(_cube, [1, 2, 3], title="Computing cubes")
-        assert all(result in [1, 8, 27] for result in results)
+        results = parallelize_with_threads(_cube, x(), title="Computing cubes")
+        assert all(result in y() for result in results)
 
     def test_parallelize_with_processes(self):
-        results = parallelize_with_processes(_cube, [1, 2, 3], title="Computing cubes")
-        assert all(result in [1, 8, 27] for result in results)
+        results = parallelize_with_processes(_cube, x(), title="Computing cubes")
+        assert all(result in y() for result in results)
 
     def test_parallize_with_batch_processes(self):
-        results = parallize_with_batch_processes(_cube, [1, 2, 3, 4], title="Computing cubes")
-        assert results == [1, 8, 27, 64]
+        results = parallize_with_batch_processes(_cube, x(), title="Computing cubes")
+        assert results == y()

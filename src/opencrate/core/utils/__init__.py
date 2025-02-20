@@ -1,8 +1,5 @@
-from .concurrency import (
-    parallelize_with_processes,
-    parallelize_with_threads,
-    parallize_with_batch_processes,
-)
+from .concurrency import parallelize_with_processes, parallelize_with_threads, parallize_with_batch_processes
+from .decorate import memoize, rate_limit, retry, timeit
 from .io import (
     copy_dir,
     create_archive,
@@ -35,6 +32,10 @@ __all__ = [
     "parallelize_with_processes",
     "parallelize_with_threads",
     "parallize_with_batch_processes",
+    "memoize",
+    "rate_limit",
+    "retry",
+    "timeit",
     "copy_dir",
     "create_archive",
     "create_dir",

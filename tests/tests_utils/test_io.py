@@ -184,15 +184,15 @@ class TestIOFunctions:
         with pytest.raises(FileNotFoundError):
             list_files_in_dir(f"{self.test_root_dir}/non_existing_dir")
         self.teardown_list_files_in_dir()
-    
+
     def setup_list_files_in_dir_with_extension(self):
         os.makedirs(f"{self.test_root_dir}/source_dir", exist_ok=True)
         with open(f"{self.test_root_dir}/source_dir/file.txt", "w") as f:
             f.write("content")
-        
+
     def teardown_list_files_in_dir_with_extension(self):
         shutil.rmtree(f"{self.test_root_dir}/source_dir", ignore_errors=True)
-    
+
     def test_list_files_in_dir_with_extension(self):
         self.setup_list_files_in_dir_with_extension()
         files = list_files_in_dir(f"{self.test_root_dir}/source_dir", extension="txt")
@@ -343,10 +343,6 @@ class TestIOFunctions:
         with open(f"{self.test_root_dir}/file.txt", "w") as f:
             f.write("content")
 
-    def teardown_delete_file(self):
-        if os.path.exists(f"{self.test_root_dir}/file.txt"):
-            os.remove(f"{self.test_root_dir}/file.txt")
-
     def test_delete_file(self):
         self.setup_delete_file()
         delete_file(f"{self.test_root_dir}/file.txt")
@@ -354,15 +350,12 @@ class TestIOFunctions:
 
         with pytest.raises(FileNotFoundError):
             delete_file(f"{self.test_root_dir}/non_existing_file.txt")
-        self.teardown_delete_file()
 
     def setup_rename(self):
         with open(f"{self.test_root_dir}/old_name.txt", "w") as f:
             f.write("old content")
 
     def teardown_rename(self):
-        if os.path.exists(f"{self.test_root_dir}/old_name.txt"):
-            os.remove(f"{self.test_root_dir}/old_name.txt")
         if os.path.exists(f"{self.test_root_dir}/new_name.txt"):
             os.remove(f"{self.test_root_dir}/new_name.txt")
 
@@ -384,10 +377,6 @@ class TestIOFunctions:
 
     def test_get_parent_dir(self):
         assert get_parent_dir("path/to/file.txt") == "path/to"
-
-    def teardown_download_file(self):
-        if os.path.exists(f"{self.test_root_dir}/archive.zip"):
-            os.remove(f"{self.test_root_dir}/archive.zip")
 
     def test_download_file(self):
         download_file(

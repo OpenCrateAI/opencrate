@@ -75,10 +75,10 @@ def parallelize_with_threads(
         >>> def io_bound_task(url):
         ...     response = requests.get(url)
         ...     return response.status_code
-        >>> results = oc.concurrency.parallelize_with_threads(
+        >>> results = parallelize_with_threads(
         ...     io_bound_task, ["https://www.example.com"] * 20, max_workers=5, title="Downloading Files"
         ... )
-        Downloading Files ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+        Downloading Files ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [217 avg it/s] [0.00 avg s/it]
         >>> print(results) # the order of results may vary
         [200, 200, 200, ..., 200]
     """
@@ -125,9 +125,9 @@ def parallelize_with_processes(
         >>> from math import factorial
         >>> def cpu_bound_task(n):
         ...     return factorial(n)
-        >>> numbers = [100000 + i for i in range(20)]
+        >>> numbers = [1000 + i for i in range(20)]
         >>> results = parallelize_with_processes(cpu_bound_task, numbers, title="Computing factorials")
-        Computing factorials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+        Computing factorials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [681 avg it/s] [0.00 avg s/it]
         >>> print(results) # the order of results may vary
         [factorial(100000), factorial(100001), ..., factorial(100019)]
     """
@@ -171,7 +171,7 @@ def parallize_with_batch_processes(
         >>> def square(x):
         ...     return x ** 2
         >>> results = parallize_with_batch_processes(square, [1, 2, 3, 4], title="Computing squares")
-        Computing squares ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00
+        Computing squares ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [684 avg it/s] [0.00 avg s/it]
         >>> print(results) # the order of results is preserved
         [1, 4, 9, 16]
     """
