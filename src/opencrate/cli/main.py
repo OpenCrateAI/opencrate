@@ -1,5 +1,5 @@
-from . import environment  # direct command file must be imported
-from . import init  # direct command file must be imported
+from . import environment  # noqa: F401 # direct command file must be imported
+from . import init  # noqa: F401 # direct command file must be imported
 from .app import app
 from .auth import auth_app
 from .workflow import workflow_app

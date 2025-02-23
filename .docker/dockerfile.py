@@ -243,7 +243,7 @@ def main():
             f.write(dockerfile_base_content)
         stream_docker_logs(
             console,
-            command=docker_client.api.build(
+            command=docker_client.api.build(  # type: ignore
                 path=".",
                 dockerfile=dockerfile_base_path,
                 tag=f"opencrate-base:latest",
@@ -271,7 +271,7 @@ def main():
 
         stream_docker_logs(
             console,
-            command=docker_client.api.build(
+            command=docker_client.api.build(  # type: ignore
                 path=".",
                 dockerfile=dockerfile_path,
                 tag=f"{image_name}:latest",

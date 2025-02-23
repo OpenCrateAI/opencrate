@@ -9,7 +9,7 @@ from rich.text import Text
 class AverageIterationPerSecond(ProgressColumn):
     """Renders human-readable processing rate."""
 
-    speeds = []
+    speeds: List[float] = []
 
     def render(self, task) -> Text:
         speed = task.finished_speed or task.speed
@@ -26,7 +26,7 @@ class AverageIterationPerSecond(ProgressColumn):
 class AverageSecondPerIteration(ProgressColumn):
     """Renders human-readable processing rate."""
 
-    speeds = []
+    speeds: List[float] = []
 
     def render(self, task) -> Text:
         speed = task.finished_speed or task.speed
@@ -44,7 +44,7 @@ def _is_iterable(obj):
     return isinstance(obj, list) or isinstance(obj, tuple)
 
 
-def _make_args_list_iterable(args_list):
+def _make_args_list_iterable(args_list: List[Any]):
     if not _is_iterable(args_list[0]):
         for i, args in enumerate(args_list):
             if not _is_iterable(args):

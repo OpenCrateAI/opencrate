@@ -5,7 +5,7 @@ import sys
 from ast import Dict
 from functools import partial
 from shutil import copyfile, rmtree
-from typing import Any, Optional, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 from loguru import logger
@@ -35,7 +35,8 @@ class Snapshot:
         self.snapshot_name: str = ""
         self._setup_not_done = True
         self._has_reset = False
-        self._dev_replaced = False
+        self._dev_replaced = True
+        self._config_dir: str = ".opencrate"
 
     def setup(
         self,
@@ -58,11 +59,13 @@ class Snapshot:
             ValueError: If `level` is not an str or valid logging level.
             ValueError: If `log_time` is not a boolean.
             ValueError: If `tag` is not a string or None.
-            ValueError: If `use_version` is not an int, 'new', 'latest' or 'dev'.
+            ValueError: If `use_version` is not an int, 'new', 'last' or 'dev'.
 
         Returns:
             None
         """
+        assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
+
         if not isinstance(level, str):  # type: ignore
             raise ValueError(f"\n\n`level` must be a string, but received {type(level)}")
         level = level.upper()
@@ -79,10 +82,10 @@ class Snapshot:
         except:
             pass
         if not isinstance(use_version, (int, str)) or (  # type: ignore
-            isinstance(use_version, str) and use_version not in ["new", "latest", "dev"]
+            isinstance(use_version, str) and use_version not in ["new", "last", "dev"]
         ):
             raise ValueError(
-                f"\n\n`use_version` must be an int, 'new', or 'latest', but received {type(use_version)}"
+                f"\n\n`use_version` must be an int, 'new', or 'last', but received {type(use_version)}"
             )
 
         self.use_version = use_version
@@ -93,7 +96,12 @@ class Snapshot:
 
         self.snapshot_name = self._snapshot_name(name)
         self._get_version()  # this must be done before setting up the script_dir
-        version_name = f"{self.version if self.version == 'dev' else f'v{self.version}'}{f':{self.tag}' if self.tag else ''}"
+        if self.version == "dev":
+            version_name = f"{self.version}"
+        else:
+            version_name = f"v{self.version}"
+        if self.tag:
+            version_name = f"{version_name}:{self.tag}"
         script_dir = os.path.join("snapshots", self.snapshot_name, version_name)
 
         self.logger.remove()
@@ -121,7 +129,7 @@ class Snapshot:
 
                 self.logger.add(
                     history_log_path,
-                    format="{time:YYYY-MM-DD HH:mm:ss} - {level: <8} {message}",  # having time in history log is must
+                    format="{time:YYYY-MM-DD HH:mm:ss} - {level: <8} {message}",
                     level=level.upper(),
                     rotation="30 MB",
                     retention="30 days",
@@ -143,14 +151,14 @@ class Snapshot:
 
         self._setup_not_done = False
 
-        if self._has_reset and use_version == "latest":
+        if self._has_reset and use_version == "last":
             self.warning(
-                "Latest snapshot is requested to be used, but all snapshots have been reset, so no latest version is left to be used. Creating new snapshot as version 'v0'"
+                "Latest snapshot is requested to be used, but all snapshots have been reset, so no last version is left to be used. Creating new snapshot as version 'v0'"
             )
 
         self.debug(f"Snapshot setup done for script '{self.snapshot_name}' with version 'v{self.version}'")
 
-    def list_tags(self, return_tags: Optional[bool] = False) -> Optional[list[str]]:
+    def list_tags(self, return_tags: Optional[bool] = False) -> Optional[List[str]]:
         """
         List all tags available in the snapshots.
 
@@ -161,7 +169,7 @@ class Snapshot:
             ValueError: If `return_tags` is not a boolean.
 
         Returns:
-            Optional[list[str]]: List of tags available in the snapshots.
+            Optional[List[str]]: List of tags available in the snapshots.
         """
         if not isinstance(return_tags, bool):  # type: ignore
             raise ValueError(f"\n\n`return_tags` must be a boolean, but received {type(return_tags)}")
@@ -169,20 +177,23 @@ class Snapshot:
         path = os.path.join("snapshots", self.snapshot_name)
         if not os.path.isdir(path):
             print("No snapshots found.")
-            return
+            return None
 
-        tags: list[str] = []
+        tags: List[str] = []
         for version_name in os.listdir(path):
             if ":" in version_name:
                 tags.append(version_name.split(":")[-1])
 
         unique_tags = list(set(tags))
+        unique_tags = sorted(unique_tags)
         print("Tags available in snapshots:")
         for tag in unique_tags:
             print(f"  - {tag}")
 
         if return_tags:
             return unique_tags
+
+        return None
 
     def checkpoint(self, checkpoint: Any, name: str) -> None:
         assert _has_torch, "\n\nPyTorch is not installed. Please install PyTorch to use this method.\n\n"
@@ -212,25 +223,27 @@ class Snapshot:
             assert isinstance(
                 image, torch.Tensor  # type: ignore
             ), f"\n\nUnsupported image type {type(image)}. Only numpy, PIL, matplotlib, and torch tensors are supported.\n"
-            if hasattr(image, "cpu"):
-                image = image.cpu().numpy()
+            image = image.cpu().numpy()
             if image.ndim == 3 and image.shape[0] in [1, 3, 4]:  # (3, H, W), (1, H, W) or (4, H, W)
                 image = np.transpose(image, (1, 2, 0))  # Convert to (H, W, 3), (H, W, 1) or (H, W, 4)
             image = image.astype("float32")
-            image = (image - image.min()) / image.ptp()
+            image = (image - image.min()) / np.ptp(image)
             image *= 255.0
             image = image.astype("uint8")
             image = Image.fromarray(image)
             image.save(os.path.join(path, name))
 
     def reset(self, confirm: bool = False) -> None:
+        assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
+
         if not self.snapshot_name:
             self.snapshot_name = self._snapshot_name()
 
-        assert confirm, (
-            f"\n\nPlease confirm to reset the versioning, add `confirm=True` to the reset method. "
-            f"Doing this will delete all `{self.snapshot_name}` snapshots.\n"
-        )
+        if not confirm:
+            raise ValueError(
+                f"\n\nPlease confirm to reset the versioning, add `confirm=True` to the reset method. "
+                f"Doing this will delete all `{self.snapshot_name}` snapshots.\n"
+            )
 
         path = os.path.join("snapshots", self.snapshot_name)
         if os.path.isdir(path):
@@ -303,45 +316,39 @@ class Snapshot:
                 return partial(self._log_asset, snapshot_type=name + "s")
 
     def _snapshot_name(self, argument_snapshot_name: Optional[str] = None) -> str:
+        if argument_snapshot_name:
+            return argument_snapshot_name
+
         snapshot_name = os.path.basename(sys.argv[0]).split(".")[0]
         if snapshot_name == "ipykernel_launcher":
-            if not argument_snapshot_name:
-                raise ValueError(
-                    "\n\nSnapshot name cannot be determined for jupyter notebook, argument `name` must be passed in the `snapshot.setup` method.\n"
-                )
-            return argument_snapshot_name
+            raise ValueError(
+                "\n\nSnapshot name cannot be determined for jupyter notebook, argument `name` must be passed in the `snapshot.setup` method.\n"
+            )
         return snapshot_name
 
     def _read_config(self):
-        if os.path.isdir(".opencrate"):
-            config_path = os.path.join(".opencrate", "config.json")
-        elif os.path.isdir("../.opencrate"):
-            config_path = os.path.join("../.opencrate", "config.json")
+        if os.path.isdir(self._config_dir):
+            config_path = os.path.join(self._config_dir, "config.json")
 
         with open(config_path, "r") as f:
             return json.load(f)
 
     def _write_config(self, config: Dict):
-        if os.path.isdir(".opencrate"):
-            config_path = os.path.join(".opencrate", "config.json")
-        elif os.path.isdir("../.opencrate"):
-            config_path = os.path.join("../.opencrate", "config.json")
+        if os.path.isdir(self._config_dir):
+            config_path = os.path.join(self._config_dir, "config.json")
 
         with open(config_path, "w") as f:
             json.dump(config, f, indent=4)
 
     def _get_version(self) -> None:
-        assert os.path.isdir(".opencrate") or os.path.isdir(
-            "../.opencrate"
-        ), "\n\nNot an OpenCrate project directory.\n"
         if self.version is not None:
-            if self.version == "dev" and not self._dev_replaced:
-                path = self._get_version_path("dev")[:-5]  # check if this hard coded 5 is correct or not
-                if os.path.isdir(path):
-                    rmtree(path)
-                self._dev_replaced = True
-                return
-            if self._dev_replaced:
+            if self.version == "dev":  # finalize this feature for _dev_replaced (how does user handle this)
+                #     path = self._get_version_path("dev")[:-4]  # check if this hard coded 5 is correct or not
+                #     if os.path.isdir(path):
+                #         rmtree(path)
+                #     self._dev_replaced = True
+                #     return
+                # if self._dev_replaced:
                 return
 
             config = self._read_config()
@@ -355,10 +362,11 @@ class Snapshot:
             else:
                 available_version = config["snapshot_version"][self.snapshot_name]
 
-                assert self.version <= available_version, (
-                    f"\n\nSnapshot of version 'v{self.version}' does not exist, cannot set `use_version` to {self.version}. "
-                    f"Available versions are upto 'v{available_version}'.\n"
-                )
+                if self.version > available_version:
+                    raise ValueError(
+                        f"\n\nSnapshot of version 'v{self.version}' does not exist, cannot set `use_version` to {self.version}. "
+                        f"Available versions are upto 'v{available_version}'.\n"
+                    )
 
                 return
 
@@ -370,7 +378,7 @@ class Snapshot:
             if self.snapshot_name not in config["snapshot_version"]:
                 config["snapshot_version"][self.snapshot_name] = 0
             else:
-                if self.use_version != "latest":
+                if self.use_version != "last":
                     config["snapshot_version"][self.snapshot_name] += 1
 
         self._write_config(config)

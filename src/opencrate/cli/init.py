@@ -1,6 +1,5 @@
 import os
 import sys
-from functools import reduce
 from pathlib import Path
 from shutil import copy, copytree, rmtree
 
@@ -122,7 +121,7 @@ def prompt_project_details():
     project_task = safe_prompt(
         lambda: questionary.select(
             f"● Select the specific task for your {' '.join(project_datatypes)} data type:",
-            choices=reduce(lambda x, y: x + y, [DATATYPE_TASKS[datatype] for datatype in project_datatypes]),
+            choices=[task for datatype in project_datatypes for task in DATATYPE_TASKS[datatype]],
             qmark="",
         ).ask()
     )

@@ -33,8 +33,8 @@ from opencrate.core.utils import (
 )
 
 
-class TestIOFunctions:
-    test_root_dir: str = "tests/tests_utils/assets"
+class TestUtilsIO:
+    test_root_dir: str = "tests/assets"
 
     def setup_ensure_dir_exists(self):
         os.makedirs(f"{self.test_root_dir}/existing_dir", exist_ok=True)

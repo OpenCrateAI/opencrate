@@ -5,7 +5,7 @@ import pytest
 from opencrate.core.utils.decorate import memoize, rate_limit, retry, timeit
 
 
-class TestDecorateFunctions:
+class TestUtilsDecorate:
     def test_timeit_with_record(self, capsys):
         @timeit(record=True)
         def slow_function():

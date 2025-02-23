@@ -1,5 +1,4 @@
 import re
-from ast import Dict
 from contextlib import contextmanager
 from typing import List, Optional, Union
 
@@ -63,7 +62,7 @@ def spinner(console: Console, message: str):
             pass
 
 
-def stream_docker_logs(console: Console, command: Dict):
+def stream_docker_logs(console: Console, command: Union[List[str], dict[str, str]]):
     try:
         for line in command:  # type: ignore
             if "stream" in line:
@@ -73,7 +72,7 @@ def stream_docker_logs(console: Console, command: Dict):
                 clean_status = re.sub(r"\x1b\[[0-9;]*m", "", line["status"]).strip()  # type: ignore
                 console.print(f"{clean_status}")
             elif "error" in line:
-                raise Exception(f"{line['error']}")
+                raise Exception(f"{line['error']}")  # type: ignore
         console.print(f"    >> ● Build successful")
     except Exception as e:
         console.print(f"\n    >> [red]●[red] Build failed:{e}", style="bold red")

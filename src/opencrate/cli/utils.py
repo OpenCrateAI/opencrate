@@ -3,10 +3,11 @@ import subprocess
 import sys
 from contextlib import contextmanager
 from functools import wraps
-from typing import Callable
+from typing import Any, Callable, List, Tuple
 
 from jinja2 import Template
-from rich.tree import Console, Tree
+from rich.console import Console
+from rich.tree import Tree
 
 
 @contextmanager
@@ -18,20 +19,20 @@ def spinner(console, message):
             pass
 
 
-def global_inits(func: Callable) -> Callable:
-    @wraps(func)
-    def wrapper(*args, **kwargs):
-        global CONFIG
-        config_path = ".opencrate/config.json"
-        with open(config_path, "r") as config_file:
-            CONFIG = json.load(config_file)
-        return func(*args, **kwargs)
+# def global_inits(func: Callable) -> Callable:
+#     @wraps(func)
+#     def wrapper(*args, **kwargs):
+#         global CONFIG
+#         config_path = ".opencrate/config.json"
+#         with open(config_path, "r") as config_file:
+#             CONFIG: Dict[str, Any] = json.load(config_file)
+#         return func(*args, **kwargs)
 
-    return wrapper
+#     return wrapper
 
 
-def handle_exceptions(console: Console) -> Callable:
-    def decorator(func: Callable) -> Callable:
+def handle_exceptions(console: Console) -> Callable[[Any], Any]:
+    def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
         @wraps(func)
         def wrapper(*args, **kwargs):
             try:
@@ -64,7 +65,7 @@ def run_command(command: str, show_output: bool = False, verbose: bool = False, 
                 bufsize=1,
             )
             while True:
-                output = process.stdout.readline()
+                output = process.stdout.readline()  # type: ignore
                 if output == "" and process.poll() is not None:
                     break
                 if output:
@@ -88,7 +89,7 @@ def create_file(path: str, content):
             f.write(content)
 
 
-def replace_in_file(file_path, replacements: list):
+def replace_in_file(file_path, replacements: List[Tuple[str, str]]):
     with open(file_path, "r") as file:
         file_contents = file.read()
 

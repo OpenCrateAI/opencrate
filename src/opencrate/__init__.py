@@ -1,17 +1,21 @@
-from .core import concurrency, decorate, io, snapshot  # type: ignore
- 
-snapshot = snapshot.Snapshot()
+from typing import Any, Callable
 
-debug = snapshot.debug
-info = snapshot.info
-warning = snapshot.warning
-error = snapshot.error
-critical = snapshot.critical
-exception = snapshot.exception
-success = snapshot.success
+from .core import concurrency, decorate, io  # noqa: F401
+from .core import snapshot as snp
+
+snapshot: snp.Snapshot = snp.Snapshot()
+
+debug: Callable[[Any], Any] = snapshot.debug
+info: Callable[[Any], Any] = snapshot.info
+warning: Callable[[Any], Any] = snapshot.warning
+error: Callable[[Any], Any] = snapshot.error
+critical: Callable[[Any], Any] = snapshot.critical
+exception: Callable[[Any], Any] = snapshot.exception
+success: Callable[[Any], Any] = snapshot.success
 
 __all__ = [
     "concurrency",
+    "decorate",
     "io",
     "snapshot",
     "debug",

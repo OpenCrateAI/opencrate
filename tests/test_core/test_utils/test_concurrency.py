@@ -17,7 +17,7 @@ def y():
     return [i**3 for i in list(range(100))]
 
 
-class TestConcurrencyFunctions:
+class TestUtilsConcurrency:
     def test_parallelize_with_threads(self):
         results = parallelize_with_threads(_cube, x(), title="Computing cubes")
         assert all(result in y() for result in results)

@@ -1,0 +1,6 @@
+{
+    "project_name": "test_snapshot",
+    "snapshot_version": {
+        "run_pytest_script": 0
+    }
+}

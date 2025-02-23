@@ -1,21 +1,23 @@
 import json
 import os
 import re
+from collections import defaultdict
+from typing import DefaultDict
 
 import docker
+import docker.errors
 from rich.console import Console
 
 from . import utils
 from .app import app
 
 console = Console()
+CONFIG: DefaultDict[str, str] = defaultdict(lambda: "")
 
 CONFIG_PATH = ".opencrate/config.json"
-try:
+if os.path.exists(CONFIG_PATH):
     with open(CONFIG_PATH, "r") as config_file:
         CONFIG = json.load(config_file)
-except:
-    CONFIG = None
 
 HELPERS = {
     "build_image": lambda: console.print(
@@ -33,8 +35,8 @@ COMMANDS = {
     "get_git_name": "git config --get user.name",
     "get_git_email": "git config --get user.email",
 }
-os.environ["HOST_GIT_NAME"] = utils.run_command(command=COMMANDS["get_git_name"])
-os.environ["HOST_GIT_EMAIL"] = utils.run_command(command=COMMANDS["get_git_email"])
+os.environ["HOST_GIT_NAME"] = utils.run_command(command=COMMANDS["get_git_name"])  # type: ignore
+os.environ["HOST_GIT_EMAIL"] = utils.run_command(command=COMMANDS["get_git_email"])  # type: ignore
 
 
 def stream_docker_logs(command, is_build=False):
@@ -155,7 +157,9 @@ def enter():
     try:
         container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
         if container.status == "running":
-            os.execvp("docker", ["docker", "exec", "-it", container.id, CONFIG["entry_command"]])
+            os.execvp(
+                "docker", ["docker", "exec", "-it", container.id, CONFIG["entry_command"]]  # type: ignore
+            )
         else:
             console.print(f" [red]○[/red] Container is not running")
             HELPERS["start_container"]()

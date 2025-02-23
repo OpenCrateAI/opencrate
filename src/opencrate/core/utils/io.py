@@ -166,7 +166,7 @@ def list_files_in_dir(dir: str, extension: Optional[str] = None) -> List[str]:
         extension (str, optional): The file extension to filter by. Defaults to None.
 
     Returns:
-        list[str]: A list of file paths.
+        List[str]: A list of file paths.
 
     Raises:
         FileNotFoundError: If the directory does not exist.

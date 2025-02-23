@@ -1,6 +1,6 @@
 import time
-from functools import cache, wraps
-from typing import Any, Callable
+from functools import lru_cache, wraps
+from typing import Any, Callable, List
 
 import numpy as np
 
@@ -21,7 +21,7 @@ def _took(elapsed_time: float) -> str:
     return took
 
 
-def timeit(record: bool = False) -> Callable:
+def timeit(record: bool = False) -> Callable[[Any], Any]:
     """
     Decorator to measure and log the execution time of a function, with optional accumulation.
 
@@ -29,7 +29,7 @@ def timeit(record: bool = False) -> Callable:
         record (bool): Whether to record the execution times.
 
     Returns:
-        Callable: The wrapped function with timing functionality.
+        Callable[[Any], Any] The wrapped function with timing functionality.
 
     Example:
     >>> @timeit(record=True)
@@ -42,7 +42,7 @@ def timeit(record: bool = False) -> Callable:
     >>> slow_function.finalize()
     """
 
-    def decorator(func: Callable) -> Callable:
+    def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
         times = []
 
         @wraps(func)
@@ -81,7 +81,7 @@ def timeit(record: bool = False) -> Callable:
     return decorator
 
 
-def memoize(func: Callable) -> Callable:
+def memoize(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     """
     Decorator to cache the results of a function to avoid redundant computations.
 
@@ -89,7 +89,7 @@ def memoize(func: Callable) -> Callable:
         func (Callable): The function to be decorated.
 
     Returns:
-        Callable: The wrapped function with memoization functionality.
+        Callable[[Any], Any] The wrapped function with memoization functionality.
 
     Example:
     >>> @memoize
@@ -104,14 +104,14 @@ def memoize(func: Callable) -> Callable:
     """
 
     @wraps(func)
-    @cache
+    @lru_cache(maxsize=None)
     def wrapper(*args, **kwargs) -> Any:
         return func(*args, **kwargs)
 
     return wrapper
 
 
-def retry(max_retries: int = 3, delay: float = 2.0) -> Callable:
+def retry(max_retries: int = 3, delay: float = 2.0) -> Callable[[Any], Any]:
     """
     Decorator to retry a function call a specified number of times on failure.
 
@@ -120,7 +120,7 @@ def retry(max_retries: int = 3, delay: float = 2.0) -> Callable:
         delay (float): Delay between retries in seconds. Default is 2.0.
 
     Returns:
-        Callable: The wrapped function with retry functionality.
+        Callable[[Any], Any] The wrapped function with retry functionality.
 
     Raises:
         Exception: If the function fails after all retry attempts.
@@ -156,7 +156,7 @@ def retry(max_retries: int = 3, delay: float = 2.0) -> Callable:
     return decorator
 
 
-def rate_limit(calls: int, period: float) -> Callable:
+def rate_limit(calls: int, period: float) -> Callable[[Any], Any]:
     """
     Decorator to limit the number of times a function can be called within a time period.
 
@@ -165,7 +165,7 @@ def rate_limit(calls: int, period: float) -> Callable:
         period (float): Time period in seconds.
 
     Returns:
-        Callable: The wrapped function with rate-limiting functionality.
+        Callable[[Any], Any] The wrapped function with rate-limiting functionality.
 
     Raises:
         Exception: If the rate limit is exceeded.
@@ -181,8 +181,8 @@ def rate_limit(calls: int, period: float) -> Callable:
     api_call() rate limit exceeded. Try again in 5.00 seconds...
     """
 
-    def decorator(func: Callable) -> Callable:
-        call_history = []
+    def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
+        call_history: List[float] = []
 
         @wraps(func)
         def wrapper(*args, **kwargs) -> Any:

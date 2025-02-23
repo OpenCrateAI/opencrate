@@ -88,7 +88,7 @@ print(files)
 - `extension` (str, optional): The file extension to filter by. Defaults to None.
 
 **Returns:**
-- `list[str]`: A list of file paths.
+- `List[str]`: A list of file paths.
 
 **Raises:**
 - `FileNotFoundError`: If the directory does not exist.
