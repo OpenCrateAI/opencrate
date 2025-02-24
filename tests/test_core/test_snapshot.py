@@ -9,6 +9,13 @@ from PIL import Image
 
 from opencrate.core.snapshot import Snapshot
 
+try:
+    import torch  # noqa: F811
+
+    _has_torch = True
+except:
+    _has_torch = False
+
 
 class TestCoreSnapshot:
     test_root_dir: str = "tests/assets"
@@ -60,10 +67,13 @@ class TestCoreSnapshot:
         self.snapshot.setup(name="test_snapshot")
 
     def test_checkpoint(self):
-        self.setup_test_checkpoint()
-        checkpoint = {"model_state": "dummy_state"}
-        self.snapshot.checkpoint(checkpoint, "checkpoint.pth")
-        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth"))
+        if _has_torch:
+            self.setup_test_checkpoint()
+            checkpoint = {"model_state": "dummy_state"}
+            self.snapshot.checkpoint(checkpoint, "checkpoint.pth")
+            assert os.path.isfile(
+                os.path.join("snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth")
+            )
 
     def setup_test_figure_numpy(self):
         self.snapshot = Snapshot()
@@ -105,11 +115,10 @@ class TestCoreSnapshot:
 
     def test_figure_torch(self):
         self.setup_test_figure_torch()
-        import torch
-
-        image = torch.rand(3, 100, 100)
-        self.snapshot.figure(image, "image.png")
-        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png"))
+        if _has_torch:
+            image = torch.rand(3, 100, 100)
+            self.snapshot.figure(image, "image.png")
+            assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png"))
 
     def setup_test_setup_with_tag(self):
         self.snapshot = Snapshot()
@@ -118,11 +127,12 @@ class TestCoreSnapshot:
 
     def test_setup_with_tag(self):
         self.setup_test_setup_with_tag()
-
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag"))
-        assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "checkpoints"))
+        if _has_torch:
+            assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "checkpoints"))
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "figures"))
         assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "test_snapshot.log"))
 
@@ -133,13 +143,14 @@ class TestCoreSnapshot:
 
     def test_asset_path_access(self):
         self.setup_test_asset_path_access()
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
-            "snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                "snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png") == os.path.join(
             "snapshots", "test_snapshot", "v0", "figures", "image.png"
         )
@@ -154,13 +165,14 @@ class TestCoreSnapshot:
 
     def test_asset_path_access_with_tags(self):
         self.setup_test_asset_path_access_with_tags()
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
-            "snapshots", "test_snapshot", "v0:test_tag", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                "snapshots", "test_snapshot", "v0:test_tag", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png") == os.path.join(
             "snapshots", "test_snapshot", "v0:test_tag", "figures", "image.png"
         )
@@ -176,45 +188,46 @@ class TestCoreSnapshot:
         self.setup_test_asset_path_access_different_tags()
 
         self.snapshot.setup(name="test_snapshot", tag="test_tag1")
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
 
-        self.snapshot.version = None
-        self.snapshot.setup(name="test_snapshot", tag="test_tag2", use_version="last")
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        self.snapshot.setup(name="test_snapshot", tag="test_tag2")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
 
-        self.snapshot.version = None
-        self.snapshot.setup(name="test_snapshot", tag="test_tag3", use_version="last")
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        self.snapshot.setup(name="test_snapshot", tag="test_tag3")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
-            "snapshots", "test_snapshot", "v0:test_tag3", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                "snapshots", "test_snapshot", "v0:test_tag3", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png") == os.path.join(
             "snapshots", "test_snapshot", "v0:test_tag3", "figures", "image.png"
         )
         assert self.snapshot.path.random("random.png") == os.path.join(
             "snapshots", "test_snapshot", "v0:test_tag3", "randoms", "random.png"
         )
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth", tag="test_tag1") == os.path.join(
-            "snapshots", "test_snapshot", "v0:test_tag1", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth", tag="test_tag1") == os.path.join(
+                "snapshots", "test_snapshot", "v0:test_tag1", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png", tag="test_tag1") == os.path.join(
             "snapshots", "test_snapshot", "v0:test_tag1", "figures", "image.png"
         )
         assert self.snapshot.path.random("random.png", tag="test_tag1") == os.path.join(
             "snapshots", "test_snapshot", "v0:test_tag1", "randoms", "random.png"
         )
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth", tag="test_tag2") == os.path.join(
-            "snapshots", "test_snapshot", "v0:test_tag2", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth", tag="test_tag2") == os.path.join(
+                "snapshots", "test_snapshot", "v0:test_tag2", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png", tag="test_tag2") == os.path.join(
             "snapshots", "test_snapshot", "v0:test_tag2", "figures", "image.png"
         )
@@ -230,48 +243,51 @@ class TestCoreSnapshot:
         self.setup_test_asset_path_access_different_tags_with_version()
 
         self.snapshot.setup(name="test_snapshot", tag="test_tag1")  # version 0, tag test_tag1
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
         assert self.snapshot.version == 0
 
         self.snapshot.version = None
         self.snapshot.setup(name="test_snapshot", tag="test_tag2")  # version 1, tag test_tag2
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
         assert self.snapshot.version == 1
 
         self.snapshot.version = None
         self.snapshot.setup(name="test_snapshot", tag="test_tag3")  # version 2, tag test_tag3
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
         assert self.snapshot.version == 2
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
-            "snapshots", "test_snapshot", "v2:test_tag3", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                "snapshots", "test_snapshot", "v2:test_tag3", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png") == os.path.join(
             "snapshots", "test_snapshot", "v2:test_tag3", "figures", "image.png"
         )
         assert self.snapshot.path.random("random.png") == os.path.join(
             "snapshots", "test_snapshot", "v2:test_tag3", "randoms", "random.png"
         )
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth", version=1, tag="test_tag2") == os.path.join(
-            "snapshots", "test_snapshot", "v1:test_tag2", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth", version=1, tag="test_tag2") == os.path.join(
+                "snapshots", "test_snapshot", "v1:test_tag2", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png", version=1, tag="test_tag2") == os.path.join(
             "snapshots", "test_snapshot", "v1:test_tag2", "figures", "image.png"
         )
         assert self.snapshot.path.random("random.png", version=1, tag="test_tag2") == os.path.join(
             "snapshots", "test_snapshot", "v1:test_tag2", "randoms", "random.png"
         )
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth", version=2, tag="test_tag3") == os.path.join(
-            "snapshots", "test_snapshot", "v2:test_tag3", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth", version=2, tag="test_tag3") == os.path.join(
+                "snapshots", "test_snapshot", "v2:test_tag3", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png", version=2, tag="test_tag3") == os.path.join(
             "snapshots", "test_snapshot", "v2:test_tag3", "figures", "image.png"
         )
@@ -288,15 +304,15 @@ class TestCoreSnapshot:
         self.setup_test_dev_version()
         assert self.snapshot.version == "dev"
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "dev:test_tag"))
-
-        self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+        if _has_torch:
+            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
         self.snapshot.debug("This is a debug message")
-
-        assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
-            "snapshots", "test_snapshot", "dev:test_tag", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                "snapshots", "test_snapshot", "dev:test_tag", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png") == os.path.join(
             "snapshots", "test_snapshot", "dev:test_tag", "figures", "image.png"
         )
@@ -309,9 +325,10 @@ class TestCoreSnapshot:
         self.setup_test_dev_version()
         self.snapshot.debug("This is a debug message")
         assert self.snapshot.version == "dev"
-        assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
-            "snapshots", "test_snapshot", "dev:test_tag", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                "snapshots", "test_snapshot", "dev:test_tag", "checkpoints", "checkpoint.pth"
+            )
         assert self.snapshot.path.figure("image.png") == os.path.join(
             "snapshots", "test_snapshot", "dev:test_tag", "figures", "image.png"
         )
@@ -329,9 +346,10 @@ class TestCoreSnapshot:
         self.snapshot.setup(name="test_snapshot")
         assert self.snapshot.version == 1
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0"))
-        assert self.snapshot.path.checkpoint("checkpoint.pth", version="dev", tag="test_tag") == os.path.join(
-            "snapshots", "test_snapshot", "dev:test_tag", "checkpoints", "checkpoint.pth"
-        )
+        if _has_torch:
+            assert self.snapshot.path.checkpoint(
+                "checkpoint.pth", version="dev", tag="test_tag"
+            ) == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "checkpoints", "checkpoint.pth")
         assert self.snapshot.path.figure("image.png", version="dev", tag="test_tag") == os.path.join(
             "snapshots", "test_snapshot", "dev:test_tag", "figures", "image.png"
         )
@@ -491,24 +509,54 @@ class TestCoreSnapshot:
         with pytest.raises(ValueError, match=r"Please confirm to reset the versioning"):
             self.snapshot.reset()
         with pytest.raises(ValueError, match=r"No snapshots are created for "):
-            self.snapshot.setup(use_version=45)
+            self.snapshot.setup(name="test_snapshot", use_version=45)
         with pytest.raises(ValueError, match=r"does not exist, cannot set `use_version` to"):
             self.snapshot.version = None
             self.snapshot.reset(confirm=True)
-            self.snapshot.setup()
+            self.snapshot.setup(name="test_snapshot")
+
             self.snapshot.version = None
-            self.snapshot.setup(use_version=44)
+            self.snapshot.setup(name="test_snapshot", use_version=44)
         with pytest.raises(AssertionError, match=r"No 'abc' snapshot type found for version"):
             self.snapshot.version = None
             self.snapshot.reset(confirm=True)
-            self.snapshot.setup()
-            self.snapshot.path.abc("checkpoint.pth")
+            self.snapshot.setup(name="test_snapshot")
+
+            self.snapshot.path.abc("whatever.pth")
+        if _has_torch:
+            with pytest.raises(
+                AssertionError,
+                match=r"No snapshot 'checkpoint_non_existing.pth' found in 'checkpoint' for version",
+            ):
+                self.snapshot.version = None
+                self.snapshot.reset(confirm=True)
+                self.snapshot.setup(name="test_snapshot")
+                self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
+                assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
+                    "snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth"
+                )
+                self.snapshot.path.checkpoint("checkpoint_non_existing.pth")
         with pytest.raises(
             AssertionError,
-            match=r"No snapshot 'checkpoint_non_existing.pth' found in 'checkpoint' for version",
+            match=r"No snapshot 'figure_non_existing.png' found in 'figure' for version",
         ):
             self.snapshot.version = None
             self.snapshot.reset(confirm=True)
-            self.snapshot.setup()
-            self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-            self.snapshot.path.checkpoint("checkpoint_non_existing.pth")
+            self.snapshot.setup(name="test_snapshot")
+            self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
+            assert self.snapshot.path.figure("image.png") == os.path.join(
+                "snapshots", "test_snapshot", "v0", "figures", "image.png"
+            )
+            self.snapshot.path.figure("figure_non_existing.png")
+        with pytest.raises(
+            AssertionError,
+            match=r"No snapshot 'random_non_existing.png' found in 'random' for version",
+        ):
+            self.snapshot.version = None
+            self.snapshot.reset(confirm=True)
+            self.snapshot.setup(name="test_snapshot")
+            self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
+            assert self.snapshot.path.random("random.png") == os.path.join(
+                "snapshots", "test_snapshot", "v0", "randoms", "random.png"
+            )
+            self.snapshot.path.random("random_non_existing.png")

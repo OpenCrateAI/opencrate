@@ -19,36 +19,38 @@ check_python = \
     fi; \
     export python_version=$${python_version}
 
-install:
-	@$(check_python)
-	@python$${python_version} -m pip install --upgrade pip
-	@python$${python_version} -m pip install -e . --no-cache-dir
-	@oc --install-completion || true
+# install:
+# 	@$(check_python)
+# 	@python$${python_version} -m pip install --upgrade pip
+# 	@python$${python_version} -m pip install -e . --no-cache-dir
+# 	@oc --install-completion || true
 
-install-dev:
+install:
 	@$(check_python)
 	@echo "Using Python version: $${python_version}"
 	@python$${python_version} -m pip install --upgrade pip
 	@python$${python_version} -m pip install -e .[dev] --no-cache-dir
-	@for version in 3.8 3.9 3.11 3.12 3.13; do \
+	@oc --install-completion || true
+	@for version in 3.7.17 3.8 3.9 3.11 3.12 3.13; do \
 		if ! pyenv versions --bare | grep -q "^$$version$$"; then \
 			pyenv install $$version; \
+			python$$version -m pip install --upgrade pip; \
 		fi; \
 	done
 	@pyenv local 3.8 3.9 3.11 3.12 3.13
 
-enter-dev:
+enter:
 	@$(git-creds)
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
 	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
 	@docker compose up opencrate_dev -d && docker exec -it opencrate_dev zsh
 
-stop-dev:
+stop:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
 	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
 	@docker compose stop
 
-kill-dev:
+kill:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
 	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
 	@docker compose down
@@ -89,9 +91,8 @@ help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  install        Install the package as user"
-	@echo "  install-dev    Install the package with development environment and dependencies"
-	@echo "  enter-dev      Enter the development container"
+	@echo "  install    	 Install the package with development environment and dependencies"
+	@echo "  enter      	 Enter the development container"
 	@echo "  test-pytest    Run pytest - for unit tests"
 	@echo "  test-black     Run black - for code formatting"
 	@echo "  test-flake8    Run flake8 - for linting"

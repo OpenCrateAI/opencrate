@@ -1,4 +1,5 @@
 import json
+import os
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -35,17 +36,22 @@ def handle_exceptions(console: Console) -> Callable[[Any], Any]:
     def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
         @wraps(func)
         def wrapper(*args, **kwargs):
-            try:
+            if os.path.exists(".opencrate/config.json"):
                 return func(*args, **kwargs)
-            except Exception as e:
-                if str(e) == "'NoneType' object is not subscriptable":
-                    console.print(f" ⊝ [ERROR]: This is not a OpenCrate project directory", style="bold red")
-                    # console.print(
-                    #     f" [yellow]●[/yellow] Use `[bold blue]oc init[/bold blue]` to initialize the project"
-                    # )
-                else:
-                    console.print(f" ⊝ [ERROR] > {type(e).__name__}: {e}", style="bold red")
+            else:
+                console.print(f" ⊝ [ERROR]: This is not a OpenCrate project directory", style="bold red")
                 sys.exit(1)
+            # try:
+            #     return func(*args, **kwargs)
+            # except Exception as e:
+            #     if str(e) == "'NoneType' object is not subscriptable":
+            #         console.print(f" ⊝ [ERROR]: This is not a OpenCrate project directory", style="bold red")
+            #         # console.print(
+            #         #     f" [yellow]●[/yellow] Use `[bold blue]oc init[/bold blue]` to initialize the project"
+            #         # )
+            #     else:
+            #         console.print(f" ⊝ [ERROR] > {type(e).__name__}: {e}", style="bold red")
+            #     sys.exit(1)
 
         return wrapper
 

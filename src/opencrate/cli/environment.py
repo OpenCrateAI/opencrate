@@ -1,8 +1,6 @@
 import json
 import os
 import re
-from collections import defaultdict
-from typing import DefaultDict
 
 import docker
 import docker.errors
@@ -12,7 +10,7 @@ from . import utils
 from .app import app
 
 console = Console()
-CONFIG: DefaultDict[str, str] = defaultdict(lambda: "")
+CONFIG = {}
 
 CONFIG_PATH = ".opencrate/config.json"
 if os.path.exists(CONFIG_PATH):
