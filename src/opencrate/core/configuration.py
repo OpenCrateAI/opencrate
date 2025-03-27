@@ -1,0 +1,440 @@
+import inspect
+import os
+import re
+import time
+from functools import wraps
+
+import yaml
+from rich.console import Console
+from rich.tree import Tree
+
+
+class Configuration:
+
+    def __init__(self) -> None:
+        self._config = {}
+        # Default mapping for built-in types.
+        self.default_type_mapping = {
+            "int": int,
+            "str": str,
+            "float": float,
+            "bool": bool,
+            "list": list,
+            "dict": dict,
+            "tuple": tuple,
+            "set": set,
+            "complex": complex,
+            "bytes": bytes,
+            "bytearray": bytearray,
+        }
+        self.non_default_imports = []
+        self.globals = globals()
+        self.globals["__builtins__"] = __builtins__
+        self.opencrate_init_done = False
+        self.config_eval_on = True
+        self.config_eval_start = 0.0
+        self.config_eval_timeout = 60
+        self.snapshot = None
+
+    def _extract_validation_info(self, docstring):
+        """
+        Extracts validation rules while preserving multi-argument lambdas.
+        New format: Validation rules are at the end of each argument description in square brackets.
+        """
+        validation_info = {}
+        pattern = re.compile(r"^\s*(\w+)\s*\(([\w\.]+)\):(?:[^\n]*\[([^\]]+)\])?", re.MULTILINE)
+        matches = pattern.findall(docstring)
+
+        for arg_name, arg_type, validation_bracket in matches:
+            validation = validation_bracket.strip("[]")
+            rules = []
+            buffer = []
+            in_lambda = False
+
+            for part in re.split(r"(,|(lambda\b))", validation):
+                if not part:
+                    continue
+                if part == "lambda":
+                    in_lambda = True
+                    buffer = ["lambda"]
+                elif in_lambda:
+                    buffer.append(part)
+                    if ":" in part:
+                        in_lambda = False
+                        rules.append("".join(buffer).strip())
+                        buffer = []
+                else:
+                    if part == ",":
+                        if buffer:
+                            rules.append("".join(buffer).strip())
+                            buffer = []
+                    else:
+                        buffer.append(part)
+            if buffer:
+                rules.append("".join(buffer).strip())
+
+            validation_info[arg_name] = {"type": arg_type.strip(), "rules": [r for r in rules if r]}
+
+        return validation_info
+
+    def _perform_validation(self, validation_rules, arg_name, arg_value, param_type, all_args):
+        for rule in validation_rules:
+            rule = rule.strip()
+
+            if rule.startswith("lambda"):
+                if ":" not in rule:
+                    raise SyntaxError("\n\nMissing colon in lambda.\n")
+                lambda_body = rule.split(":", 1)[1].strip()
+                if not lambda_body:
+                    raise SyntaxError("\n\nLambda missing expression body.\n")
+                compiled = eval(rule, self.globals, {})
+                sig = inspect.signature(compiled)
+                params = list(sig.parameters.keys())
+                if not params:
+                    raise ValueError("\n\nLambda must take at least one parameter.\n")
+                missing = [p for p in params[1:] if p not in all_args]
+                if missing:
+                    raise ValueError(
+                        f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with missing parameter(s): `{'`, `'.join(missing)}`.\n"
+                    )
+                additional_params_values = [all_args[p] for p in params[1:]]
+                args = [arg_value] + additional_params_values
+                try:
+                    lambda_validation_result = compiled(*args)
+                except NameError as e:
+                    raise NameError(
+                        f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with missing parameter: {e}.\n"
+                    )
+                if not lambda_validation_result:
+                    additional_params_names_with_values = ", ".join(
+                        [f"`{p}`: {all_args[p]}" for p in params[1:]]
+                    )
+                    if len(additional_params_names_with_values):
+                        raise ValueError(
+                            f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with value `{arg_value}` and {additional_params_names_with_values}.\n"
+                        )
+                    else:
+                        raise ValueError(
+                            f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with value `{arg_value}`.\n"
+                        )
+
+            elif rule.startswith((">", "<", ">=", "<=")):
+                match = re.match(r"([>=<]+)\s*([\d.]+)", rule)
+                if not match:
+                    raise ValueError(f"\n\nInvalid validation rule format: {rule}.\n")
+                operator_part, threshold_str = match.groups()
+                try:
+                    if param_type:
+                        threshold = (
+                            param_type(float(threshold_str)) if param_type == int else param_type(threshold_str)
+                        )
+                    else:
+                        threshold = float(threshold_str)
+                except (ValueError, TypeError):
+                    raise ValueError(
+                        f"\n\nInvalid threshold value '{threshold_str}' for type {param_type if param_type else 'numeric'}.\n"
+                    )
+                if not isinstance(arg_value, (int, float)):
+                    raise TypeError(
+                        f"\n\n`{arg_name}` must be `int` or `float` for comparison, but got `{type(arg_value)}`.\n"
+                    )
+                if operator_part == ">=" and arg_value < threshold:
+                    raise ValueError(f"\n\n`{arg_name}` must be >= {threshold}, but got `{arg_value}`.\n")
+                elif operator_part == "<=" and arg_value > threshold:
+                    raise ValueError(f"\n\n`{arg_name}` must be <= {threshold}, but got `{arg_value}`.\n")
+                elif operator_part == ">" and arg_value <= threshold:
+                    raise ValueError(f"\n\n`{arg_name}` must be > {threshold}, but got `{arg_value}`.\n")
+                elif operator_part == "<" and arg_value >= threshold:
+                    raise ValueError(f"\n\n`{arg_name}` must be < {threshold}, but got `{arg_value}`.\n")
+
+            elif rule.startswith('"') and rule.endswith('"'):
+                allowed = [v.strip().strip('"') for v in validation_rules]
+                if str(arg_value) not in allowed:
+                    raise ValueError(f"\n\n`{arg_name}` must be one of {allowed}, but got `{arg_value}`.\n")
+                break
+
+            else:
+                raise ValueError(f"\n\nUnsupported validation rule: {rule} for `{arg_name}`.\n")
+
+    def _resolve_type(self, type_str):
+        """
+        If the type string isn’t a built-in type,
+        use exec to resolve it into a usable Python type.
+        """
+        # Try the default mapping first
+        t = self.default_type_mapping.get(type_str.lower())
+        if t is not None:
+            return t
+
+        # Otherwise, attempt to resolve the custom type.
+        local_namespace = {}
+        try:
+            # Now resolve the type using the updated self.globals
+            src = f"resolved_type = {type_str}"
+            exec(src, self.globals, local_namespace)
+
+            resolved_type = local_namespace["resolved_type"]
+            # Optionally, add it to the default mapping for future lookups.
+            self.default_type_mapping[type_str.lower()] = resolved_type
+            return resolved_type
+        except Exception as e:
+            raise ValueError(f"Could not resolve type '{type_str}'. Error: {e}")
+
+    def _validate_arguments(self, validation_info, bound_args, parameters):
+        for arg_name, arg_value in bound_args.items():
+            if arg_name in validation_info:
+                func_type = parameters[arg_name].annotation
+                doc_type_str = validation_info[arg_name]["type"]
+                rules = validation_info[arg_name]["rules"]
+
+                if func_type != inspect.Parameter.empty:
+                    effective_type = func_type
+                elif doc_type_str:
+                    # Use our helper to resolve the type
+                    effective_type = self.default_type_mapping.get(doc_type_str.lower())
+                    if effective_type is None:
+                        effective_type = self._resolve_type(doc_type_str)
+                else:
+                    effective_type = None
+
+                self._perform_validation(rules, arg_name, arg_value, effective_type, bound_args)
+
+    def _get_func_meta(self, func):
+        func_name = func.__name__
+
+        # Check if this is a method of a class
+        if hasattr(func, "__qualname__"):
+            qualified_name = func.__qualname__
+            if "." in qualified_name:
+                parts = qualified_name.split(".")
+                class_name = parts[0]
+                # If this is __init__, return just the class name
+                if func_name == "__init__":
+                    func_name = class_name
+                else:
+                    # Otherwise return "class:method" format
+                    func_name = f"{class_name}:{func_name}"
+
+        return (
+            func_name,
+            inspect.getsourcefile(func),
+            inspect.getsourcelines(func)[1],
+        )
+
+    def config(self, **imports):
+        def decorator(func):
+            @wraps(func)
+            def wrapper(*args, **kwargs):
+                if self.config_eval_on:
+                    func_name, file_path, line_number = self._get_func_meta(func)
+                    if func_name not in self._config:
+                        self._config[func_name] = {
+                            "meta": {"file": file_path, "line": line_number},
+                            "config": {},
+                        }
+                    elif not self.opencrate_init_done:
+                        config_kwargs = self._config[func_name]["config"]
+                        kwargs = {
+                            param_name: config_kwargs[param_name]["value"] for param_name in config_kwargs
+                        }
+                    sig = inspect.signature(func)
+                    bound_args = sig.bind(*args, **kwargs)
+                    bound_args.apply_defaults()
+                    validation_info = self._extract_validation_info(func.__doc__ or "")
+
+                    # Add provided imports to self.globals if missing.
+                    for module_as_name, module in imports.items():
+                        if module_as_name not in self.globals:
+                            self.globals[module_as_name] = module
+
+                    update_config = len(self._config[func_name]["config"]) == 0
+
+                    # Loop over parameters (skipping 'self') to check type consistency and enforce types.
+                    for param in sig.parameters.values():
+                        if param.name == "self":
+                            continue
+
+                        arg_name = param.name
+                        func_type = param.annotation
+                        doc_info = validation_info.get(arg_name, {})
+                        doc_type_str = doc_info.get("type")
+
+                        if not doc_type_str:
+                            print(f"Warning: No type information found for `{arg_name}` in docstring.")
+                            continue
+
+                        # If a type annotation exists, ensure it matches the docstring type.
+                        if func_type != inspect.Parameter.empty:
+                            doc_type = self.default_type_mapping.get(
+                                doc_type_str.lower()
+                            ) or self._resolve_type(doc_type_str)
+                            if doc_type != func_type:
+                                raise AssertionError(
+                                    f"\n\nType mismatch for `{arg_name}`: Annotation `{func_type}` vs Docstring `{doc_type_str}`.\n"
+                                )
+                            effective_type = func_type
+                        else:
+                            effective_type = self.default_type_mapping.get(
+                                doc_type_str.lower()
+                            ) or self._resolve_type(doc_type_str)
+
+                        arg_value = bound_args.arguments[arg_name]
+                        if effective_type and not isinstance(arg_value, effective_type):
+                            raise TypeError(
+                                f"\n\n`{arg_name}` must be `{effective_type}`, but got `{arg_value}` of type `{type(arg_value)}`.\n"
+                            )
+
+                        if update_config:
+                            self._config[func_name]["config"][arg_name] = {
+                                "value": arg_value,
+                                "type": effective_type,
+                                "rules": doc_info.get("rules", ""),
+                            }
+
+                    self._validate_arguments(validation_info, bound_args.arguments, sig.parameters)
+
+                    self.config_eval_on = (
+                        time.perf_counter() - self.config_eval_start
+                    ) < self.config_eval_timeout
+                return func(*args, **kwargs)
+
+            return wrapper
+
+        return decorator
+
+    def display(self, prefix_title: str = ""):
+        """
+        Prints the given configuration dictionary in a tree-like structure with nested branches
+        based on filenames and folder paths. The tree shows paths relative to the current working directory.
+        """
+        import os
+
+        console = Console()
+        file_tree = {}
+        base_dir = os.getcwd()
+
+        for name, details in self._config.items():
+            meta = details.get("meta", {})
+            file_path = meta.get("file", "N/A")
+            line_num = meta.get("line", "N/A")
+            config_data = details.get("config", {})
+
+            if file_path != "N/A":
+                # Convert to absolute path if it's not already
+                abs_path = os.path.abspath(file_path)
+
+                # Make path relative to current working directory
+                try:
+                    rel_path = os.path.relpath(abs_path, base_dir)
+                    # Split the relative path into components
+                    parts = [p for p in rel_path.split(os.sep) if p]
+
+                    # If path is outside the base directory, mark it clearly
+                    if rel_path.startswith(".."):
+                        first_part = "<external>"
+                        parts = [first_part] + parts[1:]  # Skip the '..'
+                except ValueError:
+                    # Handle paths on different drives (Windows)
+                    parts = ["<external>", os.path.basename(file_path)]
+
+                current = file_tree
+                # Build the tree structure for directories and file node
+                for part in parts[:-1]:
+                    current = current.setdefault(part, {})
+                file_node = parts[-1]
+                current.setdefault(file_node, []).append((name, line_num, config_data))
+            else:
+                file_tree.setdefault("N/A", []).append((name, line_num, config_data))
+
+        def add_nodes(rich_tree, subtree):
+            if isinstance(subtree, dict):
+                for key in sorted(subtree.keys()):
+                    branch = rich_tree.add(f"[bold]{key}[/bold]")
+                    add_nodes(branch, subtree[key])
+            elif isinstance(subtree, list):
+                for config_name, line_num, config_data in subtree:
+                    config_branch = rich_tree.add(f"[bold cyan]{config_name}[/bold cyan] (line: {line_num})")
+                    if config_data:
+                        for param, param_details in config_data.items():
+                            ptype = param_details.get("type", None)
+                            pvalue = param_details.get("value", None)
+                            type_name = ptype.__name__ if hasattr(ptype, "__name__") else str(ptype)
+                            config_branch.add(f"[bold blue]{param}[/bold blue] ({type_name}) = {pvalue}")
+
+        # Create the root tree and populate it with the file tree
+        root = Tree(f"\n{prefix_title}")
+        add_nodes(root, file_tree)
+        console.print(root)
+        print()
+
+    def write(self, filename, replace_config: bool = False):
+        """
+        Write a structured YAML configuration file using self._config.
+        The YAML file will contain all meta and config details.
+        """
+        # Prepare a serializable version of the configuration
+        config_yaml = {}
+
+        for comp_name, comp_details in self._config.items():
+            config_yaml[comp_name] = {}
+            # Include meta information directly.
+            config_yaml[comp_name]["meta"] = comp_details.get("meta", {})
+
+            # Process the configuration details
+            config_yaml[comp_name]["config"] = {}
+            for param, param_details in comp_details.get("config", {}).items():
+                # Make a shallow copy so as not to modify the original
+                param_copy = param_details.copy()
+                # Convert any type objects to their name (e.g. <class 'float'> -> "float")
+                t = param_copy.get("type")
+                if t and hasattr(t, "__name__"):
+                    param_copy["type"] = t.__name__
+                config_yaml[comp_name]["config"][param] = param_copy
+
+        # Write the structured dictionary to a YAML file
+        if replace_config:
+            os.makedirs("config", exist_ok=True)
+            with open(f"config/{filename}.yml", "w") as f:
+                yaml.safe_dump(config_yaml, f, default_flow_style=False, sort_keys=False, indent=4)
+                self.snapshot.debug(f"Updated configuration in: 'config/{filename}.yml'")
+
+        snapshot_config_path = self.snapshot._get_version_path("")
+        if not os.path.isdir(snapshot_config_path):
+            os.makedirs(snapshot_config_path)
+
+        with open(f"{snapshot_config_path}{filename}.yml", "w") as f:
+            yaml.safe_dump(config_yaml, f, default_flow_style=False, sort_keys=False, indent=4)
+            self.snapshot.debug(
+                f"Saved configuration to the snapshot version: '{snapshot_config_path}{filename}.yml'"
+            )
+
+    def read(self, filename, load_from_use_version=False):
+        """
+        Read a structured YAML configuration file using self._config.
+        The YAML file will contain all meta and config details.
+        """
+
+        if load_from_use_version:
+            with open(f"{self.snapshot.dir_path}/{filename}.yml", "r") as f:
+                config_yaml = yaml.safe_load(f)
+        else:
+            os.makedirs("config", exist_ok=True)
+            with open(f"config/{filename}.yml", "r") as f:
+                config_yaml = yaml.safe_load(f)
+
+        self._config = {}
+        for comp_name, comp_details in config_yaml.items():
+            self._config[comp_name] = {}
+            self._config[comp_name]["meta"] = comp_details.get("meta", {})
+            self._config[comp_name]["config"] = {}
+            for param, param_details in comp_details.get("config", {}).items():
+                param_copy = param_details.copy()
+                type_str = param_copy.get("type")
+                if type_str:
+                    param_copy["type"] = self.default_type_mapping.get(type_str, type_str)
+                self._config[comp_name]["config"][param] = param_copy
+
+        if load_from_use_version:
+            self.snapshot.debug(f"Loaded configuration from the snapshot version: {self.snapshot.version_name}")
+        else:
+            self.snapshot.debug(f"Loaded configuration from custom configuration file: 'config/{filename}.yml'")

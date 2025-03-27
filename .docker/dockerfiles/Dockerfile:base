@@ -7,6 +7,7 @@ ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 RUN apt update -y &&\
     apt upgrade -y &&\
     apt install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gcc wget curl vim git &&\
+    speedtest-cli iputils-ping &&\
     echo $TZ > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata
 
 RUN apt update -y &&\

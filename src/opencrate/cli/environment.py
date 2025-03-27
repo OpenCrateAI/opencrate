@@ -1,11 +1,17 @@
+import importlib.util
+import inspect
 import json
 import os
 import re
+import sys
+import traceback
+from typing import Optional
 
 import docker
-import docker.errors
 from rich.console import Console
 
+from ..core.configuration import Configuration
+from ..core.opencrate import OpenCrate
 from . import utils
 from .app import app
 
@@ -18,14 +24,12 @@ if os.path.exists(CONFIG_PATH):
         CONFIG = json.load(config_file)
 
 HELPERS = {
-    "build_image": lambda: console.print(
-        f"    [yellow]●[/yellow] Use `[bold blue]oc build[/bold blue]` to build the image"
-    ),
+    "build_image": lambda: console.print(f"● Use [bold yellow]$ oc build[/bold yellow] to build the image"),
     "start_container": lambda: console.print(
-        f"    [yellow]●[/yellow] Use `[bold blue]oc start[/bold blue]` to start the container"
+        f"● Use [bold yellow]$ oc start[/bold yellow] to start the container"
     ),
     "enter_container": lambda: console.print(
-        f"    [yellow]●[/yellow] Use `[bold blue]oc enter[/bold blue]` to enter the container"
+        f"● Use [bold yellow]$ oc enter[/bold yellow] to enter the container"
     ),
 }
 DOCKER_CLIENT = docker.from_env()
@@ -45,22 +49,22 @@ def stream_docker_logs(command, is_build=False):
             if is_build:
                 if "stream" in line:
                     clean_line = ansi_escape.sub("", line["stream"].rstrip())
-                    console.print(f"{clean_line}")
+                    console.print(f"[#919191]{clean_line}[/]")
                 elif "status" in line:
                     clean_line = ansi_escape.sub("", line["status"])
-                    console.print(f"{clean_line}")
+                    console.print(f"[#919191]{clean_line}[/]")
                 elif "error" in line:
                     raise Exception(f"{line['error']}")
             else:
                 stdout, stderr = line
                 if stdout:
                     clean_stdout = ansi_escape.sub("", stdout.decode("utf-8").strip())
-                    console.print(clean_stdout)
+                    console.print(f"[#919191]{clean_stdout}[/]")
                 if stderr:
                     clean_stderr = ansi_escape.sub("", stderr.decode("utf-8").strip())
                     console.print(clean_stderr, style="bold red")
     except Exception as e:
-        console.print(f"\n    >> [red]●[red] Operation failed: {e}", style="bold red")
+        console.print(f"\n⛌ [ERROR]: Build failed > {e}", style="bold red")
 
 
 @app.command()
@@ -70,7 +74,7 @@ def build():
     Build the OpenCrate baseline image.
     """
 
-    console.print(f"\n [blue]●[/blue] [[blue]Building[/blue]] > {CONFIG['title']}")
+    console.print(f"\n░▒▓█ [[bold]Building[/bold]] > {CONFIG['title']}\n")
     with utils.spinner(console, ">>"):
         stream_docker_logs(
             command=DOCKER_CLIENT.api.build(path=".", tag=CONFIG["docker_image"], rm=True, decode=True),
@@ -85,31 +89,31 @@ def start():
     Start the OpenCrate container.
     """
 
-    console.print(f"\n [blue]●[/blue] [[blue]Starting[/blue]] > {CONFIG['title']}")
+    console.print(f"\n░▒▓█ [[bold]Starting[/bold]] > {CONFIG['title']}\n")
     with utils.spinner(console, ">>"):
         try:
             DOCKER_CLIENT.images.get(CONFIG["docker_image"])
         except docker.errors.ImageNotFound:
-            console.print(f" [red]○[/red] Docker image not found")
+            console.print(f"⛌ [ERROR]: Docker image not found")
             HELPERS["build_image"]()
             return
 
         try:
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
             if container.status == "running":
-                console.print(f"    >> ● Container is already running!")
+                console.print(f"✔ Container is already running!")
                 HELPERS["enter_container"]()
                 return
             elif container.status == "exited":
                 container.start()
-                console.print(f"    >> ● Successfully restarted container!")
+                console.print(f"✔ Successfully restarted container!")
                 HELPERS["enter_container"]()
                 return
         except docker.errors.NotFound:
             pass
 
         utils.run_command(f"docker compose --project-name={CONFIG['name']} up {CONFIG['name']}_development -d")
-        console.print(f"    >> ● Created and started new container")
+        console.print(f"✔ Created and started new container")
         HELPERS["enter_container"]()
 
 
@@ -121,14 +125,14 @@ def stop(down: bool = False):
     """
 
     if not down:
-        console.print(f"\n [blue]●[/blue] [[blue]Stopping[/blue]] > {CONFIG['title']}")
+        console.print(f"\n░▒▓█ [[bold]Stopping[/bold]] > {CONFIG['title']}\n")
 
     with utils.spinner(console, ">>"):
         try:
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
             if container.status == "exited":
                 if not down:
-                    console.print(f" ● Container is already stopped")
+                    console.print(f"✔ Container is already stopped")
                     HELPERS["start_container"]()
                 else:
                     container.remove()
@@ -137,9 +141,13 @@ def stop(down: bool = False):
                 utils.run_command(
                     f"docker compose --project-name={CONFIG['name']} {'stop' if not down else 'down'}"
                 )
-                console.print(f"    >> ● Stopped container")
+                console.print(f"✔ Stopped container")
+                HELPERS["start_container"]()
         except docker.errors.NotFound:
-            console.print(f" [red]○[/red] Container {CONFIG['docker_container']} not found, skipping removal")
+            console.print(
+                f"⛌ [ERROR]: Container {CONFIG['docker_container']} not found",
+                style="bold red",
+            )
             if not down:
                 HELPERS["start_container"]()
 
@@ -151,7 +159,7 @@ def enter():
     Enter the OpenCrate container.
     """
 
-    console.print(f"\n [blue]●[/blue] [[blue]Entering[/blue]] > {CONFIG['title']}")
+    console.print(f"\n░▒▓█ [[bold]Entering[/bold]] > {CONFIG['title']}\n")
     try:
         container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
         if container.status == "running":
@@ -159,10 +167,10 @@ def enter():
                 "docker", ["docker", "exec", "-it", container.id, CONFIG["entry_command"]]  # type: ignore
             )
         else:
-            console.print(f" [red]○[/red] Container is not running")
+            console.print(f"⛌ [ERROR]: Container is not running")
             HELPERS["start_container"]()
     except docker.errors.NotFound:
-        console.print(f" [red]○[/red] Container not found")
+        console.print(f"⛌ [ERROR]: Container not found")
         HELPERS["start_container"]()
 
 
@@ -173,14 +181,14 @@ def commit(message: str):
     Commit changes to the OpenCrate container.
     """
 
-    console.print(f"\n [blue]●[/blue] [[blue]Committing[/blue]] > {CONFIG['title']}")
+    console.print(f"\n░▒▓█ [[bold]Committing[/bold]] > {CONFIG['title']}\n")
     with utils.spinner(console, ">>"):
         try:
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
             container.commit(repository=CONFIG["docker_image"], author=CONFIG["git_name"], message=message)
-            console.print(f"    >> ● Successfully updated changes!")
+            console.print(f"✔ Successfully updated changes!")
         except docker.errors.NotFound:
-            console.print(f" [red]○[/red] Container not found")
+            console.print(f"⛌ [ERROR]: Container not found")
             HELPERS["start_container"]()
 
         DOCKER_CLIENT.images.prune()
@@ -193,12 +201,12 @@ def reset():
     Reset the OpenCrate environment.
     """
 
-    console.print(f"\n [blue]●[/blue] [[blue]Resetting[/blue]] > {CONFIG['title']}")
+    console.print(f"\n░▒▓█ [[bold]Resetting[/bold]] > {CONFIG['title']}\n")
     try:
         stop(down=True)
         start()
     except Exception as e:
-        console.print(f" ⊝ [ERROR]: {e}")
+        console.print(f" ⛌ [ERROR]: {e}", style="bold red")
 
 
 @app.command()
@@ -207,16 +215,17 @@ def kill():
     """
     Kill the OpenCrate environment.
     """
-    console.print(f"\n [blue]●[/blue] [[blue]Killing[/blue]] > {CONFIG['title']}")
+    console.print(f"\n░▒▓█ [[bold]Killing[/bold]] > {CONFIG['title']}\n")
 
     stop(down=True)
     try:
         DOCKER_CLIENT.images.remove(CONFIG["docker_image"], force=True)
-        console.print(f"    >> ● Removed image {CONFIG['docker_image']}")
+        console.print(f"✔ Removed image {CONFIG['docker_image']}")
+        HELPERS["build_image"]()
     except docker.errors.ImageNotFound:
-        console.print(f" [red]○[/red] Image {CONFIG['docker_image']} not found, skipping removal")
+        console.print(f"⛌ [ERROR]: Image {CONFIG['docker_image']} not found", style="bold red")
     except Exception as e:
-        console.print(f" ⊝ [ERROR]: {e}")
+        console.print(f" ⛌ [ERROR]: {e}", style="bold red")
 
 
 @app.command()
@@ -228,7 +237,7 @@ def new():
 
     new_version = f"v{int(CONFIG['version'][1:]) + 1}"
     new_docker_image = f"{CONFIG['docker_image'].split(':')[0]}:{new_version}"
-    console.print(f"\n [blue]●[/blue] [[blue]Committing[/blue]] > {new_docker_image}")
+    console.print(f"\n░▒▓█ [[bold]Committing[/bold]] > {new_docker_image}")
     git_new_path = os.path.join(os.path.dirname(__file__), "bash", "git_new.sh")
 
     with utils.spinner(console, ">>"):
@@ -251,9 +260,9 @@ def new():
             container.commit(
                 repository=new_docker_image, author=CONFIG["git_name"], message=f"Release {CONFIG['version']}"
             )
-            console.print(f"    >> ● Successfully committed changes!")
+            console.print(f"✔ Successfully committed changes!")
         except docker.errors.NotFound:
-            console.print(f" [red]○[/red] Container not found")
+            console.print(f"⛌ [ERROR]: Container not found", style="bold red")
             HELPERS["start_container"]()
 
         CONFIG["version"] = new_version
@@ -277,80 +286,241 @@ def status():
     Display the status of the OpenCrate environment.
     """
 
-    console.print(f"\n [blue]●[/blue] [[blue]Status[/blue]] > {CONFIG['title']}\n")
-    console.print(f" ● Task:\t{CONFIG['task']}")
-    console.print(f" ● Framework:\t{CONFIG['framework']}")
-    console.print(f" ● Python:\t{CONFIG['python_version']}")
-    console.print(f" ● Version:\t{CONFIG['version']}")
+    console.print(f"\n░▒▓█ [[bold]Status[/bold]] > {CONFIG['title']}\n")
+    console.print(f"- Task:\t{CONFIG['task']}")
+    console.print(f"- Framework:\t{CONFIG['framework']}")
+    console.print(f"- Python:\t{CONFIG['python_version']}")
+    console.print(f"- Version:\t{CONFIG['version']}")
     print()
 
     try:
         image = DOCKER_CLIENT.images.get(CONFIG["docker_image"])
-        console.print(f" ● Image name:\t{', '.join(image.tags)}")
-        console.print(f" ● Image Size:\t{image.attrs['Size'] / (1024 ** 2):.2f} MB")
-        console.print(f" ● Image ID:\t{image.id}")
+        console.print(f"- Image name:\t{', '.join(image.tags)}")
+        console.print(f"- Image Size:\t{image.attrs['Size'] / (1024 ** 2):.2f} MB")
+        console.print(f"- Image ID:\t{image.id}")
         print()
     except docker.errors.ImageNotFound:
-        console.print(f" ● Image {CONFIG['docker_image']} [bold red]not found[/bold red]")
+        console.print(f"- Image {CONFIG['docker_image']} [bold red]not found[/bold red]")
         HELPERS["build_image"]()
         print()
     except Exception as e:
-        console.print(f" ● [ERROR] with docker image: {e}")
+        console.print(f"[ERROR] > Extracting image info: {e}", style="bold red")
         print()
 
     try:
         container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
-        console.print(f" ● Container Name:\t{container.name}")
-        console.print(f" ● Container Status:\t{container.status}")
-        console.print(f" ● Container ID:\t{container.id}")
+        console.print(f"- Container Name:\t{container.name}")
+        console.print(f"- Container Status:\t{container.status}")
+        console.print(f"- Container ID:\t{container.id}")
         print()
     except docker.errors.NotFound:
-        console.print(f" ● Container {CONFIG['docker_container']} [bold red]not found[/bold red]")
+        console.print(f"- Container {CONFIG['docker_container']} [bold red]not found[/bold red]")
         HELPERS["start_container"]()
         print()
     except Exception as e:
-        console.print(f" ● [ERROR] with docker container: {e}")
+        console.print(f"[ERROR] > Extracting container info: {e}", style="bold red")
         print()
 
     try:
         git_remote_url = utils.run_command("git ls-remote --get-url origin", ignore_error=True)
         git_last_commit_date = utils.run_command("git log -1 --format=%cd", ignore_error=True)
         git_pull_requests_count = utils.run_command("git log --merges --oneline | wc -l", ignore_error=True)
-        console.print(f" ● Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}")
-        console.print(f" ● Last Commit Date:\t{git_last_commit_date}")
-        console.print(f" ● Pull Requests Count:\t{git_pull_requests_count}")
+        console.print(f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}")
+        console.print(f"- Last Commit Date:\t{git_last_commit_date}")
+        console.print(f"- Pull Requests Count:\t{git_pull_requests_count}")
     except Exception as e:
-        console.print(f" ● [ERROR] with git: {e}")
+        console.print(f"[ERROR] > Extracting git info: {e}", style="bold red")
         print()
 
 
 @app.command()
 @utils.handle_exceptions(console)
-def launch(script: str):
+def finetune(
+    script: str,
+    start: str = "new",
+    tag: Optional[str] = None,
+    config_custom: bool = False,
+    config_default: bool = False,
+    replace: bool = False,
+    finetune: Optional[str] = None,
+    finetune_tag: Optional[str] = None,
+    log_level: str = "info",
+):
     """
-    Launch a specific command script from the ./src folder.
+    Finetune the OpenCrate environment.
     """
+    console.print(f"\n░▒▓█ [[bold]Finetuning[/bold]] > {CONFIG['title']}\n")
 
+
+@app.command()
+@utils.handle_exceptions(console)
+def launch(
+    script: str,
+    start: str = "new",
+    tag: Optional[str] = None,
+    config_custom: bool = False,
+    config_default: bool = False,
+    replace: bool = False,
+    finetune: Optional[str] = None,
+    finetune_tag: Optional[str] = None,
+    log_level: str = "info",
+):
+    """
+    Launch a specific OpenCrate module from the scripts in the ./src folder.
+
+    Args:
+        script (str): Name of the script to be launched
+        start (str): Start a new version or use the latest version
+        tag (str): Tag for the script
+        config_custom (bool): Use a custom configuration
+        config_default (bool): Use the default configuration
+        replace (bool): Replace the existing version
+        finetune (str): Finetune the model
+        finetune_tag (str): Tag for the finetuned model
+        log_level (str): Logging level
+
+    Raises:
+        - AssertionError: If the script file is not found
+        - AssertionError: If both `config_custom` and `config_default` flags are set
+        - AssertionError: If `finetune` is set with `start` flag other than `new`
+        - ImportError: If the script module cannot be imported
+        - Exception: If the script execution fails
+        - KeyboardInterrupt: If the script execution is interrupted
+    """
     if not CONFIG:
         console.print("[red]Configuration not loaded. Exiting.[/red]")
         return
 
-    is_exited = False
+    # if use_version != "new":
+    #     assert (
+    #         use_config == "default"
+    #     ), f"\n\nCannot set `--use-config` to `custom` when `--use-version` is set to `{use_version}`, they are mutually exclusive. If you want to use custom config, then you must set `--use-config=custom`, and not set `--use-version` which will consider `--use-version=new` and create a new version. And if you want to use the config from version `{use_version}`, then you must not set the `--use-config`.\n"
+    # is_exited = False
+    # try:
+    #     container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
+    #     if container.status == "exited":
+    #         is_exited = True
+    #         container.start()
+    # except docker.errors.NotFound:  # type: ignore
+    #     start()
+    #     container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
+
+    # Check if the script exists
+    import opencrate as oc
+
+    local_script_path = f"./{script}.py"
+    if not os.path.isfile(local_script_path):
+        console.print(f"\n⛌ [ERROR]: Script {script}.py not found.\n", style="bold red")
+        exit(1)
+    console.print(f"\n░▒▓█ [[bold]Launching[/bold]] > {script}")
+
+    if config_custom and config_default:
+        console.print(
+            f"\n⛌ [ERROR]: Cannot set both `--config_custom` and `--config_default` flags.\n",
+            style="bold red",
+        )
+        exit(1)
+
+    if (not config_custom) and (not config_default):
+        use_config = "latest"
+    else:
+        use_config = "custom" if config_custom else "default"
+
+    if finetune is not None:
+        if not (start == "new"):
+            console.print(
+                f"\n⛌ [ERROR]: Cannot set `--finetune` with `--start={start}`. If you want to finetune, then you must set `--start=new`.\n",
+                style="bold red",
+            )
+            exit(1)
+
+    # Dynamically import the script module
     try:
-        container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
-        if container.status == "exited":
-            is_exited = True
-            container.start()
-    except docker.errors.NotFound:  # type: ignore
-        start()
-        container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
+        # First, make sure the script's directory is in the Python path
+        script_dir = os.path.dirname(os.path.abspath(local_script_path))
+        if script_dir not in sys.path:
+            sys.path.insert(0, script_dir)
 
-    assert os.path.isfile(f"./{script}.py"), f"Script {script}.py not found in ./src"
-    script_path = os.path.join("/home/workspace", f"{script}.py")
-    command = f"python{CONFIG['python_version']} {script_path}"
-    console.print(f"\n [blue]●[/blue] [[blue]Launching[/blue]] > {script}.py")
-    result = container.exec_run(command, stream=True, demux=True)
-    stream_docker_logs(result.output)
+        # Import the module
+        module_name = os.path.basename(script).replace(".py", "")
+        spec = importlib.util.spec_from_file_location(module_name, local_script_path)
+        if spec is None:
+            raise ImportError(f"Cannot import module {module_name}")
+        module = importlib.util.module_from_spec(spec)
+        if spec.loader is not None:
+            spec.loader.exec_module(module)
+        else:
+            raise ImportError(f"Cannot load module {module_name}")
 
-    if is_exited:
-        container.stop()
+        # Find classes in the module that inherit from OpenCrate
+        crate_classes = []
+        for name, obj in inspect.getmembers(module):
+            if inspect.isclass(obj) and issubclass(obj, OpenCrate) and obj != OpenCrate:
+                crate_classes.append(obj)
+
+        if not crate_classes:
+            console.print("⛌ [ERROR]: No OpenCrate module found in the script.", style="bold red")
+            # Fall back to running the script in the container
+        else:
+            # If multiple classes are found, use the first one
+            crate_class = crate_classes[0]
+            # console.print(
+            #     f"[blue]●[/blue] [[bold blue]Initializing[/bold blue]] > [bold white]{crate_class.__name__}[/bold white]"
+            # )
+
+            # Instantiate the class
+            crate_class.use_config = use_config
+            crate_class.start = start
+            crate_class.tag = tag
+            crate_class.replace = replace
+            crate_class.log_level = log_level
+            crate_class.finetune = finetune
+            crate_class.finetune_tag = finetune_tag
+            crate_instance = crate_class()
+            try:
+                crate_instance()
+            except KeyboardInterrupt:
+                crate_instance.snapshot.debug("⛌ [ERROR]: Launch interrupted by user, exiting...")
+                crate_instance.save_checkpoint()
+            return
+
+    except Exception as e:
+        e = str(e).replace("\n", "")
+        if oc.snapshot._setup_not_done:
+            console.print(f"⛌ [ERROR]: {traceback.format_exc()}", style="bold red")
+        else:
+            oc.snapshot.exception(f"{e}")
+
+    # # If we're here, either the direct import failed or no OpenCrate classes were found
+    # # Fall back to the original execution method in the Docker container
+    # script_path = os.path.join("/home/workspace", f"{script}.py")
+    # command = f"python{CONFIG['python_version']} {script_path}"
+    # result = container.exec_run(command, stream=True, demux=True)
+    # stream_docker_logs(result.output)
+
+    # if is_exited:
+    #     container.stop()
+
+
+@app.command()
+@utils.handle_exceptions(console)
+def snapshot(name: str, reset: bool = False, show: bool = False):
+    """
+    Create a snapshot of the OpenCrate environment.
+    """
+
+    import opencrate as oc
+
+    console.print(f"\n░▒▓█ [[bold]Snapshot[/bold]] > {CONFIG['title']}\n")
+    if reset:
+        console.print(f"✔ Resetting {name} snapshot")
+        oc.snapshot.snapshot_name = name
+        oc.snapshot.reset(confirm=True)
+
+    if show:
+        console.print(f"✔ Showing {name} snapshot")
+
+        # TODO: Implement `oc snapshot train --tag`
+        console.print(f"✔ Showing {name} snapshot")
+
+    # TODO: Implement `oc snapshot train --tag`

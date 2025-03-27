@@ -1,10 +1,75 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=61.0.0", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[project]
+name = "opencrate"
+description = "Democratizing AI by simplifing DX for everyone"
+authors = [
+    {name = "Rishik C. Mourya", email = "braindotai@gmail.ai"}
+]
+version = "0.1.0"
+license = {text = "MIT"}
+requires-python = ">=3.5"
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3 :: Only",
+    "Programming Language :: Python :: 3.5",
+    "Programming Language :: Python :: 3.6",
+    "Programming Language :: Python :: 3.7",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11", 
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13"
+]
+dependencies = [
+    "pydantic_settings",
+    "prompt-toolkit",
+    "questionary",
+    "ipywidgets",
+    "matplotlib",
+    "numpy",
+    "opencv-python-headless",
+    "rich",
+    "typer",
+    "loguru",
+    "docker",
+    "jinja2",
+    "imageio",
+    "requests",
+    "pyyaml",
+    "lovelyplots"
+]
+
+[project.optional-dependencies]
+dev = [
+    "tox",
+    "flake8",
+    "mypy",
+    "black",
+    "pytest",
+    "pytest-cov",
+    "types-requests",
+    "torch"
+]
+
+[project.scripts]
+oc = "opencrate.cli.main:app"
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+zip-safe = false
+license-files = ["LICENCE"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+include = ["opencrate", "opencrate.*"]
 
 [tool.black]
 line-length = 112
-target-version = ['py37', 'py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py34', 'py35', 'py36', 'py37', 'py38', 'py39', 'py310', 'py311', 'py312', 'py313']
 exclude = '''
 /(
     \.git
@@ -21,3 +86,28 @@ exclude = '''
     | __pycache__
 )/
 '''
+
+[tool.flake8]
+exclude = ".git, __pycache__, build, dist, .mypy_cache, .tox, .venv"
+max-line-length = 112
+extend-ignore = ["E203", "W503", "F541", "E722", "E501"]
+
+[tool.mypy]
+exclude = ".git, __pycache__, build, dist, .mypy_cache, .tox, .venv"
+warn_return_any = false
+warn_unused_configs = true
+ignore_missing_imports = true
+check_untyped_defs = true
+disallow_any_generics = true
+disallow_untyped_calls = false
+disallow_untyped_defs = false
+no_implicit_optional = true
+show_error_codes = true
+strict_equality = true
+warn_redundant_casts = true
+warn_unreachable = true
+no_implicit_reexport = false
+
+[tool.pytest.ini_options]
+addopts = "--verbose --cov=opencrate --cov-report=term-missing --color=yes -vv"
+testpaths = ["tests"]

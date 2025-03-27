@@ -1,13 +1,30 @@
-# __{{name}}__
+<div align="center">
+
+# <img src=".opencrate/assets/logo.svg" width="4%"> __{{title}}__
 
 {{description}}
 
-## __Setup Guide__
+</div>
 
-Here is the converted table in READ.md format:
 
-**Setup Guide**
+## __🛠 Configuration__
 
-| **Datatypes** | **Task** | **Framework** | **Logging** | **Python Version** | **Docker Image** |
-| --- | --- | --- | --- | --- | --- |
-| {{datatypes}} | {{task}} | {{framework}} | {{logging}} | {{python_version}} | {{docker_image}} |
+| **Config** | **Value** |
+| --- | --- |
+| ⏳ Version | {{version}} |
+| 🗃️ Datatypes | {{datatypes}} |
+| 🎯 Task | {{task}} |
+| 🔥 Framework | {{framework}} |
+| 🖇 Logging | {{logging}} |
+| 🐍 Python Version | {{python_version}} |
+| 🐋 Docker Image | {{docker_image}} |
+| 🖥 Runtime | {{runtime}} |
+
+## __📥  Installation__
+
+```
+$ git clone {{git_remote_url}} && cd {{name}}
+$ oc build
+$ oc start
+$ oc enter
+```

@@ -2,6 +2,7 @@ torch
 torchvision
 torchtext
 torchaudio
+torchdata
 
 --extra-index-url https://pypi.org/simple
 torchinfo

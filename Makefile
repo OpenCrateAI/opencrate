@@ -19,31 +19,29 @@ check_python = \
     fi; \
     export python_version=$${python_version}
 
-# install:
-# 	@$(check_python)
-# 	@python$${python_version} -m pip install --upgrade pip
-# 	@python$${python_version} -m pip install -e . --no-cache-dir
-# 	@oc --install-completion || true
 
-install:
+build-opencrate:
 	@$(check_python)
-	@echo "Using Python version: $${python_version}"
-	@python$${python_version} -m pip install --upgrade pip
-	@python$${python_version} -m pip install -e .[dev] --no-cache-dir
-	@oc --install-completion || true
-	@for version in 3.7.17 3.8 3.9 3.11 3.12 3.13; do \
-		if ! pyenv versions --bare | grep -q "^$$version$$"; then \
-			pyenv install $$version; \
-			python$$version -m pip install --upgrade pip; \
-		fi; \
-	done
-	@pyenv local 3.8 3.9 3.11 3.12 3.13
+	@python$${python_version} .docker/dockerfile.py --python=$${python:-3.10} --runtime=$${runtime:-cuda}
 
-enter:
-	@$(git-creds)
+build-opencrate-all:
+	@$(check_python)
+	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
+        for runtime in cuda cpu; do \
+            python$${python_version} .docker/dockerfile.py --python=$$python --runtime=$$runtime; \
+        done \
+    done
+
+build:
+	@docker build -t opencrate-dev:latest .
+
+start:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
 	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
-	@docker compose up opencrate_dev -d && docker exec -it opencrate_dev zsh
+	@docker compose up opencrate_dev -d
+
+enter:
+	@docker exec -it opencrate_dev zsh
 
 stop:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
@@ -54,6 +52,21 @@ kill:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
 	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
 	@docker compose down
+
+install:
+	@$(check_python)
+	@echo "Using Python version: $${python_version}"
+	@python$${python_version} -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir
+	@python$${python_version} -m pip install -e .[dev] --root-user-action=ignore --no-cache-dir
+	@PYTHON_VERSIONS="3.5 3.6 3.7 3.8 3.9 3.11 3.12 3.13"; \
+	echo "Installing Python versions: $$PYTHON_VERSIONS"; \
+	for version in $$PYTHON_VERSIONS; do \
+		if ! pyenv versions --bare | grep -q "^$$version\\."; then \
+			pyenv install $$version; \
+		fi; \
+	done; \
+	pyenv local $$PYTHON_VERSIONS
+	echo "\nDone installing the package with development environment and dependencies"
 
 test-pytest:
 	@PYTHONPATH=src pytest
@@ -72,34 +85,23 @@ test: test-pytest test-black test-flake8 test-mypy
 test-all:
 	@tox
 
-build:
-	@$(check_python)
-	@python$${python_version} .docker/dockerfile.py --python=$(if $${python_version},$${python_version},3.10) --runtime=$(if $${runtime},$${runtime},cuda)
-
-build-all:
-	@$(check_python)
-	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
-        for runtime in cuda cpu; do \
-            python$${python_version} .docker/dockerfile.py --python=$$python --runtime=$$runtime; \
-        done \
-    done
-
-build-dev:
-	@docker build -t opencrate-dev:latest .
 
 help:
 	@echo "Usage: make [target]"
 	@echo ""
 	@echo "Targets:"
-	@echo "  install    	 Install the package with development environment and dependencies"
-	@echo "  enter      	 Enter the development container"
-	@echo "  test-pytest    Run pytest - for unit tests"
-	@echo "  test-black     Run black - for code formatting"
-	@echo "  test-flake8    Run flake8 - for linting"
-	@echo "  test-mypy      Run mypy - for static type checking"
-	@echo "  test           Run all tests - pytest, black, flake8, mypy"
-	@echo "  test-all       Run all tests with tox for multiple Python versions - pytest, black, flake8, mypy"
-	@echo "  build          Build the Docker image with the specified Python version and runtime"
-	@echo "  build-all      Build all Docker images for all supported Python versions and runtimes"
-	@echo "  build-dev      Build the development Docker image"
-	@echo "  help           Show this help message"
+	@echo "  install         Install the package with development environment and dependencies"
+	@echo "  build           Build the Docker image (opencrate-dev:latest)"
+	@echo "  build-opencrate Build OpenCrate Docker image with specified Python and runtime"
+	@echo "  build-opencrate-all Build all OpenCrate Docker images for all supported Python versions and runtimes"
+	@echo "  start           Start the development container"
+	@echo "  enter           Enter the development container"
+	@echo "  stop            Stop the development container"
+	@echo "  kill            Remove the development container"
+	@echo "  test-pytest     Run pytest - for unit tests"
+	@echo "  test-black      Run black - for code formatting"
+	@echo "  test-flake8     Run flake8 - for linting"
+	@echo "  test-mypy       Run mypy - for static type checking"
+	@echo "  test            Run all tests - pytest, black, flake8, mypy"
+	@echo "  test-all        Run all tests with tox for multiple Python versions"
+	@echo "  help            Show this help message"

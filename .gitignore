@@ -1,6 +1,7 @@
 .history
 .venv
 tests/cli
+tests/pipelines
 # Byte-compiled / optimized / DLL files
 *__pycache__*
 *.py[cod]

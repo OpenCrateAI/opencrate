@@ -48,6 +48,8 @@ class TestCoreSnapshot:
         self.setup_test_list_no_tags()
         tags = self.snapshot.list_tags(return_tags=True)
         assert tags == []
+        tags = self.snapshot.list_tags()
+        assert tags is None
 
     def setup_test_list_with_tags(self):
         self.snapshot = Snapshot()
@@ -58,6 +60,8 @@ class TestCoreSnapshot:
 
     def test_list_with_tags(self):
         self.setup_test_list_with_tags()
+        with pytest.raises(ValueError, match=r"`return_tags` must be a boolean, but received"):
+            tags = self.snapshot.list_tags(return_tags="wrong_argument")  # type: ignore
         tags = self.snapshot.list_tags(return_tags=True)
         assert tags == ["test_tag1", "test_tag2", "test_tag3"]
 
@@ -147,6 +151,7 @@ class TestCoreSnapshot:
             self.snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
         self.snapshot.figure(np.random.rand(100, 100, 3), "image.png")
         self.snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        self.snapshot.bias(np.random.rand(100, 100, 3), "bias.png")
         if _has_torch:
             assert self.snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
                 "snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth"
@@ -156,6 +161,9 @@ class TestCoreSnapshot:
         )
         assert self.snapshot.path.random("random.png") == os.path.join(
             "snapshots", "test_snapshot", "v0", "randoms", "random.png"
+        )
+        assert self.snapshot.path.bias("bias.png") == os.path.join(
+            "snapshots", "test_snapshot", "v0", "biases", "bias.png"
         )
 
     def setup_test_asset_path_access_with_tags(self):
@@ -392,6 +400,93 @@ class TestCoreSnapshot:
             assert "This is a critical message" in log_content
             assert "This is a success message" in log_content
             assert "This is an exception message" in log_content
+
+    def setup_test_logging_without_setup(self):
+        self.snapshot = Snapshot()
+        self.snapshot._config_dir = self.test_root_dir
+
+    def test_logging_without_setup(self):
+        self.setup_test_logging_without_setup()
+        self.snapshot.debug("This is a debug message")
+        snapshot_name = self.snapshot.snapshot_name
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is a debug message" in log_content
+
+        self.snapshot.reset(confirm=True)
+        self.snapshot.version = None
+        self.snapshot.snapshot_name = ""
+        self.snapshot._setup_not_done = True
+        self.snapshot.info("This is an info message")
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is an info message" in log_content
+
+        self.snapshot.reset(confirm=True)
+        self.snapshot.version = None
+        self.snapshot.snapshot_name = ""
+        self.snapshot._setup_not_done = True
+        self.snapshot.warning("This is a warning message")
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is a warning message" in log_content
+
+        self.snapshot.reset(confirm=True)
+        self.snapshot.version = None
+        self.snapshot.snapshot_name = ""
+        self.snapshot._setup_not_done = True
+        self.snapshot.error("This is an error message")
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is an error message" in log_content
+
+        self.snapshot.reset(confirm=True)
+        self.snapshot.version = None
+        self.snapshot.snapshot_name = ""
+        self.snapshot._setup_not_done = True
+        self.snapshot.critical("This is a critical message")
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is a critical message" in log_content
+
+        self.snapshot.reset(confirm=True)
+        self.snapshot.version = None
+        self.snapshot.snapshot_name = ""
+        self.snapshot._setup_not_done = True
+        self.snapshot.success("This is a success message")
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is a success message" in log_content
+
+        self.snapshot.reset(confirm=True)
+        self.snapshot.version = None
+        self.snapshot.snapshot_name = ""
+        self.snapshot._setup_not_done = True
+        self.snapshot.exception("This is a exception message")
+        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
+        assert log_file_path == self.snapshot.log_path
+        assert os.path.isfile(log_file_path)
+        with open(log_file_path, "r") as log_file:
+            log_content = log_file.read()
+            assert "This is a exception message" in log_content
 
     def setup_test_history_logging(self):
         self.snapshot = Snapshot()

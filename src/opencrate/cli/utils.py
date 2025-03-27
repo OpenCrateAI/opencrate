@@ -38,6 +38,8 @@ def handle_exceptions(console: Console) -> Callable[[Any], Any]:
         def wrapper(*args, **kwargs):
             if os.path.exists(".opencrate/config.json"):
                 return func(*args, **kwargs)
+            elif func.__name__ == "init":
+                return func(*args, **kwargs)
             else:
                 console.print(f" ⊝ [ERROR]: This is not a OpenCrate project directory", style="bold red")
                 sys.exit(1)

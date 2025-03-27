@@ -2,6 +2,7 @@
     "python.analysis.autoImportCompletions": true,
     "python.analysis.typeCheckingMode": "standard",
     "github.copilot.advanced": {
+        "authProvider": "github",
         "indexWorkspace": true
     },
     "python.testing.pytestArgs": [

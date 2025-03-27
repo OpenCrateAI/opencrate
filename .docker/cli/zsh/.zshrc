@@ -113,7 +113,3 @@ eval "$(zoxide init zsh)"
 
 . "$HOME/.atuin/bin/env"
 eval "$(atuin init zsh)"
-
-export PYENV_ROOT="$HOME/.pyenv"
-[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init - bash)"

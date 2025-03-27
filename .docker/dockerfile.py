@@ -28,6 +28,8 @@ UBUNTU_POST_INSTALLATION = [
             "curl",
             "vim",
             "git",
+            "speedtest-cli",
+            "iputils-ping",
         ],
         pre_installation_steps=[
             "apt update -y",

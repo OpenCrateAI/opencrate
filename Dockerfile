@@ -6,8 +6,9 @@ ENV TZ=Asia/Kolkata
 ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 RUN apt update -y && \
-    apt install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gcc wget curl vim git && \
+    apt install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gcc wget curl vim git speedtest-cli iputils-ping && \
     echo $TZ > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata && \
+    git config --global init.defaultBranch main && \
     apt install -y --no-install-recommends fontconfig btop unrar make tree htop bat tldr zoxide cpufetch jq nvtop && \
     mkdir -p /etc/apt/keyrings && \
     wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg && \
@@ -27,11 +28,12 @@ RUN apt update -y && \
     curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh && \
     mkdir -p ~/.config/btop/ ~/.config/atuin/ ~/.config/fastfetch/ ~/.local/share/fonts && \
     fc-cache -f -v && \
-    apt upgrade -y
+    # install docker
+    curl -fsSL https://get.docker.com | sh && \
+    usermod -aG docker root
 
 # Stage 2: Copy configuration files
 FROM base AS config
-
 COPY .docker/cli/ /root/
 COPY .docker/fonts/ /root/
 COPY .docker/hooks/ /root/.hooks/
@@ -44,7 +46,8 @@ RUN mv /root/zsh/.zshrc /root/.zshrc && \
     cp -r /root/atuin/ ~/.config/ && \
     cp -r /root/fastfetch/ ~/.config/ && \
     cp /root/*ttf ~/.local/share/fonts/ && \
-    rm -rf /root/zsh/ /root/*ttf
+    rm -rf /root/zsh/ /root/*ttf && \
+    echo '\n# PyEnv Configuration\nexport PYENV_ROOT="$HOME/.pyenv"\n[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"\neval "$(pyenv init - zsh)"\n' >> /root/.zshrc
 
 # Stage 3: Install Python and PyEnv
 FROM base AS python
@@ -53,10 +56,7 @@ RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt update -y && \
     apt install -y --no-install-recommends python3.10-distutils python3.10-dev python3.7-dev && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10 && \
-    apt install -y python3.7-distutils && \
-    curl -sS https://bootstrap.pypa.io/pip/3.7/get-pip.py | python3.7 && \
-    python3.10 -m pip install --upgrade pip --root-user-action=ignore && \
-    python3.7 -m pip install --upgrade pip --root-user-action=ignore && \
+    python3.10 -m pip install --upgrade pip docker rich --root-user-action=ignore && \
     curl -fsSL https://pyenv.run | bash
 
 # Final stage: Combine everything

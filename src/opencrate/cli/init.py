@@ -5,7 +5,7 @@ from shutil import copy, copytree, rmtree
 
 import questionary
 from rich.console import Console
-from rich.table import Table
+from rich.tree import Tree
 
 from . import utils
 from .app import app
@@ -87,40 +87,47 @@ def safe_prompt(prompt_func):
 def prompt_project_details():
     project_title = safe_prompt(
         lambda: questionary.text(
-            "● Project Name:",
+            "📦 Project Name:",
             qmark="",
-            validate=lambda text: True if len(text) > 0 else "Please enter Project Name, can't be empty.",
+            validate=lambda text: True if len(text) > 0 else "❌ Please enter Project Name, can't be empty.",
         ).ask()
     )
     project_name = project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
 
-    overwrite = True
-
-    if os.path.exists(project_name):
-        if not questionary.confirm(
-            f"● OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
-            qmark="",
-        ).ask():
-            sys.exit(0)
-
     project_description = safe_prompt(
-        lambda: questionary.text("● Give a brief description of your project:", multiline=True, qmark="").ask()
+        lambda: questionary.text("💬 Give a brief description of your project:", multiline=True, qmark="").ask()
     )
 
     project_datatypes = safe_prompt(
         lambda: questionary.checkbox(
-            "● Select the types of datasets you're gonna be dealing with:",
+            "🏷️ Select the types of datasets you're gonna be dealing with:",
             choices=[
                 {"name": f"{data_type}", "value": data_type, "checked": data_type == "Image"}
                 for data_type in DATATYPES
             ],
             qmark="",
-        ).ask()
+            validate=lambda x: True if len(x) > 0 else "❌ Please select at least one datatype",
+        ).ask(),
     )
+
+    if len(project_datatypes) == 0:
+        while len(project_datatypes) == 0:
+            console.print("\n❌ Please select at least one datatype")
+            project_datatypes = safe_prompt(
+                lambda: questionary.checkbox(
+                    "🏷️ Select the types of datasets you're gonna be dealing with:",
+                    choices=[
+                        {"name": f"{data_type}", "value": data_type, "checked": data_type == "Image"}
+                        for data_type in DATATYPES
+                    ],
+                    qmark="",
+                    validate=lambda x: True if len(x) > 0 else "❌ Please select at least one datatype",
+                ).ask(),
+            )
 
     project_task = safe_prompt(
         lambda: questionary.select(
-            f"● Select the specific task for your {' '.join(project_datatypes)} data type:",
+            f"🎯 Select the specific task for your {' '.join(project_datatypes)} data type:",
             choices=[task for datatype in project_datatypes for task in DATATYPE_TASKS[datatype]],
             qmark="",
         ).ask()
@@ -128,7 +135,7 @@ def prompt_project_details():
 
     project_framework = safe_prompt(
         lambda: questionary.select(
-            "● Select pre-baked opencrate containers for your framework:",
+            "🛠️ Select pre-baked opencrate containers for your framework:",
             choices=[{"name": f"{framework}", "value": framework} for framework in ML_FRAMEWORKS],
             qmark="",
             default={"name": f"{'PyTorch'}", "value": "PyTorch"},
@@ -137,7 +144,7 @@ def prompt_project_details():
 
     project_logging = safe_prompt(
         lambda: questionary.select(
-            "● Select your logging framework of choice:",
+            "📜 Select your logging framework of choice:",
             choices=[{"name": f"{framework}", "value": framework} for framework in LOGGING_FRAMEWORKS.keys()],
             qmark="",
             default={"name": f"{'WandB'}", "value": "WandB"},
@@ -146,7 +153,7 @@ def prompt_project_details():
 
     project_python_version = safe_prompt(
         lambda: questionary.select(
-            "● Select your python environment version:",
+            "🐍 Select your python environment version:",
             choices=[{"name": f"{version}", "value": f"{version}"} for version in PYTHON_VERSIONS],
             qmark="",
             default={"name": "3.10", "value": "3.10"},
@@ -155,7 +162,7 @@ def prompt_project_details():
 
     project_runtime = safe_prompt(
         lambda: questionary.select(
-            "● Select your runtime environment:",
+            "⚡ Select your runtime environment:",
             choices=[{"name": "CUDA", "value": "cuda"}, {"name": "CPU", "value": "cpu"}],
             qmark="",
             default={"name": "CUDA", "value": "cuda"},
@@ -165,7 +172,7 @@ def prompt_project_details():
     if project_runtime == "cuda" and project_framework == "PyTorch":
         project_framework_runtime = safe_prompt(
             lambda: questionary.select(
-                "● Select your cuda driver version",
+                "🟢 Select your cuda driver version",
                 choices=[
                     {"name": "CUDA 12.4 [Latest]", "value": "12.4"},
                     {"name": "CUDA 12.1", "value": "12.1"},
@@ -183,24 +190,30 @@ def prompt_project_details():
 
     if not safe_prompt(
         lambda: questionary.confirm(
-            "● Initialize project in current directory?",
+            "❓ Initialize project in current directory?",
             qmark="",
         ).ask()
     ):
         project_dir = os.path.join(
-            questionary.path("● Enter the path to the root project directory:", qmark="").ask(),
+            questionary.path("⌨️ Enter the path to the root project directory:", qmark="").ask(),
             project_name,
         )
     else:
         project_dir = project_name
 
-    git_remote_url = safe_prompt(lambda: questionary.path("● Set Git Remote URL:", qmark="", default="").ask())
+    if os.path.exists(project_dir):
+        if not questionary.confirm(
+            f"❓ OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
+            qmark="",
+        ).ask():
+            sys.exit(0)
+
+    git_remote_url = safe_prompt(lambda: questionary.path("🔗 Set Git Remote URL:", qmark="", default="").ask())
 
     project_docker_image = f"oc-{project_name}:v0"
     project_docker_container = f"{project_docker_image.replace(':', '-')}-container"
 
     return {
-        "overwrite": overwrite,
         "project_title": project_title,
         "project_name": project_name,
         "project_description": project_description,
@@ -281,53 +294,90 @@ def setup_git_repository(project_dir, git_remote_url):
     utils.run_command(f"cd {project_dir} && bash {GIT_BASH_SCRIPT} {git_remote_url} && cd ..", show_output=True)
 
 
-def display_summary(config):
-    result_table = Table(
-        title="\n🚀 Project Summary 🚀",
-        title_justify="left",
-        show_header=True,
-        header_style="bold magenta",
-    )
-    result_table.add_column("Property", style="cyan", no_wrap=True)
-    result_table.add_column("Value", style="green")
-
-    result_table.add_row("Project Name", config["project_name"])
-    result_table.add_row("Project Title", config["project_title"])
-    result_table.add_row("Description", config["project_description"])
-    result_table.add_row(
-        "Data Types",
-        f"{' '.join([EMOJIS[datatype] + ' ' + datatype for datatype in config['project_datatypes']])}",
-    )
-    result_table.add_row("Optimization Task", config["project_task"])
-    result_table.add_row("Framework", f"{EMOJIS[config['project_framework']]} {config['project_framework']}")
-    result_table.add_row(
-        "Logging Framework", f"{EMOJIS[config['project_logging']]} {config['project_logging']}"
-    )
-    result_table.add_row("Python Version", f"🐍 {config['project_python_version']}")
-    result_table.add_row("Runtime Environment", config["project_runtime"].upper())
-    result_table.add_row("Docker Image", f"🐳 {config['project_docker_image']}")
-    result_table.add_row("Docker Container", config["project_docker_container"])
-    result_table.add_row("Git Remote URL", config["git_remote_url"] or "Not Set")
-    result_table.add_row("Project Directory", f"👉🏻 {os.path.abspath(config['project_dir'])}")
-
-    console.print(result_table)
-
-
 def start_project(config):
     utils.run_command(f"cd {config['project_dir']} && oc build", show_output=True)
     utils.run_command(f"cd {config['project_dir']} && oc start", show_output=True)
 
 
+FILE_TYPE_EMOJIS = {
+    ".py": "🐍",  # Python
+    ".js": "📜",  # JavaScript
+    ".html": "🌐",  # HTML
+    ".css": "🎨",  # CSS
+    ".md": "📝",  # Markdown
+    "Dockerfile": "🐳",  # Docker
+    "docker-compose.yml": "🐳",  # Docker Compose
+    ".yml": "⚙️",  # YAML
+    ".json": "📦",  # JSON
+    ".txt": "📄",  # Text file
+    ".log": "🪵",  # Log file
+    ".sh": "❯",  # Shell script
+    ".git": "🗄️",  # Git Repo
+}
+
+
+def display_summary(path: str):
+    """
+    Prints the tree folder structure of a given path without expanding subdirectories,
+    using the rich library for a beautiful display with emojis before filenames.
+    Displays folders first and excludes hidden folders/files.
+
+    Args:
+        path (str): The path to the directory to display.
+    """
+
+    print()
+    
+    def add_files(tree: Tree, path: str):
+        """Adds files and directories to the tree without recursion."""
+        try:
+            folders = []
+            files = []
+            
+            for entry in os.scandir(path):
+                # if entry.name.startswith('.'):
+                #     continue
+                    
+                if entry.is_dir():
+                    folders.append(entry)
+                else:
+                    files.append(entry)
+            
+            # Add folders first
+            for entry in folders:
+                tree.add(f"🖿  {entry.name}/")
+                    
+            # Then add files
+            for entry in files:
+                ext = os.path.splitext(entry.name)[1]
+                emoji = FILE_TYPE_EMOJIS.get(ext, "📄")
+                if entry.name == "Dockerfile":
+                    emoji = FILE_TYPE_EMOJIS.get("Dockerfile", "📄")
+                elif entry.name == "docker-compose.yml":
+                    emoji = FILE_TYPE_EMOJIS.get("docker-compose.yml", "📄")
+                tree.add(f"{emoji} {entry.name}")
+                
+        except OSError as e:
+            console.print(f"⤬ [ERROR] > Unable to access {path}: {e}")
+            return
+
+    tree = Tree(f"[bold]{os.path.basename(path)}[/bold]")  # Root node
+    add_files(tree, path)
+    console.print(tree)
+
+
 @app.command()
 @utils.handle_exceptions(console)
 def init():
+    console.print(f"\n░▒▓█ [[bold]Initializing[/bold]]\n")
+    
     config = prompt_project_details()
     try:
         create_project_structure(config)
         setup_git_repository(config["project_dir"], config["git_remote_url"])
         start_project(config)
+        display_summary(config["project_dir"])
+        console.print(f"\n🚀 [bold]Project initialized successfully![/]")
     except Exception as e:
         rmtree(config["project_name"])
-        console.print(f" ⊝ [ERROR] > {type(e).__name__}: {e}", style="bold red")
-
-    # display_summary(config)
+        console.print(f"⤬ [ERROR] > Initializing the project: {e}")
