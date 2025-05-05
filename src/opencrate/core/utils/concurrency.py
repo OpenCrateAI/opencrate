@@ -14,13 +14,15 @@ class AverageIterationPerSecond(ProgressColumn):
     def render(self, task) -> Text:
         speed = task.finished_speed or task.speed
         if speed is None:
-            return Text("[... avg it/s]", style="blue")
+            # return Text("[... avg it/s]", style="blue")
+            return Text("[... avg it/s]")
 
         self.speeds.append(speed)
         if len(self.speeds) > 20:
             self.speeds.pop(0)
         avg_speed = sum(self.speeds) / len(self.speeds)
-        return Text(f"[{avg_speed:.0f} avg it/s]", style="blue")
+        # return Text(f"[{avg_speed:.0f} avg it/s]", style="blue")
+        return Text(f"[{avg_speed:.0f} avg it/s]")
 
 
 class AverageSecondPerIteration(ProgressColumn):
@@ -31,7 +33,8 @@ class AverageSecondPerIteration(ProgressColumn):
     def render(self, task) -> Text:
         speed = task.finished_speed or task.speed
         if speed is None:
-            return Text("[... avg s/it]", style="blue")
+            # return Text("[... avg s/it]", style="blue")
+            return Text("[... avg s/it]")
 
         self.speeds.append(speed)
         if len(self.speeds) > 20:
@@ -87,7 +90,7 @@ def parallelize_with_threads(
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(func, *args) for args in _make_args_list_iterable(args_list)]
         progress = Progress(
-            TextColumn("[bold blue]{task.description}[/bold blue]"),
+            TextColumn("[bold]{task.description}[/bold]"),
             BarColumn(complete_style="magenta", finished_style="green"),
             "[progress.percentage]{task.percentage:>3.0f}%",
             TimeRemainingColumn(),
@@ -136,7 +139,7 @@ def parallelize_with_processes(
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
         futures = [executor.submit(func, *args) for args in _make_args_list_iterable(args_list)]
         progress = Progress(
-            TextColumn("[bold blue]{task.description}[/bold blue]"),
+            TextColumn("[bold]{task.description}[/bold]"),
             BarColumn(complete_style="magenta", finished_style="green"),
             "[progress.percentage]{task.percentage:>3.0f}%",
             TimeRemainingColumn(),
@@ -182,7 +185,7 @@ def parallize_with_batch_processes(
     results: List[Any] = []
     with Pool(batch_size) as pool:
         progress = Progress(
-            TextColumn("[bold blue]{task.description}[/bold blue]"),
+            TextColumn("[bold]{task.description}[/bold]"),
             BarColumn(complete_style="magenta", finished_style="green"),
             "[progress.percentage]{task.percentage:>3.0f}%",
             TimeRemainingColumn(),

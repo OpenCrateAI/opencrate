@@ -1,5 +1,6 @@
 import os
 import sys
+import traceback
 from pathlib import Path
 from shutil import copy, copytree, rmtree
 
@@ -16,6 +17,7 @@ console = Console()
 DATATYPES = ["Image", "Text", "Video", "Audio", "Tabular"]
 ML_FRAMEWORKS = ["PyTorch", "Tensorflow", "Default"]
 LOGGING_FRAMEWORKS = {
+    "None": "",
     "WandB": "wandb",
     "Comet": "comet-ml",
     "Neptune": "neptune",
@@ -59,18 +61,30 @@ DATATYPE_TASKS = {
         "Image-to-Image",
         "Image Feature Extraction",
         "Zero-Shot Image Classification",
+        "Image Feature Extraction",
     ],
-    "Video": ["Video Classification", "Video-to-Text", "Text-to-Video"],
+    "Video": ["Video Classification", "Video-to-Text", "Text-to-Video", "Video Feature Extraction"],
     "Text": [
         "Text Classification",
         "Context Question Answering",
         "Zero-Shot Classification",
         "Translation",
-        "Summarization",
-        "Feature Extraction",
+        "Text Summarization",
+        "Text Feature Extraction",
     ],
-    "Audio": ["Text-to-Audio", "Audio-to-Text", "Audio-to-Audio", "Audio Classification"],
-    "Tabular": ["Tabular Classification", "Tabular Regression", "Time Series Forecasting"],
+    "Audio": [
+        "Text-to-Audio",
+        "Audio-to-Text",
+        "Audio-to-Audio",
+        "Audio Classification",
+        "Audio Feature Extraction",
+    ],
+    "Tabular": [
+        "Tabular Classification",
+        "Tabular Regression",
+        "Time Series Forecasting",
+        "Tabular Feature Extraction",
+    ],
 }
 
 
@@ -145,9 +159,11 @@ def prompt_project_details():
     project_logging = safe_prompt(
         lambda: questionary.select(
             "📜 Select your logging framework of choice:",
-            choices=[{"name": f"{framework}", "value": framework} for framework in LOGGING_FRAMEWORKS.keys()],
+            choices=[
+                *[{"name": f"{framework}", "value": framework} for framework in LOGGING_FRAMEWORKS.keys()],
+            ],
             qmark="",
-            default={"name": f"{'WandB'}", "value": "WandB"},
+            default={"name": "None", "value": None},
         ).ask()
     )
 
@@ -327,26 +343,26 @@ def display_summary(path: str):
     """
 
     print()
-    
+
     def add_files(tree: Tree, path: str):
         """Adds files and directories to the tree without recursion."""
         try:
             folders = []
             files = []
-            
+
             for entry in os.scandir(path):
                 # if entry.name.startswith('.'):
                 #     continue
-                    
+
                 if entry.is_dir():
                     folders.append(entry)
                 else:
                     files.append(entry)
-            
+
             # Add folders first
             for entry in folders:
                 tree.add(f"🖿  {entry.name}/")
-                    
+
             # Then add files
             for entry in files:
                 ext = os.path.splitext(entry.name)[1]
@@ -356,7 +372,7 @@ def display_summary(path: str):
                 elif entry.name == "docker-compose.yml":
                     emoji = FILE_TYPE_EMOJIS.get("docker-compose.yml", "📄")
                 tree.add(f"{emoji} {entry.name}")
-                
+
         except OSError as e:
             console.print(f"⤬ [ERROR] > Unable to access {path}: {e}")
             return
@@ -370,7 +386,7 @@ def display_summary(path: str):
 @utils.handle_exceptions(console)
 def init():
     console.print(f"\n░▒▓█ [[bold]Initializing[/bold]]\n")
-    
+
     config = prompt_project_details()
     try:
         create_project_structure(config)
@@ -379,5 +395,8 @@ def init():
         display_summary(config["project_dir"])
         console.print(f"\n🚀 [bold]Project initialized successfully![/]")
     except Exception as e:
-        rmtree(config["project_name"])
+        error_traceback = traceback.format_exc()
+        if os.path.exists(config["project_name"]):
+            rmtree(config["project_name"])
         console.print(f"⤬ [ERROR] > Initializing the project: {e}")
+        console.print(f"[dim]\n{error_traceback}[/dim]")

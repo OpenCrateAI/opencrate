@@ -116,7 +116,8 @@ class Snapshot:
             backtrace=False,  # Show full stack traces for exceptions
             diagnose=True,  # Show detailed information about variables in stack traces
         )
-        self.logger.level("INFO", color="<blue>")
+        # self.logger.level("INFO", color="<blue>")
+        self.logger.level("INFO")
 
         self.log_path = os.path.join(self.dir_path, f"{self.snapshot_name}.log")
 
@@ -226,6 +227,37 @@ class Snapshot:
             os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
 
         torch.save(checkpoint, os.path.join(path, name))  # type: ignore
+
+    def json(self, data: Union[Dict, List], name: str) -> None:
+        """
+        Save a dictionary or list to a JSON file.
+
+        Args:
+            data (Dict): The dictionary or list to be saved.
+            name (str): The name of the file to save the data to. If the name contains directory separators,
+                the necessary directories will be created.
+        Raises:
+            AssertionError: If the data is not a dictionary or list.
+            ValueError: If the data type is not supported.
+        """
+
+        self._get_version()
+        path = self._get_version_path("jsons")
+        os.makedirs(path, exist_ok=True)
+
+        if os.path.sep in name:
+            os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
+
+        if isinstance(data, dict):
+            with open(os.path.join(path, name), "w") as f:
+                json.dump(data, f, indent=4)
+        elif isinstance(data, list):
+            with open(os.path.join(path, name), "w") as f:
+                json.dump(data, f, indent=4)
+        else:
+            raise ValueError(
+                f"\n\nUnsupported data type {type(data)}. Only dictionaries and lists are supported.\n"
+            )
 
     def figure(self, image: Any, name: str) -> None:
         """

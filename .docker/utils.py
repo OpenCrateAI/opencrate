@@ -55,7 +55,7 @@ class CLInstall:
 
 @contextmanager
 def spinner(console: Console, message: str):
-    with console.status(message, spinner="point"):
+    with console.status(message, spinner="dots"):
         try:
             yield
         finally:

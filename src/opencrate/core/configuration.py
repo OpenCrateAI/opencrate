@@ -5,6 +5,7 @@ import time
 from functools import wraps
 
 import yaml
+from arrow import get
 from rich.console import Console
 from rich.tree import Tree
 
@@ -227,6 +228,9 @@ class Configuration:
             def wrapper(*args, **kwargs):
                 if self.config_eval_on:
                     func_name, file_path, line_number = self._get_func_meta(func)
+                    if "tmp/" in file_path:
+                        file_path = "jupyter_notebook"
+
                     if func_name not in self._config:
                         self._config[func_name] = {
                             "meta": {"file": file_path, "line": line_number},
@@ -307,7 +311,6 @@ class Configuration:
         Prints the given configuration dictionary in a tree-like structure with nested branches
         based on filenames and folder paths. The tree shows paths relative to the current working directory.
         """
-        import os
 
         console = Console()
         file_tree = {}
@@ -319,7 +322,7 @@ class Configuration:
             line_num = meta.get("line", "N/A")
             config_data = details.get("config", {})
 
-            if file_path != "N/A":
+            if file_path != "N/A" and "/tmp" not in file_path:
                 # Convert to absolute path if it's not already
                 abs_path = os.path.abspath(file_path)
 
@@ -344,7 +347,7 @@ class Configuration:
                 file_node = parts[-1]
                 current.setdefault(file_node, []).append((name, line_num, config_data))
             else:
-                file_tree.setdefault("N/A", []).append((name, line_num, config_data))
+                file_tree.setdefault("", []).append((name, line_num, config_data))
 
         def add_nodes(rich_tree, subtree):
             if isinstance(subtree, dict):
@@ -353,13 +356,13 @@ class Configuration:
                     add_nodes(branch, subtree[key])
             elif isinstance(subtree, list):
                 for config_name, line_num, config_data in subtree:
-                    config_branch = rich_tree.add(f"[bold cyan]{config_name}[/bold cyan] (line: {line_num})")
+                    config_branch = rich_tree.add(f"[bold]{config_name}[/bold] (line: {line_num})")
                     if config_data:
                         for param, param_details in config_data.items():
                             ptype = param_details.get("type", None)
                             pvalue = param_details.get("value", None)
                             type_name = ptype.__name__ if hasattr(ptype, "__name__") else str(ptype)
-                            config_branch.add(f"[bold blue]{param}[/bold blue] ({type_name}) = {pvalue}")
+                            config_branch.add(f"[bold]{param}[/bold] ({type_name}) = {pvalue}")
 
         # Create the root tree and populate it with the file tree
         root = Tree(f"\n{prefix_title}")

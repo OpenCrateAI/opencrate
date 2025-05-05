@@ -57,10 +57,7 @@ class MetricsColumn(ProgressColumn):
         if not self.metrics:
             return Text("")
         metrics_text = ", ".join(
-            [
-                f"[bold blue]{key}[/bold blue]: [bold grey]{value:.4f}[/bold grey]"
-                for key, value in self.metrics.items()
-            ]
+            [f"[bold]{key}[/bold]: [bold grey]{value:.4f}[/bold grey]" for key, value in self.metrics.items()]
         )
         return Text.from_markup(metrics_text)
 
@@ -85,6 +82,10 @@ class CustomProgress(Progress):
 
         if "plot_groups" in metrics:
             del metrics["plot_groups"]
+        else:
+            self.plot_groups = [
+                [metric_name] for metric_name in metrics.keys() if metric_name != "plot_samples"
+            ]
         if "plot_samples" in metrics:
             del metrics["plot_samples"]
 
@@ -267,33 +268,42 @@ def progress(
     CustomProgress._snapshot = snapshot
 
     with CustomProgress(
-        TextColumn("[bold blue]{task.description}[/bold blue]"),
-        SpinnerColumn(spinner_name="point", style="grey"),
-        BarColumn(complete_style="yellow", finished_style="green"),
+        TextColumn("[bold]{task.description}[/bold]"),
+        SpinnerColumn(spinner_name="dots", style="gray"),
+        BarColumn(complete_style="white", finished_style="black"),
         TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
         TimeElapsedColumn(),
         TimeRemainingColumn(),
         AverageProgressSpeed(),
     ) as progress_bar:
+        if title != "":
+            title += " "
         total = len(iterator)
         task_id = progress_bar.add_task(title, total=total)  # type: ignore - TODO: write logic if iterator has no len method
         progress_bar.total_idx = total
         # Calculate initial completed percentage
+        has_error = False
+        has_progressed = False
         if step_start > 0:
             progress_bar.start_task(task_id)
             progress_bar.advance(task_id, advance=step_start)
-            progress_bar.update(
-                task_id, description=f"{title} [bold cyan]{step}({step_start}/{total})[/bold cyan]"
-            )
+            progress_bar.update(task_id, description=f"{title}[bold]{step}({step_start}/{total})[/bold]")
         try:
             for iter_idx, item in enumerate(iterator, step_start):
                 progress_bar.advance(task_id)
-                progress_bar.update(
-                    task_id, description=f"{title} [bold cyan]{step}({iter_idx}/{total})[/bold cyan]"
-                )
+                progress_bar.update(task_id, description=f"{title}[bold]{step}({iter_idx}/{total})[/bold]")
                 progress_bar.refresh()
                 yield iter_idx, item, progress_bar
+            has_progressed = "iter_idx" not in locals()
+        except Exception as e:
+            has_error = True
+            snapshot.error(e)
         finally:
+            if has_error or has_progressed:
+                # Clear and remove the progress bar in case of error or no progress
+                progress_bar.update(task_id, visible=False)
+                progress_bar.stop()
+                return
             progress_bar.accumulate_metrics()
             # Store metrics info before removing the progress bar
             progress_snapshot = progress_bar.tasks[task_id]
@@ -325,15 +335,15 @@ def progress(
 
             if speed:
                 snapshot.info(
-                    f"{title} {step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time} - {speed:.2f} it/s {(1/speed):.2f} s/it {metrics}"
+                    f"{title}{step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time} - {speed:.2f} it/s {(1/speed):.2f} s/it {metrics}"
                 )
             else:
                 if len(metrics):
                     snapshot.info(
-                        f"{title} {step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time} {metrics}"
+                        f"{title}{step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time} {metrics}"
                     )
                 else:
-                    snapshot.info(f"{title} {step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time}")
+                    snapshot.info(f"{title}{step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time}")
 
             # Stop and remove the progress bar
             progress_bar.stop()

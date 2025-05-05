@@ -1,5 +1,6 @@
 import inspect
 import os
+import re
 import time
 from typing import Any, Generator, Optional, Union
 
@@ -40,6 +41,7 @@ class OpenCrate:
         "metrics": {},
         "metrics_accumulated": {},
     }
+    meta_saved = False
     registered_checkpoint_configs_list = []
 
     def _snapshot_reset(self, confirm):
@@ -51,9 +53,6 @@ class OpenCrate:
             del kwargs["name"]
 
         return self._original_snapshot_setup(*args, **kwargs, name=self.script_name)
-
-    def run(self):
-        raise NotImplementedError
 
     def save_meta(self, **kwargs):
         """
@@ -78,6 +77,7 @@ class OpenCrate:
         else:
             self.snapshot.debug("No meta config initialized.")
 
+        self.meta_saved = True
         # self.current_epoch, self.current_batch_idx,
 
     def register_checkpoint_config(self, module_name, module, get_params, update_params):
@@ -93,14 +93,17 @@ class OpenCrate:
             self.snapshot.debug(f"Registered checkpoint config for '{module_name}'")
 
     def __call__(self):
-        self.run()
+        raise NotImplementedError
 
     def __init_subclass__(cls, **kwargs):
         """Finalize configuration"""
         original_init = cls.__init__
 
         def new_init(self, *args, **kwargs):
-            self.script_name = cls.__module__.split(".")[-1]
+            # self.script_name = cls.__module__.split(".")[-1]
+            self.script_name = cls.__name__
+            self.script_name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", self.script_name)
+            self.script_name = re.sub(r"([a-z])([A-Z])", r"\1_\2", self.script_name).lower()
 
             # Setup snapshot
             _configuration.snapshot = self.snapshot
@@ -130,11 +133,11 @@ class OpenCrate:
                 _configuration.write(self.script_name)
                 if prefix != "Finetuning":
                     _configuration.display(
-                        f"[blue]{prefix}[/blue] [purple]{self.snapshot.version_name}[/purple] with custom config"
+                        f"[bold]{prefix}[/bold] [bold]{self.snapshot.version_name}[/bold] with custom config"
                     )
                 else:
                     if self.finetune is not None:
-                        if self.start == "dev":
+                        if self.finetune == "dev":
                             finetune_from_version = f"{self.finetune}"
                         else:
                             finetune_from_version = f"v{self.finetune}"
@@ -142,16 +145,14 @@ class OpenCrate:
                             finetune_from_version = f"{finetune_from_version}:{self.finetune_tag}"
 
                     _configuration.display(
-                        f"[blue]{prefix}[/blue] from [purple]{finetune_from_version}[/purple] to [purple]{self.snapshot.version_name}[/purple] with custom config"
+                        f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with custom config"
                     )
                 use_existing_config = True
             elif self.use_config == "latest" and checkpoint_exists and self.start not in ("reset", "new"):
                 # Use latest config from checkpoint
                 _configuration.read(self.script_name, load_from_use_version=True)
                 _configuration.write(self.script_name, replace_config=True)
-                _configuration.display(
-                    f"[blue]{prefix}[/blue] [purple]{self.snapshot.version_name}[/purple] with latest config"
-                )
+                _configuration.display(f"[bold]{prefix} {self.snapshot.version_name}[/bold] with latest config")
                 use_existing_config = True
 
             # Initialize with appropriate config
@@ -167,12 +168,25 @@ class OpenCrate:
             # write the default config
             if not use_existing_config or (self.start == "new" and self.use_config == "latest"):
                 _configuration.write(self.script_name, replace_config=True)
-                config_type = "default"
-                if not use_existing_config and self.use_config == "custom":
-                    config_type += f" (as no custom config found at '{config_path}')"
-                _configuration.display(
-                    f"[blue]{prefix}[/blue] [purple]{self.snapshot.version_name}[/purple] with {config_type} config"
-                )
+                if self.finetune:
+                    if self.finetune is not None:
+                        if self.finetune == "dev":
+                            finetune_from_version = f"{self.finetune}"
+                        else:
+                            finetune_from_version = f"v{self.finetune}"
+                        if self.finetune_tag:
+                            finetune_from_version = f"{finetune_from_version}:{self.finetune_tag}"
+
+                    _configuration.display(
+                        f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with default config"
+                    )
+                else:
+                    config_type = "default"
+                    if not use_existing_config and self.use_config == "custom":
+                        config_type += f" (as no custom config found at '{config_path}')"
+                    _configuration.display(
+                        f"[bold]{prefix}[/bold] [bold]{self.snapshot.version_name}[/bold] with {config_type} config"
+                    )
 
             has_save_checkpoint = hasattr(self, "save_checkpoint")
             has_load_checkpoint = hasattr(self, "load_checkpoint")
@@ -228,11 +242,6 @@ class OpenCrate:
                     self.snapshot.debug(
                         f"Loading checkpoint for finetuning from '{self.snapshot.version_name}'"
                     )
-                    print("self.snapshot.version", self.snapshot.version)
-                    print("self.snapshot.version_name", self.snapshot.version_name)
-                    print("self.finetune", self.finetune)
-                    print("self.finetune_tag", self.finetune_tag)
-
                 else:
                     meta_path = self.snapshot.path.checkpoint("meta.pth", check_exists=False)
                     # if self.finetune is not None:
@@ -287,6 +296,9 @@ class OpenCrate:
         return wrapper
 
     def epoch_progress(self, title: str = "Epoch"):
+        assert hasattr(
+            self, "num_epochs"
+        ), "`num_epochs` is not defined. Please add it in your OpenCrate class's `__init__` method."
         self.epoch_title = title
         for self.current_epoch in range(self.start_epoch, self.num_epochs):
             yield self.current_epoch
@@ -304,15 +316,22 @@ class OpenCrate:
 
             self.start_epoch += 1  # TODO: consider automating and standardizing some of such common variable names in ML projects
 
-    def batch_progress(self, dataloader, title="Batch") -> Generator[int, Any, CustomProgress]:
+    def batch_progress(self, dataloader, title="Batch"):
+        assert self.meta_saved, "Meta variables not saved. Please call `save_meta()` before using this method."
+
         if self.is_resuming:
             self.start_batch_idx += 1
 
         metrics_are_not_resumed = True
+        has_epoch = hasattr(self, "epoch_title")
+        if has_epoch:
+            epoch_title = f"{self.epoch_title}({self.current_epoch}/{self.num_epochs})"
+        else:
+            epoch_title = ""
 
         for batch_idx, batch, self._custom_batch_progress in progress(
             dataloader,
-            title=f"{self.epoch_title}({self.current_epoch}/{self.num_epochs})",
+            title=epoch_title,
             step=title,
             step_start=self.start_batch_idx,
         ):
@@ -323,27 +342,49 @@ class OpenCrate:
                     self._custom_batch_progress.metrics_accumulated[metric_name] = metrics_accumulated_values
                 metrics_are_not_resumed = False
 
-            self._custom_batch_progress.current_epoch = self.current_epoch
+            # if has_epoch:
+            #     self._custom_batch_progress.current_epoch = self.current_epoch
+            #     this is not required but check again just to be sure
             self.is_resuming, self.start_batch_idx = True, batch_idx
             yield batch_idx, batch, self._custom_batch_progress
             self.is_resuming, self.start_batch_idx = False, self.start_batch_idx + 1
 
-        for metric_name, metric_values in self._custom_batch_progress.metrics.items():
-            self.meta_kwargs["metrics"][metric_name] = metric_values
+        if hasattr(self, "_custom_batch_progress"):
+            for metric_name, metric_values in self._custom_batch_progress.metrics.items():
+                self.meta_kwargs["metrics"][metric_name] = metric_values
 
-        for (
-            metric_name,
-            metrics_accumulated_values,
-        ) in self._custom_batch_progress.metrics_accumulated.items():
-            self.meta_kwargs["metrics_accumulated"][metric_name] = metrics_accumulated_values
+            for (
+                metric_name,
+                metrics_accumulated_values,
+            ) in self._custom_batch_progress.metrics_accumulated.items():
+                self.meta_kwargs["metrics_accumulated"][metric_name] = metrics_accumulated_values
 
-        self.start_batch_idx = 1
+            self.start_batch_idx = 1
 
     @classmethod
     def launch(cls, *args, **kwargs):
         from ..cli.environment import launch
 
-        script = cls.__module__.split(".")[-1]
-        if "script" in kwargs:
-            del kwargs["script"]
-        launch(*args, **kwargs, script=script)
+        workflow = cls.__module__.split(".")[-1]
+        if workflow == "__main__" or "." not in workflow:
+            workflow = cls
+        if "workflow" in kwargs:
+            del kwargs["workflow"]
+        return launch(*args, **kwargs, workflow=workflow)
+
+    def __str__(self) -> str:
+        cls_name = type(self).__name__
+
+        details = [
+            f"version={self.snapshot.version_name}",
+            f"tag={self.tag}",
+            f"replace={self.replace}",
+            f"config={self.use_config}",
+            f"finetune={self.finetune}",
+            f"finetune_tag={self.finetune_tag}",
+        ]
+
+        return f"{cls_name}({', '.join(details)})"
+
+    def __repr__(self) -> str:
+        return self.__str__()

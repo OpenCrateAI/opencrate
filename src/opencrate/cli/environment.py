@@ -355,7 +355,8 @@ def finetune(
 @app.command()
 @utils.handle_exceptions(console)
 def launch(
-    script: str,
+    workflow: str,
+    task: Optional[str] = None,
     start: str = "new",
     tag: Optional[str] = None,
     config_custom: bool = False,
@@ -369,7 +370,7 @@ def launch(
     Launch a specific OpenCrate module from the scripts in the ./src folder.
 
     Args:
-        script (str): Name of the script to be launched
+        workflow (str): Name of the file and OpenCrate module to be launched
         start (str): Start a new version or use the latest version
         tag (str): Tag for the script
         config_custom (bool): Use a custom configuration
@@ -381,8 +382,8 @@ def launch(
 
     Raises:
         - AssertionError: If the script file is not found
-        - AssertionError: If both `config_custom` and `config_default` flags are set
-        - AssertionError: If `finetune` is set with `start` flag other than `new`
+        - AssertionError: If both config_custom and config_default flags are set
+        - AssertionError: If finetune is set with start flag other than new
         - ImportError: If the script module cannot be imported
         - Exception: If the script execution fails
         - KeyboardInterrupt: If the script execution is interrupted
@@ -394,7 +395,7 @@ def launch(
     # if use_version != "new":
     #     assert (
     #         use_config == "default"
-    #     ), f"\n\nCannot set `--use-config` to `custom` when `--use-version` is set to `{use_version}`, they are mutually exclusive. If you want to use custom config, then you must set `--use-config=custom`, and not set `--use-version` which will consider `--use-version=new` and create a new version. And if you want to use the config from version `{use_version}`, then you must not set the `--use-config`.\n"
+    #     ), f"\n\nCannot set --use-config to custom when --use-version is set to {use_version}, they are mutually exclusive. If you want to use custom config, then you must set --use-config=custom, and not set --use-version which will consider --use-version=new and create a new version. And if you want to use the config from version {use_version}, then you must not set the --use-config.\n"
     # is_exited = False
     # try:
     #     container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
@@ -408,15 +409,20 @@ def launch(
     # Check if the script exists
     import opencrate as oc
 
-    local_script_path = f"./{script}.py"
-    if not os.path.isfile(local_script_path):
-        console.print(f"\n⛌ [ERROR]: Script {script}.py not found.\n", style="bold red")
-        exit(1)
-    console.print(f"\n░▒▓█ [[bold]Launching[/bold]] > {script}")
+    if isinstance(workflow, str) and "." in workflow:
+        script, class_name = workflow.split(".")
+        local_script_path = f"{script}.py"
+        if not os.path.isfile(local_script_path):
+            console.print(f"\n⛌ [ERROR]: Script {script}.py not found.\n", style="bold red")
+            exit(1)
+
+    console.print(
+        f"\n░▒▓█ [[bold]Launching[/bold]] > {workflow if isinstance(workflow, str) else workflow.__name__}"
+    )
 
     if config_custom and config_default:
         console.print(
-            f"\n⛌ [ERROR]: Cannot set both `--config_custom` and `--config_default` flags.\n",
+            f"\n⛌ [ERROR]: Cannot set both --config_custom and --config_default flags.\n",
             style="bold red",
         )
         exit(1)
@@ -429,66 +435,85 @@ def launch(
     if finetune is not None:
         if not (start == "new"):
             console.print(
-                f"\n⛌ [ERROR]: Cannot set `--finetune` with `--start={start}`. If you want to finetune, then you must set `--start=new`.\n",
+                f"\n⛌ [ERROR]: Cannot set --finetune with --start={start}. If you want to finetune, then you must set --start=new.\n",
                 style="bold red",
             )
             exit(1)
 
     # Dynamically import the script module
     try:
-        # First, make sure the script's directory is in the Python path
-        script_dir = os.path.dirname(os.path.abspath(local_script_path))
-        if script_dir not in sys.path:
-            sys.path.insert(0, script_dir)
-
-        # Import the module
-        module_name = os.path.basename(script).replace(".py", "")
-        spec = importlib.util.spec_from_file_location(module_name, local_script_path)
-        if spec is None:
-            raise ImportError(f"Cannot import module {module_name}")
-        module = importlib.util.module_from_spec(spec)
-        if spec.loader is not None:
-            spec.loader.exec_module(module)
-        else:
-            raise ImportError(f"Cannot load module {module_name}")
-
-        # Find classes in the module that inherit from OpenCrate
         crate_classes = []
-        for name, obj in inspect.getmembers(module):
-            if inspect.isclass(obj) and issubclass(obj, OpenCrate) and obj != OpenCrate:
-                crate_classes.append(obj)
+        if isinstance(workflow, str):
+            # First, make sure the script's directory is in the Python path
+            script_dir = os.path.dirname(os.path.abspath(local_script_path))
+            if script_dir not in sys.path:
+                sys.path.insert(0, script_dir)
 
-        if not crate_classes:
-            console.print("⛌ [ERROR]: No OpenCrate module found in the script.", style="bold red")
-            # Fall back to running the script in the container
+            # Import the module
+            module_name = os.path.basename(script).replace(".py", "")
+            spec = importlib.util.spec_from_file_location(module_name, local_script_path)
+            if spec is None:
+                raise ImportError(f"Cannot import module {module_name}")
+            module = importlib.util.module_from_spec(spec)
+            if spec.loader is not None:
+                spec.loader.exec_module(module)
+            else:
+                raise ImportError(f"Cannot load module {module_name}")
+
+            # Find classes in the module that inherit from OpenCrate
+            for name, inherited_class in inspect.getmembers(module):
+                if (
+                    inspect.isclass(inherited_class)
+                    and issubclass(inherited_class, OpenCrate)
+                    and inherited_class != OpenCrate
+                ):
+                    crate_classes.append(inherited_class)
         else:
-            # If multiple classes are found, use the first one
-            crate_class = crate_classes[0]
-            # console.print(
-            #     f"[blue]●[/blue] [[bold blue]Initializing[/bold blue]] > [bold white]{crate_class.__name__}[/bold white]"
-            # )
+            crate_classes.append(workflow)
 
-            # Instantiate the class
-            crate_class.use_config = use_config
-            crate_class.start = start
-            crate_class.tag = tag
-            crate_class.replace = replace
-            crate_class.log_level = log_level
-            crate_class.finetune = finetune
-            crate_class.finetune_tag = finetune_tag
-            crate_instance = crate_class()
+        if len(crate_classes) == 0:
+            if isinstance(workflow, str):
+                console.print(
+                    f"\n⛌ [ERROR]: No OpenCrate workflow found in {script}.py.\n",
+                    style="bold red",
+                )
+                exit(1)
+
+        if isinstance(workflow, str):
+            available_classes = [cls.__name__ for cls in crate_classes]
+            assert (
+                class_name in available_classes
+            ), f"\n\nNo '{class_name}' workflow found in '{script}.py'. Available workflows: {available_classes}."
+            crate_class = list(filter(lambda x: x.__name__ == class_name, crate_classes))[0]
+        else:
+            crate_class = workflow
+
+        crate_class.use_config = use_config
+        crate_class.start = start
+        crate_class.tag = tag
+        crate_class.replace = replace
+        crate_class.log_level = log_level
+        crate_class.finetune = finetune
+        crate_class.finetune_tag = finetune_tag
+        crate_instance = crate_class()
+
+        if task:
             try:
-                crate_instance()
+                assert hasattr(
+                    crate_instance, task
+                ), f"\n\n{crate_class.__name__} has no task named '{task}'.\n"
+                getattr(crate_instance, task)()
             except KeyboardInterrupt:
                 crate_instance.snapshot.debug("⛌ [ERROR]: Launch interrupted by user, exiting...")
                 crate_instance.save_checkpoint()
-            return
+        else:
+            return crate_instance
 
     except Exception as e:
-        e = str(e).replace("\n", "")
         if oc.snapshot._setup_not_done:
             console.print(f"⛌ [ERROR]: {traceback.format_exc()}", style="bold red")
         else:
+            e = str(e).replace("\n", "")
             oc.snapshot.exception(f"{e}")
 
     # # If we're here, either the direct import failed or no OpenCrate classes were found
