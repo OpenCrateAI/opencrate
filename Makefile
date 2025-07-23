@@ -68,6 +68,9 @@ install:
 	pyenv local $$PYTHON_VERSIONS
 	echo "\nDone installing the package with development environment and dependencies"
 
+mkdocs:
+	mkdocs serve -a 0.0.0.0:8000
+	
 test-pytest:
 	@PYTHONPATH=src pytest
 

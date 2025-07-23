@@ -2,7 +2,13 @@ from concurrent.futures import ProcessPoolExecutor, ThreadPoolExecutor, as_compl
 from multiprocessing import Pool, cpu_count
 from typing import Any, Callable, List, Optional
 
-from rich.progress import BarColumn, Progress, ProgressColumn, TextColumn, TimeRemainingColumn
+from rich.progress import (
+    BarColumn,
+    Progress,
+    ProgressColumn,
+    TextColumn,
+    TimeRemainingColumn,
+)
 from rich.text import Text
 
 
@@ -40,7 +46,7 @@ class AverageSecondPerIteration(ProgressColumn):
         if len(self.speeds) > 20:
             self.speeds.pop(0)
         avg_speed = sum(self.speeds) / len(self.speeds)
-        return Text(f"[{1/avg_speed:.2f} avg s/it]", style="blue")
+        return Text(f"[{1 / avg_speed:.2f} avg s/it]", style="blue")
 
 
 def _is_iterable(obj):
@@ -88,7 +94,9 @@ def parallelize_with_threads(
 
     results: List[Any] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(func, *args) for args in _make_args_list_iterable(args_list)]
+        futures = [
+            executor.submit(func, *args) for args in _make_args_list_iterable(args_list)
+        ]
         progress = Progress(
             TextColumn("[bold]{task.description}[/bold]"),
             BarColumn(complete_style="magenta", finished_style="green"),
@@ -137,7 +145,9 @@ def parallelize_with_processes(
 
     results: List[Any] = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [executor.submit(func, *args) for args in _make_args_list_iterable(args_list)]
+        futures = [
+            executor.submit(func, *args) for args in _make_args_list_iterable(args_list)
+        ]
         progress = Progress(
             TextColumn("[bold]{task.description}[/bold]"),
             BarColumn(complete_style="magenta", finished_style="green"),
@@ -156,7 +166,10 @@ def parallelize_with_processes(
 
 
 def parallize_with_batch_processes(
-    func: Callable[[Any], Any], data: List[Any], batch_size: Optional[int] = None, title: Optional[str] = None
+    func: Callable[[Any], Any],
+    data: List[Any],
+    batch_size: Optional[int] = None,
+    title: Optional[str] = None,
 ) -> List[Any]:
     """
     Processes data in batches using multiprocessing. Best for tasks with uniform execution times where the order of results is important.
@@ -193,7 +206,9 @@ def parallize_with_batch_processes(
             AverageSecondPerIteration(),
         )
         with progress:
-            task = progress.add_task(f"[cyan]{title if title else 'Batch processing'}", total=len(data))
+            task = progress.add_task(
+                f"[cyan]{title if title else 'Batch processing'}", total=len(data)
+            )
             for result in pool.imap(func, data):
                 results.append(result)
                 progress.update(task, advance=1)

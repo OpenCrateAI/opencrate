@@ -8,7 +8,7 @@ if [ ! -f "/tmp/first_run_completed" ]; then
     git config --global user.email "$GIT_USER_EMAIL"
     
     touch /tmp/first_run_completed
+    echo "First-time setup completed successfully."
 fi
-
 # Start your main application
 exec "$@"

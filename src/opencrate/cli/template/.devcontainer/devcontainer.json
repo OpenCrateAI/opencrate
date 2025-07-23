@@ -26,9 +26,7 @@
                 "maorbarak.pytoipynb",
                 "mechatroner.rainbow-csv",
                 "mhutchie.git-graph",
-                "mikoz.black-py",
-                "ms-python.black-formatter",
-                "ms-python.debugpy",
+                "charliermarsh.ruff",
                 "ms-python.isort",
                 "ms-python.mypy-type-checker",
                 "ms-python.python",
@@ -48,7 +46,7 @@
                 "ms-vscode.remote-server",
                 "ms-vsliveshare.vsliveshare",
                 "phplasma.csv-to-table",
-                "xelad0m.jupyter-toc",
+                "xelad0m.jupyter-toc"
             ]
         }
     }

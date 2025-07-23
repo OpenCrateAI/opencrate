@@ -1,4 +1,4 @@
-from typing import Dict, List, Optional, Tuple, Union
+from typing import List, Optional, Tuple, Union
 
 import cv2
 import matplotlib.pyplot as plt
@@ -64,9 +64,9 @@ def image_stack(
     save: bool = False,
 ) -> None:
     if titles:
-        assert len(stack_lists) == len(
-            titles
-        ), f'\n\nTitles must be provided for each image columns, found total "{len(titles)}" titles, while total image columns are "{len(stack_lists)}".\n'
+        assert len(stack_lists) == len(titles), (
+            f'\n\nTitles must be provided for each image columns, found total "{len(titles)}" titles, while total image columns are "{len(stack_lists)}".\n'
+        )
 
     fig = plt.figure(figsize=shape)
     first_elem = stack_lists[0]
@@ -101,7 +101,7 @@ def image_grid(
     cmap=None,
     alpha=1.0,
     title: Optional[str] = None,
-) -> None:
+) -> plt.Figure:
     fig = plt.figure(figsize=(size, size))
     grid = ImageGrid(fig, 111, nrows_ncols=shape, axes_pad=0.02)
 
@@ -109,7 +109,9 @@ def image_grid(
 
     for idx, (ax, image) in enumerate(zip(grid, grid_list)):  # type: ignore
         # for 1 channel or no channel show image in gray
-        ax.imshow(_get_plt_image(image, bgr2rgb, normalize), cmap=cmap[idx], alpha=alpha[idx])
+        ax.imshow(
+            _get_plt_image(image, bgr2rgb, normalize), cmap=cmap[idx], alpha=alpha[idx]
+        )
         ax.axis("off")
 
     if title is not None:
@@ -133,14 +135,15 @@ def labeled_images(
     alpha=1.0,
     show=True,
 ) -> None:
-
     fig = plt.figure(figsize=(size, size))
     grid = ImageGrid(fig, 111, nrows_ncols=shape, axes_pad=0.05)
 
     cmap, alpha = _get_cmap_alpha(cmap, alpha, int(shape[0] * shape[1]))
 
     for idx, (ax, image, label) in enumerate(zip(grid, image_batch, label_batch)):  # type: ignore
-        ax.imshow(_get_plt_image(image, bgr2rgb, normalize), cmap=cmap[idx], alpha=alpha[idx])  # type: ignore
+        ax.imshow(
+            _get_plt_image(image, bgr2rgb, normalize), cmap=cmap[idx], alpha=alpha[idx]
+        )  # type: ignore
         ax.axis("off")
         ax.set_title(f"{label}" if label_names is None else f"{label_names[label]}")
 

@@ -1,250 +1,189 @@
-import os
-import re
+import traceback
 from datetime import timedelta
-from typing import Dict, Iterator, List, Optional
+from typing import Dict, Iterator, List, Optional, Tuple
 
-import lovelyplots
+import lovelyplots  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
-from rich.progress import (
-    BarColumn,
-    Progress,
-    ProgressColumn,
-    SpinnerColumn,
-    TextColumn,
-    TimeElapsedColumn,
-    TimeRemainingColumn,
-)
-from rich.text import Text
-
-from .io.gif import dir_to_gif
+from tqdm import tqdm
 
 plt.style.use(["use_mathtext", "colors10-ls"])
-# plt.style.use("seaborn-v0_8-darkgrid")
-# plt.style.use("dark_background")
 
 
-class AverageProgressSpeed(ProgressColumn):
-    """Renders human-readable processing rate (seconds per iteration)."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.speeds: List[float] = []
-
-    def render(self, task) -> Text:
-        speed = task.finished_speed or task.speed
-        if speed is None or speed == 0:
-            return Text("... s/it ... it/s")
-        self.speeds.append(speed)
-        if len(self.speeds) > 20:
-            self.speeds.pop(0)
-        avg_speed = sum(self.speeds) / len(self.speeds)
-        return Text(f"{1/avg_speed:.2f} s/it {avg_speed:.2f} it/s")
-
-
-class MetricsColumn(ProgressColumn):
-    """Renders live metrics like g_loss and d_loss."""
-
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.metrics: Dict[str, float] = {}
-
-    def update_metrics(self, **metrics: float):
-        """Update the metrics to be displayed."""
-        self.metrics.update(metrics)
-
-    def render(self, task) -> Text:
-        if not self.metrics:
-            return Text("")
-        metrics_text = ", ".join(
-            [f"[bold]{key}[/bold]: [bold grey]{value:.4f}[/bold grey]" for key, value in self.metrics.items()]
-        )
-        return Text.from_markup(metrics_text)
-
-
-class CustomProgress(Progress):
+class OpenCrateProgress:
     _snapshot = None
 
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
-        self.metrics_column = MetricsColumn()
-        self.metrics = {}
-        self.metrics_accumulated = {}
-        self.monitor_idx = 0
-        self.columns = list(self.columns) + [self.metrics_column]
+    def __init__(self, total: int, title: str = "", step_start: int = 0):
+        self.total = total
+        self.title = title
+        self.metrics: Dict[str, List[float]] = {}
+        self.metrics_accumulated: Dict[str, List[float]] = {}
+        self.metrics_column: Dict[str, float] = {}
+        self.plot_groups: Optional[List[List[str]]] = None
+
+        # Initialize tqdm progress bar with starting position
+        # Use file=None initially to prevent immediate display when step_start > 0
+        self.pbar = tqdm(
+            total=total,
+            initial=step_start,
+            desc=title,
+            unit="it",
+            leave=False,
+            ncols=120,
+            bar_format="{desc} {percentage:.2f}% |{bar}| {elapsed}, {remaining}, {rate_fmt}{postfix}",
+        )
+        # Clear any initial display artifacts
+        if step_start > 0:
+            self.pbar.clear()
+
+    def step(self):
+        """Advance the progress bar by one step."""
+        if self.pbar is not None:
+            self.pbar.update(1)
+
+    def update_description(self, description: str):
+        """Update the progress bar description."""
+        if self.pbar is not None and self.pbar.desc != description:
+            self.pbar.set_description(description, refresh=True)
+
+    def close(self):
+        """Close the progress bar."""
+        if self.pbar is not None:
+            self.pbar.close()
+            self.pbar = None
 
     def monitor(self, **metrics: float):
-        """Update the metrics displayed in the progress bar."""
-        self.monitor_idx += 1
-
-        self.plot_groups = metrics.get("plot_groups", None)
-        self.plot_samples = metrics.get("plot_samples", 10)
-
-        if "plot_groups" in metrics:
+        # handle plot controls
+        groups = metrics.get("plot_groups")
+        samples = metrics.get("plot_samples")
+        if groups is not None:
+            self.plot_groups = groups
             del metrics["plot_groups"]
-        else:
-            self.plot_groups = [
-                [metric_name] for metric_name in metrics.keys() if metric_name != "plot_samples"
-            ]
-        if "plot_samples" in metrics:
+        elif self.plot_groups is None:
+            self.plot_groups = [[k] for k in metrics.keys()]
+        if samples is not None:
+            self.plot_samples = samples
             del metrics["plot_samples"]
+        else:
+            self.plot_samples = self.total
 
-        self.metrics_column.update_metrics(**metrics)
+        # update live metrics
+        self.metrics_column.update(metrics)
 
-        if self.plot_groups:
-            for group in self.plot_groups:
-                missing_metrics = [metric for metric in group if metric not in metrics]
-                if missing_metrics:
-                    raise ValueError(
-                        f"\n\nThe following metrics are missing from the provided metrics names: {', '.join(missing_metrics)}. "
-                        f"Allowed metrics names are {list(metrics.keys())}.\n"
-                    )
+        display = {}
+        for metric_name, metric_value in metrics.items():
+            metric_value = (
+                np.mean(metric_value)
+                if isinstance(metric_value, (list, tuple, np.ndarray))
+                else metric_value
+            )
+            self.metrics.setdefault(metric_name, []).append(metric_value)
+            if len(self.metrics[metric_name]) % self.plot_samples == 0:
+                recent = self.metrics[metric_name][-self.plot_samples :]
+                avg = sum(recent) / len(recent)
+                self.metrics_accumulated.setdefault(metric_name, []).append(avg)
+            if isinstance(metric_value, int):
+                display[metric_name] = metric_value
+            else:
+                display[metric_name] = f"{metric_value:.4f}"
 
-        if self.monitor_idx % (self.total_idx // self.plot_samples) == 0:
-            for metric_name, metric_value in metrics.items():
-                if metric_name not in self.metrics:
-                    self.metrics[metric_name] = {"raw": []}
-                self.metrics[metric_name]["raw"].append(metric_value)
+        if self.pbar and display:
+            self.pbar.set_postfix(display)
 
     def accumulate_metrics(self):
-        """Accumulate metrics for the entire training run."""
-        if not hasattr(self, "plot_groups") or not self.plot_groups:
+        if not self.plot_groups:
             return
+        for k in self.metrics:
+            vals = self.metrics[k][-self.plot_samples :]
+            avg = sum(vals) / len(vals)
+            self.metrics_accumulated.setdefault(k, []).append(avg)
 
-        for metric_name in self.metrics:
-            if metric_name not in self.metrics_accumulated:
-                self.metrics_accumulated[metric_name] = {
-                    "raw": [],
-                }
-            values = self.metrics[metric_name]["raw"][-self.plot_samples :]
-            accumulated_metric_value = sum(values) / len(values)
-
-            self.metrics_accumulated[metric_name]["raw"].append(accumulated_metric_value)
-
-    def plot_accumulated_metrics(self, **title_kwargs):
-        """Plot the accumulated metrics using seaborn and save the figure."""
-        if not hasattr(self, "plot_groups") or not self.plot_groups:
+    def plot_accumulated_metrics(
+        self, **title_kwargs
+    ) -> Iterator[Tuple[str, plt.Figure]]:
+        if not self.plot_groups:
             return
-
-        if len(title_kwargs):
-            for x_axis_name in title_kwargs:
-                break
-            plot_title = f"{x_axis_name.title()}({title_kwargs[x_axis_name]})"
+        if title_kwargs:
+            x_name, x_val = next(iter(title_kwargs.items()))
+            plot_title = f"{x_name.title()}({x_val})"
         else:
-            x_axis_name = "Accumulated Iteration"
+            x_name = "Accumulated Iteration"
             plot_title = "Accumulated Metrics"
-
-        for metric_group in self.plot_groups:
+        for group in self.plot_groups:
             fig = plt.figure(figsize=(12, 6))
-            title = "x"
-            all_values = []
+            all_vals = []
+            for k in group:
+                data = self.metrics_accumulated.get(k, [])
+                if data:
+                    all_vals += data
+                    plt.plot(range(1, len(data) + 1), data, label=k)
+            if all_vals:
+                mn, mx = min(all_vals), max(all_vals)
+                rng = mx - mn or 1
+                pad = rng * 0.15
+                plt.ylim(mn - pad, mx + pad)
+            plt.title(f"{plot_title} - {','.join(group)}")
+            plt.xlabel(x_name.title())
+            plt.ylabel("Value")
+            plt.legend()
+            yield ",".join(group), fig
 
-            for metric_name in metric_group:
-                if metric_name in self.metrics_accumulated:
-                    title += f", {metric_name}"
-                    values = self.metrics_accumulated[metric_name]["raw"]
-
-                    all_values.extend(values)
-                    plt.plot(range(len(values)), values, label=metric_name)
-
-            if all_values:
-                y_min, y_max = min(all_values), max(all_values)
-                y_range = y_max - y_min
-                padding = y_range * 0.15
-                ylim_top = y_max + padding
-                ylim_bottom = y_min - padding
-
-                if y_min >= 0 and ylim_bottom < 0 and y_min < y_range * 0.3:
-                    ylim_bottom = 0
-
-                if y_max <= 0 and ylim_top > 0 and abs(y_max) < y_range * 0.3:
-                    ylim_top = 0
-
-            if title != "x":
-                title = title.replace("x, ", "")
-                plt.grid(True, linestyle="--", alpha=0.8)
-                plt.title(f"{plot_title} - {title}", fontsize=12)
-                plt.xlabel(x_axis_name, fontsize=10)
-                plt.ylabel("Value", fontsize=10)
-                plt.legend(fontsize=10)
-
-                if all_values:
-                    # Ensure top and bottom are different to avoid singular transformation
-                    if abs(ylim_top - ylim_bottom) < 1e-10:
-                        ylim_top += 0.1
-                        ylim_bottom -= 0.1
-                    plt.ylim(top=ylim_top, bottom=ylim_bottom)
-
-                plt.tick_params(axis="both", which="major", labelsize=10)
-
-                yield title, fig
-
-    def plot_metrics(self):
-        """Plot the metrics using seaborn and save the figure."""
-        if not hasattr(self, "plot_groups") or not self.plot_groups:
+    def plot_metrics(self) -> Iterator[Tuple[str, plt.Figure]]:
+        if not self.plot_groups:
             return
-
-        for group_index, metric_group in enumerate(self.plot_groups):
+        for group in self.plot_groups:
             fig = plt.figure(figsize=(12, 6))
-            title = "x"
-            all_values = []  # Collect all values to determine optimal y limits
+            all_vals = []
+            for k in group:
+                data = self.metrics.get(k, [])
+                if data:
+                    vals = (
+                        np.clip(
+                            data,
+                            np.percentile(data, 5)
+                            - 1.5 * np.subtract(*np.percentile(data, [95, 5])),
+                            np.percentile(data, 95)
+                            + 1.5 * np.subtract(*np.percentile(data, [95, 5])),
+                        )
+                        if len(data) > 5
+                        else data
+                    )
+                    all_vals += list(vals)
+                    plt.plot(range(len(data)), data, label=k)
+            if all_vals:
+                mn, mx = min(all_vals), max(all_vals)
+                rng = mx - mn or 1
+                pad = rng * 0.15
+                plt.ylim(mn - pad, mx + pad)
+            plt.title(",".join(group))
+            plt.xlabel("Iteration")
+            plt.ylabel("Value")
+            plt.legend()
+            yield ",".join(group), fig
 
-            # First pass - collect all values and create the plots
-            for metric_name in metric_group:
-                if metric_name in self.metrics:
-                    title += f", {metric_name}"
-                    values = self.metrics[metric_name]["raw"]
 
-                    # Clip outliers - only if we have enough data points
-                    if len(values) > 5:
-                        q1, q3 = np.percentile(values, [5, 95])
-                        iqr = q3 - q1
-                        upper_bound = q3 + 1.5 * iqr
-                        lower_bound = q1 - 1.5 * iqr
-                        clipped_values = np.clip(values, lower_bound, upper_bound)
-                    else:
-                        clipped_values = values
+def _is_jupyter():
+    """
+    Checks if the code is running in a Jupyter Notebook.
 
-                    all_values.extend(clipped_values)
-                    plt.plot(range(len(values)), values, label=metric_name)
+    Returns:
+        bool: True if running in a Jupyter Notebook, False otherwise.
+    """
+    try:
+        # Attempt to get the IPython shell instance.
+        shell = get_ipython().__class__.__name__
+        # Check if the shell is the specific one used by Jupyter.
+        if shell == "ZMQInteractiveShell":
+            return True  # Jupyter Notebook or qtconsole
+        elif shell == "TerminalInteractiveShell":
+            return False  # Terminal running IPython
+        else:
+            return False  # Other type of shell
+    except NameError:
+        return False  # Probably standard Python interpreter
 
-            # Set appropriate y-axis limits
-            if all_values:
-                y_min, y_max = min(all_values), max(all_values)
 
-                # Add padding (10% on top/bottom, but more if needed for readability)
-                y_range = y_max - y_min
-                if y_range < 1e-6:  # Avoid division by zero or very small ranges
-                    y_range = abs(y_min) * 0.1 if y_min != 0 else 0.1
-
-                padding = y_range * 0.15  # 15% padding
-
-                # Ensure we don't create negative padding when values are near zero
-                ylim_top = y_max + padding
-                ylim_bottom = y_min - padding
-
-                # Special handling for values near zero
-                if y_min >= 0 and ylim_bottom < 0 and y_min < y_range * 0.3:
-                    ylim_bottom = 0  # Don't go below zero if data is close to zero
-
-                # If values are all negative, make sure top limit doesn't cross zero
-                if y_max <= 0 and ylim_top > 0 and abs(y_max) < y_range * 0.3:
-                    ylim_top = 0
-
-            if title != "x":
-                title = title.replace("x, ", "")
-                plt.grid(True, linestyle="--", alpha=0.8)
-                plt.title(title, fontsize=12)
-                plt.xlabel("Iteration", fontsize=10)
-                plt.ylabel("Value", fontsize=10)
-                plt.legend(fontsize=10)
-
-                if all_values:
-                    plt.ylim(top=ylim_top, bottom=ylim_bottom)
-
-                plt.tick_params(axis="both", which="major", labelsize=10)
-
-                yield title, fig
+_IS_JUPYTER = _is_jupyter()
 
 
 def progress(
@@ -252,6 +191,8 @@ def progress(
     title: str,
     step: str = "Iter",
     step_start: int = 0,
+    total_count: Optional[int] = None,
+    job_name: str = "",
 ) -> Iterator:
     """
     Create a progress bar that automatically advances and supports updating metrics.
@@ -261,89 +202,73 @@ def progress(
         title: The title of the progress bar
         step: The name of the step (default: "Iter")
         step_start: The starting index for the step counter
+        total_count: Total count if iterator doesn't support len()
     """
 
-    from ..opencrate import snapshot
+    from ... import snapshot
 
-    CustomProgress._snapshot = snapshot
+    OpenCrateProgress._snapshot = snapshot
 
-    with CustomProgress(
-        TextColumn("[bold]{task.description}[/bold]"),
-        SpinnerColumn(spinner_name="dots", style="gray"),
-        BarColumn(complete_style="white", finished_style="black"),
-        TextColumn("[progress.percentage]{task.percentage:>3.0f}%"),
-        TimeElapsedColumn(),
-        TimeRemainingColumn(),
-        AverageProgressSpeed(),
-    ) as progress_bar:
-        if title != "":
-            title += " "
-        total = len(iterator)
-        task_id = progress_bar.add_task(title, total=total)  # type: ignore - TODO: write logic if iterator has no len method
-        progress_bar.total_idx = total
-        # Calculate initial completed percentage
-        has_error = False
-        has_progressed = False
-        if step_start > 0:
-            progress_bar.start_task(task_id)
-            progress_bar.advance(task_id, advance=step_start)
-            progress_bar.update(task_id, description=f"{title}[bold]{step}({step_start}/{total})[/bold]")
+    # Determine total count
+    if total_count is not None:
+        total = total_count
+    else:
         try:
-            for iter_idx, item in enumerate(iterator, step_start):
-                progress_bar.advance(task_id)
-                progress_bar.update(task_id, description=f"{title}[bold]{step}({iter_idx}/{total})[/bold]")
-                progress_bar.refresh()
-                yield iter_idx, item, progress_bar
-            has_progressed = "iter_idx" not in locals()
-        except Exception as e:
-            has_error = True
-            snapshot.error(e)
-        finally:
-            if has_error or has_progressed:
-                # Clear and remove the progress bar in case of error or no progress
-                progress_bar.update(task_id, visible=False)
-                progress_bar.stop()
-                return
-            progress_bar.accumulate_metrics()
-            # Store metrics info before removing the progress bar
-            progress_snapshot = progress_bar.tasks[task_id]
-            speed = progress_snapshot.speed
+            total = len(iterator)
+        except TypeError:
+            raise ValueError(
+                "Iterator does not support len(). Please provide total_count parameter."
+            )
 
-            # Hide the progress bar by completing the task (which will make it disappear)
-            progress_bar.update(task_id, visible=False)
-            progress_bar.refresh()
+    # Initialize progress bar with proper title and starting position
+    desc = f"{title} " if title else ""
+    initial_desc = f"{desc}{step}({step_start}/{total})"
+    progress_bar = OpenCrateProgress(
+        total=total, title=initial_desc, step_start=step_start
+    )
+    current_idx = step_start
 
-            # Plot and save the metrics at the end of each iteration
-            for fig_title, fig in progress_bar.plot_metrics():
-                # Save epoch-specific version if epoch number is available
-                fig_title = fig_title.replace(", ", "_")
-                fig_path = f"monitored/{fig_title}[iterations].jpg"
-                plt.subplots_adjust(left=0.08, right=0.92, top=0.9, bottom=0.1)
-                snapshot.figure(fig, fig_path)
+    try:
+        for item in iterator:
+            yield current_idx, item, progress_bar
+            current_idx += 1
+            # Only update description after we've moved to the next step
+            next_desc = f"{desc}{step}({current_idx}/{total})"
+            progress_bar.update_description(next_desc)
+            progress_bar.step()
+    except Exception as e:
+        tb_str = traceback.format_exc()
+        snapshot.exception(f"\n{str(e)}\n{tb_str}")
+    finally:
+        if not _IS_JUPYTER:
+            print("\n", end="")  # Ensure a new line after progress bar
+        # Save plots if any metrics were tracked
+        for title_key, fig in progress_bar.plot_metrics():
+            path = f"monitored/{job_name}({title_key})[iterations].jpg"
+            plt.subplots_adjust(left=0.08, right=0.92, top=0.9, bottom=0.1)
+            snapshot.figure(fig, path)
+            plt.close(fig)
+        plt.close("all")
 
-                plt.close(fig)
-            plt.close("all")
+        # Log final summary
+        elapsed_str = str(
+            timedelta(seconds=int(progress_bar.pbar.format_dict["elapsed"]))
+        )
+        metrics_text = ", ".join(
+            f"{k}: {v:.4f}" for k, v in progress_bar.metrics_column.items()
+        )
 
-            completed = ((iter_idx) / total) * 100
-            # Log the final state of the progress bar and metrics
-            elapsed_time = progress_snapshot.elapsed
-            elapsed_time = str(timedelta(seconds=max(0, int(elapsed_time))))
+        # Calculate actual percentage based on current progress
+        percentage = (current_idx / total) * 100 if total > 0 else 0
+        summary = (
+            f"{desc}{step}({current_idx}/{total}): {percentage:.2f}%, {elapsed_str}"
+        )
+        if metrics_text:
+            summary += f", {metrics_text}"
 
-            metrics = progress_bar.metrics_column.render(progress_snapshot)
-            if len(str(metrics)):
-                metrics = f"- {metrics}"
+        if not snapshot._setup_not_done:
+            snapshot.info(summary)
+        else:
+            print(summary)
 
-            if speed:
-                snapshot.info(
-                    f"{title}{step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time} - {speed:.2f} it/s {(1/speed):.2f} s/it {metrics}"
-                )
-            else:
-                if len(metrics):
-                    snapshot.info(
-                        f"{title}{step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time} {metrics}"
-                    )
-                else:
-                    snapshot.info(f"{title}{step}({iter_idx}/{total}) - {completed:.2f}% - {elapsed_time}")
-
-            # Stop and remove the progress bar
-            progress_bar.stop()
+        progress_bar.close()

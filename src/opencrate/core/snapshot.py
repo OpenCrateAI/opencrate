@@ -8,6 +8,7 @@ from shutil import copyfile, rmtree
 from typing import Any, List, Optional, Union
 
 import numpy as np
+import pandas as pd
 from loguru import logger
 from matplotlib.figure import Figure
 
@@ -63,19 +64,34 @@ class Snapshot:
         Returns:
             None
         """
-        assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
+        assert os.path.isdir(self._config_dir), (
+            "\n\nNot an OpenCrate project directory.\n"
+        )
 
         if not isinstance(log_level, str):  # type: ignore
-            raise ValueError(f"\n\n`log_level` must be a string, but received {type(log_level)}")
-        log_level = log_level.upper()
-        if log_level not in ["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL", "SUCCESS"]:
             raise ValueError(
-                f"\n\n`log_level` must be one of ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'SUCCESS']"
+                f"\n\n`log_level` must be a string, but received {type(log_level)}"
+            )
+        log_level = log_level.upper()
+        if log_level not in [
+            "DEBUG",
+            "INFO",
+            "WARNING",
+            "ERROR",
+            "CRITICAL",
+            "SUCCESS",
+        ]:
+            raise ValueError(
+                "\n\n`log_level` must be one of ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'SUCCESS']"
             )
         if not isinstance(log_time, bool):  # type: ignore
-            raise ValueError(f"\n\n`log_time` must be a boolean, but received {type(log_time)}")
+            raise ValueError(
+                f"\n\n`log_time` must be a boolean, but received {type(log_time)}"
+            )
         if tag is not None and not isinstance(tag, str):  # type: ignore
-            raise ValueError(f"\n\n`tag` must be a string or None, but received {type(tag)}")
+            raise ValueError(
+                f"\n\n`tag` must be a string or None, but received {type(tag)}"
+            )
         try:
             start = int(start)
         except:
@@ -83,7 +99,9 @@ class Snapshot:
         if not isinstance(start, (int, str)) or (  # type: ignore
             isinstance(start, str) and start not in ["new", "last", "dev"]
         ):
-            raise ValueError(f"\n\n`start` must be an int, 'new', 'last' or 'dev', but received {type(start)}")
+            raise ValueError(
+                f"\n\n`start` must be an int, 'new', 'last' or 'dev', but received {type(start)}"
+            )
 
         self.start = start
         self.tag = tag if tag else ""
@@ -154,7 +172,9 @@ class Snapshot:
 
         self._setup_not_done = False
 
-        self.debug(f"Snapshot setup done for script '{self.snapshot_name}' with version '{self.version_name}'")
+        self.debug(
+            f"Snapshot setup done for script '{self.snapshot_name}' with version '{self.version_name}'"
+        )
 
     def list_tags(self, return_tags: Optional[bool] = False) -> Optional[List[str]]:
         """
@@ -202,8 +222,7 @@ class Snapshot:
 
     def checkpoint(self, checkpoint: Any, name: str) -> None:
         """
-        Save a checkpoint of the current state to a specified file.
-        This method saves the given checkpoint object to a file with the specified name
+        Saves the given checkpoint object to a file with the specified name
         within the "checkpoints" directory. If the directory or any necessary subdirectories
         do not exist, they will be created. The method requires PyTorch to be installed.
 
@@ -214,11 +233,19 @@ class Snapshot:
             AssertionError: If PyTorch is not installed.
 
         Example:
-        >>> model_state = {'epoch': 10, 'state_dict': model.state_dict(), 'optimizer': optimizer.state_dict()}
-        >>> oc.snapshot.checkpoint(model_state, 'model_epoch_10.pth')
+            ```python
+            model_state = {
+                'epoch': 10,
+                'state_dict': model.state_dict(),
+                'optimizer': optimizer.state_dict()
+            }
+            oc.snapshot.checkpoint(model_state, 'training/epoch_10.pth')
+            ```
         """
 
-        assert _has_torch, "\n\nPyTorch is not installed. Please install PyTorch to use this method.\n\n"
+        assert _has_torch, (
+            "\n\nPyTorch is not installed. Please install PyTorch to use this method.\n\n"
+        )
         self._get_version()
         path = self._get_version_path("checkpoints")
         os.makedirs(path, exist_ok=True)
@@ -228,7 +255,7 @@ class Snapshot:
 
         torch.save(checkpoint, os.path.join(path, name))  # type: ignore
 
-    def json(self, data: Union[Dict, List], name: str) -> None:
+    def json(self, data: Union[Dict, List[Any]], name: str) -> None:
         """
         Save a dictionary or list to a JSON file.
 
@@ -259,6 +286,19 @@ class Snapshot:
                 f"\n\nUnsupported data type {type(data)}. Only dictionaries and lists are supported.\n"
             )
 
+    def csv(self, df: pd.DataFrame, name: str) -> None:
+        """
+        Save a pandas DataFrame to a CSV file.
+        """
+        self._get_version()
+        path = self._get_version_path("csvs")
+        os.makedirs(path, exist_ok=True)
+
+        if os.path.sep in name:
+            os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
+
+        df.to_csv(os.path.join(path, name), index=False)
+
     def figure(self, image: Any, name: str) -> None:
         """
         Save an image to the specified path with the given name.
@@ -277,7 +317,6 @@ class Snapshot:
         Raises:
             AssertionError: If Pillow is not installed.
             ValueError: If the image type is not supported.
-
         """
 
         self._get_version()
@@ -288,7 +327,9 @@ class Snapshot:
             os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
 
         if isinstance(image, np.ndarray):
-            assert _has_pillow, f"\n\nPillow is not installed. Please install Pillow to save a numpy image.\n\n"
+            assert _has_pillow, (
+                "\n\nPillow is not installed. Please install Pillow to save a numpy image.\n\n"
+            )
             image = image.astype("float32")
             image = (image - image.min()) / np.ptp(image)
             image *= 255.0
@@ -301,11 +342,20 @@ class Snapshot:
             image.savefig(os.path.join(path, name), dpi=100)  # type: ignore
         else:  # for torch images
             assert isinstance(
-                image, torch.Tensor  # type: ignore
-            ), f"\n\nUnsupported image type {type(image)}. Only numpy, PIL, matplotlib, and torch tensors are supported.\n"
+                image,
+                torch.Tensor,  # type: ignore
+            ), (
+                f"\n\nUnsupported image type {type(image)}. Only numpy, PIL, matplotlib, and torch tensors are supported.\n"
+            )
             image = image.cpu().numpy()
-            if image.ndim == 3 and image.shape[0] in [1, 3, 4]:  # (3, H, W), (1, H, W) or (4, H, W)
-                image = np.transpose(image, (1, 2, 0))  # Convert to (H, W, 3), (H, W, 1) or (H, W, 4)
+            if image.ndim == 3 and image.shape[0] in [
+                1,
+                3,
+                4,
+            ]:  # (3, H, W), (1, H, W) or (4, H, W)
+                image = np.transpose(
+                    image, (1, 2, 0)
+                )  # Convert to (H, W, 3), (H, W, 1) or (H, W, 4)
             image = image.astype("float32")
             image = (image - image.min()) / np.ptp(image)
             image *= 255.0
@@ -314,7 +364,9 @@ class Snapshot:
             image.save(os.path.join(path, name))
 
     def reset(self, confirm: bool = False) -> None:
-        assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
+        assert os.path.isdir(self._config_dir), (
+            "\n\nNot an OpenCrate project directory.\n"
+        )
 
         if not self.snapshot_name:
             self.snapshot_name = self._snapshot_name()
@@ -426,7 +478,10 @@ class Snapshot:
 
             config = self._read_config()
 
-            if "snapshot_version" not in config or self.snapshot_name not in config["snapshot_version"]:
+            if (
+                "snapshot_version" not in config
+                or self.snapshot_name not in config["snapshot_version"]
+            ):
                 if self.start is not None and self.start != "new":
                     raise ValueError(
                         f"\n\nNo snapshots are created for `{self.snapshot_name}`, cannot set `start` to {self.start}.\n"
@@ -466,7 +521,9 @@ class Snapshot:
 
         # return os.path.join("snapshots", self.snapshot_name, str(version_name), snapshot_type)
 
-        return os.path.join("snapshots", self.snapshot_name, self.version_name, snapshot_type)
+        return os.path.join(
+            "snapshots", self.snapshot_name, self.version_name, snapshot_type
+        )
 
     def _log_asset(self, item: Any, name: str, snapshot_type: str) -> None:
         self._get_version()
@@ -485,7 +542,7 @@ class _PATH:
 
     def __getattr__(self, snapshot_type: str):
         def path_func(
-            name: str,
+            name: Optional[str] = None,
             version: Optional[Union[str, int]] = None,
             tag: Optional[str] = None,
             check_exists: bool = True,
@@ -504,17 +561,23 @@ class _PATH:
             else:
                 asset_type_plural = snapshot_type + "s"
 
-            asset_dir = os.path.join("snapshots", self.snapshot_name, str(version), asset_type_plural)
+            asset_dir = os.path.join(
+                "snapshots", self.snapshot_name, str(version), asset_type_plural
+            )
+
+            if name is None:
+                return asset_dir
+
             if check_exists:
-                assert os.path.isdir(
-                    asset_dir
-                ), f"\n\nNo '{snapshot_type}' snapshot type found for version '{version}'.\n"
+                assert os.path.isdir(asset_dir), (
+                    f"\n\nNo '{snapshot_type}' snapshot type found for version '{version}'.\n"
+                )
 
             asset_path = os.path.join(asset_dir, name)
             if check_exists:
-                assert os.path.exists(
-                    asset_path
-                ), f"\n\nNo snapshot '{name}' found in '{snapshot_type}' for version '{version}'.\n"
+                assert os.path.exists(asset_path), (
+                    f"\n\nNo snapshot '{name}' found in '{snapshot_type}' for version '{version}'.\n"
+                )
 
             return asset_path
 

@@ -10,7 +10,6 @@ from typing import Optional
 import docker
 from rich.console import Console
 
-from ..core.configuration import Configuration
 from ..core.opencrate import OpenCrate
 from . import utils
 from .app import app
@@ -24,12 +23,14 @@ if os.path.exists(CONFIG_PATH):
         CONFIG = json.load(config_file)
 
 HELPERS = {
-    "build_image": lambda: console.print(f"● Use [bold yellow]$ oc build[/bold yellow] to build the image"),
+    "build_image": lambda: console.print(
+        "● Use [bold yellow]$ oc build[/bold yellow] to build the image"
+    ),
     "start_container": lambda: console.print(
-        f"● Use [bold yellow]$ oc start[/bold yellow] to start the container"
+        "● Use [bold yellow]$ oc start[/bold yellow] to start the container"
     ),
     "enter_container": lambda: console.print(
-        f"● Use [bold yellow]$ oc enter[/bold yellow] to enter the container"
+        "● Use [bold yellow]$ oc enter[/bold yellow] to enter the container"
     ),
 }
 DOCKER_CLIENT = docker.from_env()
@@ -77,7 +78,9 @@ def build():
     console.print(f"\n░▒▓█ [[bold]Building[/bold]] > {CONFIG['title']}\n")
     with utils.spinner(console, ">>"):
         stream_docker_logs(
-            command=DOCKER_CLIENT.api.build(path=".", tag=CONFIG["docker_image"], rm=True, decode=True),
+            command=DOCKER_CLIENT.api.build(
+                path=".", tag=CONFIG["docker_image"], rm=True, decode=True
+            ),
             is_build=True,
         )
 
@@ -94,26 +97,28 @@ def start():
         try:
             DOCKER_CLIENT.images.get(CONFIG["docker_image"])
         except docker.errors.ImageNotFound:
-            console.print(f"⛌ [ERROR]: Docker image not found")
+            console.print("⛌ [ERROR]: Docker image not found")
             HELPERS["build_image"]()
             return
 
         try:
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
             if container.status == "running":
-                console.print(f"✔ Container is already running!")
+                console.print("✔ Container is already running!")
                 HELPERS["enter_container"]()
                 return
             elif container.status == "exited":
                 container.start()
-                console.print(f"✔ Successfully restarted container!")
+                console.print("✔ Successfully restarted container!")
                 HELPERS["enter_container"]()
                 return
         except docker.errors.NotFound:
             pass
 
-        utils.run_command(f"docker compose --project-name={CONFIG['name']} up {CONFIG['name']}_development -d")
-        console.print(f"✔ Created and started new container")
+        utils.run_command(
+            f"docker compose --project-name={CONFIG['name']} up {CONFIG['name']}_development -d"
+        )
+        console.print("✔ Created and started new container")
         HELPERS["enter_container"]()
 
 
@@ -132,7 +137,7 @@ def stop(down: bool = False):
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
             if container.status == "exited":
                 if not down:
-                    console.print(f"✔ Container is already stopped")
+                    console.print("✔ Container is already stopped")
                     HELPERS["start_container"]()
                 else:
                     container.remove()
@@ -141,7 +146,7 @@ def stop(down: bool = False):
                 utils.run_command(
                     f"docker compose --project-name={CONFIG['name']} {'stop' if not down else 'down'}"
                 )
-                console.print(f"✔ Stopped container")
+                console.print("✔ Stopped container")
                 HELPERS["start_container"]()
         except docker.errors.NotFound:
             console.print(
@@ -164,7 +169,8 @@ def enter():
         container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
         if container.status == "running":
             os.execvp(
-                "docker", ["docker", "exec", "-it", container.id, CONFIG["entry_command"]]  # type: ignore
+                "docker",
+                ["docker", "exec", "-it", container.id, CONFIG["entry_command"]],  # type: ignore
             )
         else:
             console.print(f"⛌ [ERROR]: Container is not running")
@@ -185,7 +191,11 @@ def commit(message: str):
     with utils.spinner(console, ">>"):
         try:
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
-            container.commit(repository=CONFIG["docker_image"], author=CONFIG["git_name"], message=message)
+            container.commit(
+                repository=CONFIG["docker_image"],
+                author=CONFIG["git_name"],
+                message=message,
+            )
             console.print(f"✔ Successfully updated changes!")
         except docker.errors.NotFound:
             console.print(f"⛌ [ERROR]: Container not found")
@@ -223,7 +233,9 @@ def kill():
         console.print(f"✔ Removed image {CONFIG['docker_image']}")
         HELPERS["build_image"]()
     except docker.errors.ImageNotFound:
-        console.print(f"⛌ [ERROR]: Image {CONFIG['docker_image']} not found", style="bold red")
+        console.print(
+            f"⛌ [ERROR]: Image {CONFIG['docker_image']} not found", style="bold red"
+        )
     except Exception as e:
         console.print(f" ⛌ [ERROR]: {e}", style="bold red")
 
@@ -258,7 +270,9 @@ def new():
         try:
             container = DOCKER_CLIENT.containers.get(CONFIG["docker_container"])
             container.commit(
-                repository=new_docker_image, author=CONFIG["git_name"], message=f"Release {CONFIG['version']}"
+                repository=new_docker_image,
+                author=CONFIG["git_name"],
+                message=f"Release {CONFIG['version']}",
             )
             console.print(f"✔ Successfully committed changes!")
         except docker.errors.NotFound:
@@ -296,11 +310,13 @@ def status():
     try:
         image = DOCKER_CLIENT.images.get(CONFIG["docker_image"])
         console.print(f"- Image name:\t{', '.join(image.tags)}")
-        console.print(f"- Image Size:\t{image.attrs['Size'] / (1024 ** 2):.2f} MB")
+        console.print(f"- Image Size:\t{image.attrs['Size'] / (1024**2):.2f} MB")
         console.print(f"- Image ID:\t{image.id}")
         print()
     except docker.errors.ImageNotFound:
-        console.print(f"- Image {CONFIG['docker_image']} [bold red]not found[/bold red]")
+        console.print(
+            f"- Image {CONFIG['docker_image']} [bold red]not found[/bold red]"
+        )
         HELPERS["build_image"]()
         print()
     except Exception as e:
@@ -314,7 +330,9 @@ def status():
         console.print(f"- Container ID:\t{container.id}")
         print()
     except docker.errors.NotFound:
-        console.print(f"- Container {CONFIG['docker_container']} [bold red]not found[/bold red]")
+        console.print(
+            f"- Container {CONFIG['docker_container']} [bold red]not found[/bold red]"
+        )
         HELPERS["start_container"]()
         print()
     except Exception as e:
@@ -322,10 +340,18 @@ def status():
         print()
 
     try:
-        git_remote_url = utils.run_command("git ls-remote --get-url origin", ignore_error=True)
-        git_last_commit_date = utils.run_command("git log -1 --format=%cd", ignore_error=True)
-        git_pull_requests_count = utils.run_command("git log --merges --oneline | wc -l", ignore_error=True)
-        console.print(f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}")
+        git_remote_url = utils.run_command(
+            "git ls-remote --get-url origin", ignore_error=True
+        )
+        git_last_commit_date = utils.run_command(
+            "git log -1 --format=%cd", ignore_error=True
+        )
+        git_pull_requests_count = utils.run_command(
+            "git log --merges --oneline | wc -l", ignore_error=True
+        )
+        console.print(
+            f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}"
+        )
         console.print(f"- Last Commit Date:\t{git_last_commit_date}")
         console.print(f"- Pull Requests Count:\t{git_pull_requests_count}")
     except Exception as e:
@@ -339,8 +365,8 @@ def finetune(
     script: str,
     start: str = "new",
     tag: Optional[str] = None,
-    config_custom: bool = False,
-    config_default: bool = False,
+    custom_config: bool = False,
+    default_config: bool = False,
     replace: bool = False,
     finetune: Optional[str] = None,
     finetune_tag: Optional[str] = None,
@@ -356,11 +382,12 @@ def finetune(
 @utils.handle_exceptions(console)
 def launch(
     workflow: str,
-    task: Optional[str] = None,
+    job: Optional[str] = None,
     start: str = "new",
     tag: Optional[str] = None,
-    config_custom: bool = False,
-    config_default: bool = False,
+    config: str = "default",
+    # custom_config: bool = False,
+    # default_config: bool = False,
     replace: bool = False,
     finetune: Optional[str] = None,
     finetune_tag: Optional[str] = None,
@@ -373,8 +400,7 @@ def launch(
         workflow (str): Name of the file and OpenCrate module to be launched
         start (str): Start a new version or use the latest version
         tag (str): Tag for the script
-        config_custom (bool): Use a custom configuration
-        config_default (bool): Use the default configuration
+        config (str): Initial configuration to use for the new pipeline
         replace (bool): Replace the existing version
         finetune (str): Finetune the model
         finetune_tag (str): Tag for the finetuned model
@@ -382,7 +408,6 @@ def launch(
 
     Raises:
         - AssertionError: If the script file is not found
-        - AssertionError: If both config_custom and config_default flags are set
         - AssertionError: If finetune is set with start flag other than new
         - ImportError: If the script module cannot be imported
         - Exception: If the script execution fails
@@ -413,24 +438,27 @@ def launch(
         script, class_name = workflow.split(".")
         local_script_path = f"{script}.py"
         if not os.path.isfile(local_script_path):
-            console.print(f"\n⛌ [ERROR]: Script {script}.py not found.\n", style="bold red")
+            console.print(
+                f"\n⛌ [ERROR]: Script {script}.py not found.\n", style="bold red"
+            )
             exit(1)
 
     console.print(
         f"\n░▒▓█ [[bold]Launching[/bold]] > {workflow if isinstance(workflow, str) else workflow.__name__}"
     )
 
-    if config_custom and config_default:
-        console.print(
-            f"\n⛌ [ERROR]: Cannot set both --config_custom and --config_default flags.\n",
-            style="bold red",
-        )
-        exit(1)
+    # if custom_config and default_config:
+    #     console.print(
+    #         f"\n⛌ [ERROR]: Cannot set both --custom_config and --default_config flags.\n",
+    #         style="bold red",
+    #     )
+    #     exit(1)
 
-    if (not config_custom) and (not config_default):
-        use_config = "latest"
-    else:
-        use_config = "custom" if config_custom else "default"
+    # if (not custom_config) and (not default_config):
+    #     use_config = "latest"
+    # else:
+    #     use_config = "custom" if custom_config else "default"
+    use_config = config
 
     if finetune is not None:
         if not (start == "new"):
@@ -451,7 +479,9 @@ def launch(
 
             # Import the module
             module_name = os.path.basename(script).replace(".py", "")
-            spec = importlib.util.spec_from_file_location(module_name, local_script_path)
+            spec = importlib.util.spec_from_file_location(
+                module_name, local_script_path
+            )
             if spec is None:
                 raise ImportError(f"Cannot import module {module_name}")
             module = importlib.util.module_from_spec(spec)
@@ -481,10 +511,12 @@ def launch(
 
         if isinstance(workflow, str):
             available_classes = [cls.__name__ for cls in crate_classes]
-            assert (
-                class_name in available_classes
-            ), f"\n\nNo '{class_name}' workflow found in '{script}.py'. Available workflows: {available_classes}."
-            crate_class = list(filter(lambda x: x.__name__ == class_name, crate_classes))[0]
+            assert class_name in available_classes, (
+                f"\n\nNo '{class_name}' workflow found in '{script}.py'. Available workflows: {available_classes}."
+            )
+            crate_class = list(
+                filter(lambda x: x.__name__ == class_name, crate_classes)
+            )[0]
         else:
             crate_class = workflow
 
@@ -497,15 +529,11 @@ def launch(
         crate_class.finetune_tag = finetune_tag
         crate_instance = crate_class()
 
-        if task:
-            try:
-                assert hasattr(
-                    crate_instance, task
-                ), f"\n\n{crate_class.__name__} has no task named '{task}'.\n"
-                getattr(crate_instance, task)()
-            except KeyboardInterrupt:
-                crate_instance.snapshot.debug("⛌ [ERROR]: Launch interrupted by user, exiting...")
-                crate_instance.save_checkpoint()
+        if job:
+            assert hasattr(crate_instance, job), (
+                f"\n\n{crate_class.__name__} has no job named '{job}'. Available jobs are: {crate_instance.available_jobs}\n"
+            )
+            getattr(crate_instance, job)()
         else:
             return crate_instance
 

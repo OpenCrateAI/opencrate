@@ -5,12 +5,12 @@ from rich.console import Console
 from utils import CLInstall, spinner, stream_docker_logs, write_python_version
 
 parser = argparse.ArgumentParser(description="Build Dockerfile with specified configurations.")
-parser.add_argument("--python", type=float, default=3.9, help="Specify the Python version to use.")
+parser.add_argument("--python", type=float, default=3.10, help="Specify the Python version to use.")
 parser.add_argument("--runtime", type=str, default="cuda", help="Specify the runtime")
 
 args = parser.parse_args()
 if args.python == 3.1:
-    args.python = f"{3.10:.2f}"
+    args.python = "3.10"
 
 UBUNTU_POST_INSTALLATION = [
     CLInstall(

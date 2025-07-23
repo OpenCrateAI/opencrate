@@ -25,11 +25,13 @@ classifiers = [
     "Programming Language :: Python :: 3.13"
 ]
 dependencies = [
+    "mkdocstrings-python",
     "pydantic_settings",
     "prompt-toolkit",
     "questionary",
     "ipywidgets",
     "matplotlib",
+    "pandas",
     "numpy",
     "opencv-python-headless",
     "rich",
@@ -40,20 +42,24 @@ dependencies = [
     "imageio",
     "requests",
     "pyyaml",
-    "lovelyplots"
+    "lovelyplots",
+    "tqdm",
+    "pynvml",
+    "pyinstrument",
+    "memory_profiler",
 ]
 
 [project.optional-dependencies]
 dev = [
     "tox",
-    "flake8",
     "mypy",
-    "black",
     "pytest",
     "pytest-cov",
     "types-requests",
     "torch",
     "build",
+    "mkdocs",
+    "mkdocs-material",
 ]
 
 [project.scripts]

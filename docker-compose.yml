@@ -20,3 +20,5 @@ services:
         environment:
             - GIT_USER_NAME=${HOST_GIT_NAME}
             - GIT_USER_EMAIL=${HOST_GIT_EMAIL}
+        ports:
+            - 8000:8000

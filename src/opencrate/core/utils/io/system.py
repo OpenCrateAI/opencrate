@@ -538,6 +538,7 @@ def extract_archive(archive_file: str, dest_dir: str, replace: bool = True) -> N
         >>> extract_archive("archive.zip", "extracted_folder")
         Archive extracted: archive.zip
     """
+
     ensure_file_exists(archive_file)
     handle_replace(dest_dir, replace)
     shutil.unpack_archive(archive_file, dest_dir)

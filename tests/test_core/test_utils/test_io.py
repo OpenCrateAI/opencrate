@@ -156,7 +156,9 @@ class TestUtilsIO:
 
     def test_write_json(self):
         self.setup_write_json()
-        write_json(f"{self.test_root_dir}/data.json", {"key": "new_value"}, replace=True)
+        write_json(
+            f"{self.test_root_dir}/data.json", {"key": "new_value"}, replace=True
+        )
         with open(f"{self.test_root_dir}/data.json", "r") as f:
             data = json.load(f)
         assert data == {"key": "new_value"}
@@ -212,7 +214,9 @@ class TestUtilsIO:
         assert os.path.exists(f"{self.test_root_dir}/dst")
 
         with pytest.raises(FileNotFoundError):
-            copy_dir(f"{self.test_root_dir}/non_existing_src", f"{self.test_root_dir}/dst")
+            copy_dir(
+                f"{self.test_root_dir}/non_existing_src", f"{self.test_root_dir}/dst"
+            )
         self.teardown_copy_dir()
 
     def setup_move_dir(self):
@@ -229,7 +233,9 @@ class TestUtilsIO:
         assert not os.path.exists(f"{self.test_root_dir}/src")
 
         with pytest.raises(FileNotFoundError):
-            move_dir(f"{self.test_root_dir}/non_existing_src", f"{self.test_root_dir}/dst")
+            move_dir(
+                f"{self.test_root_dir}/non_existing_src", f"{self.test_root_dir}/dst"
+            )
         self.teardown_move_dir()
 
     def setup_read_file(self):
@@ -361,12 +367,19 @@ class TestUtilsIO:
 
     def test_rename(self):
         self.setup_rename()
-        rename(f"{self.test_root_dir}/old_name.txt", f"{self.test_root_dir}/new_name.txt", replace=True)
+        rename(
+            f"{self.test_root_dir}/old_name.txt",
+            f"{self.test_root_dir}/new_name.txt",
+            replace=True,
+        )
         assert os.path.exists(f"{self.test_root_dir}/new_name.txt")
         assert not os.path.exists(f"{self.test_root_dir}/old_name.txt")
 
         with pytest.raises(FileNotFoundError):
-            rename(f"{self.test_root_dir}/non_existing_file.txt", f"{self.test_root_dir}/new_name.txt")
+            rename(
+                f"{self.test_root_dir}/non_existing_file.txt",
+                f"{self.test_root_dir}/new_name.txt",
+            )
         self.teardown_rename()
 
     def test_get_file_name(self):
@@ -396,7 +409,11 @@ class TestUtilsIO:
 
     def test_create_archive(self):
         self.setup_create_archive()
-        create_archive(f"{self.test_root_dir}/create_archive", f"{self.test_root_dir}/source_dir", format="zip")
+        create_archive(
+            f"{self.test_root_dir}/create_archive",
+            f"{self.test_root_dir}/source_dir",
+            format="zip",
+        )
         assert os.path.exists(f"{self.test_root_dir}/create_archive.zip")
         self.teardown_create_archive()
 
@@ -414,10 +431,15 @@ class TestUtilsIO:
             os.remove(f"{self.test_root_dir}/archive.zip")
 
     def test_extract_archive(self):
-        extract_archive(f"{self.test_root_dir}/archive.zip", f"{self.test_root_dir}/dest_dir")
+        extract_archive(
+            f"{self.test_root_dir}/archive.zip", f"{self.test_root_dir}/dest_dir"
+        )
         assert os.path.exists(f"{self.test_root_dir}/dest_dir")
         self.teardown_extract_archive()
 
     def test_extract_archive_invalid_file(self):
         with pytest.raises(FileNotFoundError):
-            extract_archive(f"{self.test_root_dir}/non_existing_archive.zip", f"{self.test_root_dir}/dest_dir")
+            extract_archive(
+                f"{self.test_root_dir}/non_existing_archive.zip",
+                f"{self.test_root_dir}/dest_dir",
+            )
