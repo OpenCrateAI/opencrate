@@ -110,7 +110,7 @@ def build():
     Build the OpenCrate baseline image.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Building[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Building[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(cli.console, ">>"):
         utils.stream_docker_logs(
             command=cli.docker_client.api.build(
@@ -128,7 +128,7 @@ def start():
     Start the OpenCrate container.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Starting[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Starting[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(cli.console, ">>"):
         try:
             cli.docker_client.images.get(cli.config.get("docker_image"))
@@ -153,8 +153,9 @@ def start():
         except errors.NotFound:
             pass
 
+        branch_name = cli.config.get("version")
         utils.run_command(
-            f"docker compose --project-name={cli.config.get('name')} up {cli.config.get('name')}_development -d"
+            f"docker compose --project-name={cli.config.get('name')} up oc_{cli.config.get('name')}_{branch_name} -d"
         )
         cli.console.print("✔ Created and started new container")
         cli.get_help("enter_container")()
@@ -168,9 +169,7 @@ def stop(down: bool = False):
     """
 
     if not down:
-        cli.console.print(
-            f"\n░▒▓█ [[bold]Stopping[/bold]] > {cli.config.get('title')}\n"
-        )
+        cli.console.print(f"\n░▒▓█ [bold]Stopping[/bold] > {cli.config.get('title')}\n")
 
     with utils.spinner(cli.console, ">>"):
         try:
@@ -206,7 +205,7 @@ def enter():
     Enter the OpenCrate container.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Entering[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Entering[/bold] > {cli.config.get('title')}\n")
     try:
         container = cli.docker_client.containers.get(cli.config.get("docker_container"))
         if container.status == "running":
@@ -235,7 +234,7 @@ def commit(message: str):
     Commit changes to the OpenCrate container.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Committing[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Committing[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(cli.console, ">>"):
         try:
             container = cli.docker_client.containers.get(
@@ -261,7 +260,7 @@ def reset():
     Reset the OpenCrate environment.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Resetting[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Resetting[/bold] > {cli.config.get('title')}\n")
     try:
         stop(down=True)
         start()
@@ -275,7 +274,7 @@ def kill():
     """
     Kill the OpenCrate environment.
     """
-    cli.console.print(f"\n░▒▓█ [[bold]Killing[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Killing[/bold] > {cli.config.get('title')}\n")
 
     stop(down=True)
     try:
@@ -293,7 +292,12 @@ def kill():
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def branch(name: str, delete: bool = False):
+def branch(
+    name: Optional[str] = None,
+    create: bool = False,
+    delete: bool = False,
+    show: bool = False,
+):
     """
     Create a new branch for the OpenCrate environment.
 
@@ -301,9 +305,34 @@ def branch(name: str, delete: bool = False):
         name (str): The name of the new branch.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Branching[/bold]] > {cli.config.get('title')}\n")
+    # create, delete and show options are not allowed to be True at the same time. If any two of them are True, it will raise an assertion error > implement this
+    if show:
+        assert name is None and not create and not delete, (
+            "\n\nFor showing branches, using --name, --create and --delete options are not allowed.\n"
+        )
 
-    if delete:
+        cli.console.print("\n░▒▓█ [bold]Showing branches[/bold]")
+        git_branches = utils.run_command("git branch").strip().split("\n")
+        docker_images = [
+            f"oc-{cli.config.get('name')}:{branch.strip().replace('* ', '')}"
+            for branch in git_branches
+        ]
+        # show the list of branches and their corresponding Docker images in a table
+        cli.console.print(
+            "\n".join(
+                f"└─ {branch.strip().replace('* ', '')}\t-> {image}"
+                for branch, image in zip(git_branches, docker_images)
+            )
+        )
+    elif delete:
+        assert name, (
+            "\n\nYou must provide a branch name to delete. Use --name option.\n"
+        )
+        assert not create, (
+            "\n\nYou cannot delete a branch while creating a new one. Remove --create option.\n"
+        )
+
+        cli.console.print(f"\n░▒▓█ [bold]Deleting branch[/bold]: {name}\n")
         with utils.spinner(cli.console, ">>"):
             current_branch = utils.run_command(
                 "git rev-parse --abbrev-ref HEAD"
@@ -326,43 +355,68 @@ def branch(name: str, delete: bool = False):
                     f"[ERROR]: Image {image_name} not found, skipping...",
                     style="bold red",
                 )
-        return
-
-    with utils.spinner(cli.console, ">>"):
-        utils.run_command(f"git checkout -b {name}")
-        new_docker_image = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
-        new_docker_container = f"{new_docker_image.replace(':', '-')}-container"
-        dockercompose_filepath = "docker-compose.yml"
-        replacements = (
-            (cli.config.get("docker_image"), new_docker_image),
-            (cli.config.get("docker_container"), new_docker_container),
+    elif create:
+        assert name, (
+            "\n\nYou must provide a branch name to create. Use --name option.\n"
         )
-        with open(dockercompose_filepath, "r") as file:
-            file_contents = file.read()
-        for old_string, new_string in replacements:
-            file_contents = file_contents.replace(old_string, new_string)
-        with open(dockercompose_filepath, "w") as file:
-            file.write(file_contents)
 
-        cli.config.set("version", name)
-        cli.config.set("docker_image", new_docker_image)
-        cli.config.set("docker_container", new_docker_container)
-        cli.config.write()
+        with utils.spinner(cli.console, ">>"):
+            utils.run_command(f"git checkout -b {name}")
+            new_docker_image = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
+            new_docker_container = f"{new_docker_image.replace(':', '-')}-container"
 
-        utils.run_command("git add .", ignore_error=True)
-        utils.run_command(
-            f"git commit -m 'opencrate new branch {name}'",
-            ignore_error=True,
-        )
-        cli.docker_client.images.prune()
+            # dockercompose_filepath = "docker-compose.yml"
+            # replacements = (
+            #     (cli.config.get("docker_image"), new_docker_image),
+            #     (cli.config.get("docker_container"), new_docker_container),
+            # )
+            # with open(dockercompose_filepath, "r") as file:
+            #     file_contents = file.read()
+            # for old_string, new_string in replacements:
+            #     file_contents = file_contents.replace(old_string, new_string)
+            # with open(dockercompose_filepath, "w") as file:
+            #     file.write(file_contents)
 
-    # check if the container is running
-    if cli.config.get("docker_container") in [
-        container.name for container in cli.docker_client.containers.list()
-    ]:
-        stop(down=True)
-    build()
-    start()
+            utils.replace_in_file(
+                file_path="docker-compose.yml",
+                replacements=[
+                    (cli.config.get("docker_image"), new_docker_image),
+                    (cli.config.get("docker_container"), new_docker_container),
+                    (
+                        f"oc_{cli.config.get('name')}_{cli.config.get('version')}",
+                        f"oc_{cli.config.get('name')}_{name}",
+                    ),
+                ],
+            )
+            utils.replace_in_file(
+                file_path=".devcontainer/devcontainer.json",
+                replacements=[
+                    (
+                        f"oc_{cli.config.get('name')}_{cli.config.get('version')}",
+                        f"oc_{cli.config.get('name')}_{name}",
+                    ),
+                ],
+            )
+
+            cli.config.set("version", name)
+            cli.config.set("docker_image", new_docker_image)
+            cli.config.set("docker_container", new_docker_container)
+            cli.config.write()
+
+            utils.run_command("git add .", ignore_error=True)
+            utils.run_command(
+                f"git commit -m 'opencrate new branch {name}'",
+                ignore_error=True,
+            )
+            cli.docker_client.images.prune()
+
+        # check if the container is running
+        if cli.config.get("docker_container") in [
+            container.name for container in cli.docker_client.containers.list()
+        ]:
+            stop(down=True)
+        build()
+        start()
 
 
 # @app.command()
@@ -375,7 +429,7 @@ def branch(name: str, delete: bool = False):
 #         name (str): The name of the branch to checkout.
 #     """
 
-#     cli.console.print(f"\n░▒▓█ [[bold]Checking out[/bold]] > {cli.config.get('title')}\n")
+#     cli.console.print(f"\n░▒▓█ [bold]Checking out[/bold] > {cli.config.get('title')}\n")
 
 #     with utils.spinner(cli.console, ">>"):
 #         utils.run_command(f"git checkout {name}")
@@ -421,7 +475,7 @@ def branch(name: str, delete: bool = False):
 
 #     new_version = f"v{int(cli.config.get('version')[1:]) + 1}"
 #     new_docker_image = f"{cli.config.get('docker_image').split(':')[0]}:{new_version}"
-#     cli.console.print(f"\n░▒▓█ [[bold]Releasing[/bold]] > {new_docker_image}")
+#     cli.console.print(f"\n░▒▓█ [bold]Releasing[/bold] > {new_docker_image}")
 #     git_new_path = os.path.join(os.path.dirname(__file__), "bash", "git_new.sh")
 #     current_git_branch = utils.run_command("git rev-parse --abbrev-ref HEAD").strip()
 
@@ -487,7 +541,7 @@ def checkout(
     Checkout a specific version of the OpenCrate environment.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Checking out[/bold]] > {name}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Checking out[/bold] > {name}\n")
 
     stop()
     with utils.spinner(cli.console, ">>"):
@@ -507,7 +561,7 @@ def clone(git_url: str):
     """
 
     repo_name = git_url.split("/")[-1].replace(".git", "")
-    cli.console.print(f"\n░▒▓█ [[bold]Cloning[/bold]] > {git_url}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Cloning[/bold] > {git_url}\n")
 
     try:
         # Clone the repository
@@ -545,7 +599,7 @@ def status():
     Display the status of the OpenCrate environment.
     """
 
-    cli.console.print(f"\n░▒▓█ [[bold]Status[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Status[/bold] > {cli.config.get('title')}\n")
     cli.console.print(f"- Task:\t{cli.config.get('task')}")
     cli.console.print(f"- Framework:\t{cli.config.get('framework')}")
     cli.console.print(f"- Python:\t{cli.config.get('python_version')}")
@@ -665,7 +719,7 @@ def launch(
             exit(1)
 
     cli.console.print(
-        f"\n░▒▓█ [[bold]Launching[/bold]] > {workflow if isinstance(workflow, str) else workflow.__name__}"
+        f"\n░▒▓█ [bold]Launching[/bold] > {workflow if isinstance(workflow, str) else workflow.__name__}"
     )
 
     use_config = config
@@ -773,7 +827,7 @@ def snapshot(name: str, reset: bool = False, show: bool = False):
 
     import opencrate as oc
 
-    cli.console.print(f"\n░▒▓█ [[bold]Snapshot[/bold]] > {cli.config.get('title')}\n")
+    cli.console.print(f"\n░▒▓█ [bold]Snapshot[/bold] > {cli.config.get('title')}\n")
     if reset:
         cli.console.print(f"✔ Resetting {name} snapshot")
         oc.snapshot.snapshot_name = name

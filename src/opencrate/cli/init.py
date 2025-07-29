@@ -467,8 +467,8 @@ def init():
                 file.write(line)
         setup_git_repository(config["project_dir"], config["git_remote_url"])
     except Exception as e:
-        error_traceback = traceback.format_exc()
-        if os.path.exists(config["project_name"]):
-            rmtree(config["project_name"])
+        # error_traceback = traceback.format_exc()
+        # if os.path.exists(config["project_name"]):
+        #     rmtree(config["project_name"])
         console.print(f"[ERROR] > Initializing the project: {e}")
-        console.print(f"[dim]\n{error_traceback}[/dim]")
+        # console.print(f"[dim]\n{error_traceback}[/dim]")
