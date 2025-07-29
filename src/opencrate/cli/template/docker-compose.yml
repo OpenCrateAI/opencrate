@@ -1,5 +1,5 @@
 services:
-    {{name}}_development:
+    {{name}}_devcontainer:
         build:
             context: .
             dockerfile: Dockerfile

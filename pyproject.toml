@@ -25,7 +25,6 @@ classifiers = [
     "Programming Language :: Python :: 3.13"
 ]
 dependencies = [
-    "mkdocstrings-python",
     "pydantic_settings",
     "prompt-toolkit",
     "questionary",
@@ -33,7 +32,7 @@ dependencies = [
     "matplotlib",
     "pandas",
     "numpy",
-    "opencv-python-headless",
+    "opencv-python",
     "rich",
     "typer",
     "loguru",
@@ -60,6 +59,7 @@ dev = [
     "build",
     "mkdocs",
     "mkdocs-material",
+    "mkdocstrings-python",
 ]
 
 [project.scripts]

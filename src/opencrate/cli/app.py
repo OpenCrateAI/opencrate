@@ -4,7 +4,7 @@ from rich.console import Console
 console = Console()
 
 app = typer.Typer(
-    help="🚀 Opencrate Project Initialization",
+    help="░▒▓█ OpenCrate CLI",
     no_args_is_help=True,
     pretty_exceptions_enable=False,
 )

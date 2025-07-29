@@ -7,7 +7,7 @@
 </div>
 
 
-## __🛠 Configuration__
+## __# Configuration__
 
 | **Config** | **Value** |
 | --- | --- |
@@ -20,11 +20,9 @@
 | 🐋 Docker Image | {{docker_image}} |
 | 🖥 Runtime | {{runtime}} |
 
-## __📥  Installation__
+## __# Installation__
 
 ```
-$ git clone {{git_remote_url}} && cd {{name}}
-$ oc build
-$ oc start
+$ oc clone {{git_remote_url}}
 $ oc enter
 ```

@@ -1,5 +1,6 @@
 import json
 import os
+import re
 import subprocess
 import sys
 from contextlib import contextmanager
@@ -13,7 +14,7 @@ from rich.tree import Tree
 
 @contextmanager
 def spinner(console, message):
-    with console.status(message, spinner="point"):
+    with console.status(message, spinner="dots"):
         try:
             yield
         finally:
@@ -32,6 +33,32 @@ def spinner(console, message):
 #     return wrapper
 
 
+def stream_docker_logs(command, console: Console, is_build=False):
+    ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
+
+    try:
+        for line in command:
+            if is_build:
+                if "stream" in line:
+                    clean_line = ansi_escape.sub("", line["stream"].rstrip())
+                    console.print(f"[#919191]{clean_line}[/]")
+                elif "status" in line:
+                    clean_line = ansi_escape.sub("", line["status"])
+                    console.print(f"[#919191]{clean_line}[/]")
+                elif "error" in line:
+                    raise Exception(f"{line['error']}")
+            else:
+                stdout, stderr = line
+                if stdout:
+                    clean_stdout = ansi_escape.sub("", stdout.decode("utf-8").strip())
+                    console.print(f"[#919191]{clean_stdout}[/]")
+                if stderr:
+                    clean_stderr = ansi_escape.sub("", stderr.decode("utf-8").strip())
+                    console.print(clean_stderr, style="bold red")
+    except Exception as e:
+        console.print(f"\n[ERROR]: Build failed > {e}", style="bold red")
+
+
 def handle_exceptions(console: Console) -> Callable[[Any], Any]:
     def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
         @wraps(func)
@@ -41,7 +68,10 @@ def handle_exceptions(console: Console) -> Callable[[Any], Any]:
             elif func.__name__ == "init":
                 return func(*args, **kwargs)
             else:
-                console.print(f" ⊝ [ERROR]: This is not a OpenCrate project directory", style="bold red")
+                console.print(
+                    "[ERROR]: This is not a OpenCrate project directory",
+                    style="bold red",
+                )
                 sys.exit(1)
             # try:
             #     return func(*args, **kwargs)
@@ -60,7 +90,12 @@ def handle_exceptions(console: Console) -> Callable[[Any], Any]:
     return decorator
 
 
-def run_command(command: str, show_output: bool = False, verbose: bool = False, ignore_error: bool = False):
+def run_command(
+    command: str,
+    show_output: bool = False,
+    verbose: bool = False,
+    ignore_error: bool = False,
+):
     try:
         if verbose:
             process = subprocess.Popen(
@@ -80,7 +115,13 @@ def run_command(command: str, show_output: bool = False, verbose: bool = False, 
                     print(output.strip())
             return process.poll()
         else:
-            result = subprocess.run(command, shell=True, capture_output=not show_output, text=True, check=True)
+            result = subprocess.run(
+                command,
+                shell=True,
+                capture_output=not show_output,
+                text=True,
+                check=True,
+            )
             return result.stdout.strip() if not show_output else result.returncode
     except subprocess.CalledProcessError as e:
         if not ignore_error:
@@ -125,7 +166,9 @@ def show_project_structure(console):
 
     # Add subdirectories and files
     assets = tree.add("📁 assets                [dark_cyan].........created folder")
-    assets_dataset = assets.add("📁 dataset           [dark_cyan].........created folder")
+    assets_dataset = assets.add(
+        "📁 dataset           [dark_cyan].........created folder"
+    )
     assets_dataset.add("📁 raw           [dark_cyan].........created folder")
     assets_dataset.add("📁 train         [dark_cyan].........created folder")
     assets_dataset.add("📁 val           [dark_cyan].........created folder")

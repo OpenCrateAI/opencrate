@@ -10,13 +10,7 @@ git init &> /dev/null
 git add . &> /dev/null
 
 # Commit the changes
-git commit -m 'oc-init' &> /dev/null
-
-# Rename the current branch to main-v0
-git branch -m main-v0 &> /dev/null
-
-# Create and switch to a new branch dev-v0
-git checkout -b dev-v0 &> /dev/null
+git commit -m 'opencrate initial commit' &> /dev/null
 
 # # Add the remote repository
 # git remote add origin "$git_remote_url"

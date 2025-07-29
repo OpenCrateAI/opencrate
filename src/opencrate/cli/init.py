@@ -27,8 +27,12 @@ LOGGING_FRAMEWORKS = {
 PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/template"
-REQUIREMENTS_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/requirements"
-GIT_BASH_SCRIPT = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
+REQUIREMENTS_DIR = (
+    Path(__file__).resolve().parent.parent.parent / "opencrate/cli/requirements"
+)
+GIT_BASH_SCRIPT = (
+    Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
+)
 
 EMOJIS = {
     "Image": "🐶",
@@ -63,7 +67,12 @@ DATATYPE_TASKS = {
         "Zero-Shot Image Classification",
         "Image Feature Extraction",
     ],
-    "Video": ["Video Classification", "Video-to-Text", "Text-to-Video", "Video Feature Extraction"],
+    "Video": [
+        "Video Classification",
+        "Video-to-Text",
+        "Text-to-Video",
+        "Video Feature Extraction",
+    ],
     "Text": [
         "Text Classification",
         "Context Question Answering",
@@ -101,76 +110,105 @@ def safe_prompt(prompt_func):
 def prompt_project_details():
     project_title = safe_prompt(
         lambda: questionary.text(
-            "📦 Project Name:",
+            "● Project Name:",
             qmark="",
-            validate=lambda text: True if len(text) > 0 else "❌ Please enter Project Name, can't be empty.",
+            validate=lambda text: True
+            if len(text) > 0
+            else "Please enter Project Name, can't be empty.",
         ).ask()
     )
-    project_name = project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
+    project_name = (
+        project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
+    )
 
     project_description = safe_prompt(
-        lambda: questionary.text("💬 Give a brief description of your project:", multiline=True, qmark="").ask()
+        lambda: questionary.text(
+            "● Give a brief description of your project:", multiline=True, qmark=""
+        ).ask()
     )
 
     project_datatypes = safe_prompt(
         lambda: questionary.checkbox(
-            "🏷️ Select the types of datasets you're gonna be dealing with:",
+            "● Select the types of datasets you're gonna be dealing with:",
             choices=[
-                {"name": f"{data_type}", "value": data_type, "checked": data_type == "Image"}
+                {
+                    "name": f"{data_type}",
+                    "value": data_type,
+                    "checked": data_type == "Image",
+                }
                 for data_type in DATATYPES
             ],
             qmark="",
-            validate=lambda x: True if len(x) > 0 else "❌ Please select at least one datatype",
+            validate=lambda x: True
+            if len(x) > 0
+            else "Please select at least one datatype",
         ).ask(),
     )
 
     if len(project_datatypes) == 0:
         while len(project_datatypes) == 0:
-            console.print("\n❌ Please select at least one datatype")
+            console.print("\nPlease select at least one datatype")
             project_datatypes = safe_prompt(
                 lambda: questionary.checkbox(
-                    "🏷️ Select the types of datasets you're gonna be dealing with:",
+                    "● Select the types of datasets you're gonna be dealing with:",
                     choices=[
-                        {"name": f"{data_type}", "value": data_type, "checked": data_type == "Image"}
+                        {
+                            "name": f"{data_type}",
+                            "value": data_type,
+                            "checked": data_type == "Image",
+                        }
                         for data_type in DATATYPES
                     ],
                     qmark="",
-                    validate=lambda x: True if len(x) > 0 else "❌ Please select at least one datatype",
+                    validate=lambda x: True
+                    if len(x) > 0
+                    else "Please select at least one datatype",
                 ).ask(),
             )
 
     project_task = safe_prompt(
         lambda: questionary.select(
-            f"🎯 Select the specific task for your {' '.join(project_datatypes)} data type:",
-            choices=[task for datatype in project_datatypes for task in DATATYPE_TASKS[datatype]],
+            f"● Select the specific task for your {' '.join(project_datatypes)} data type:",
+            choices=[
+                task
+                for datatype in project_datatypes
+                for task in DATATYPE_TASKS[datatype]
+            ],
             qmark="",
         ).ask()
     )
 
     project_framework = safe_prompt(
         lambda: questionary.select(
-            "🛠️ Select pre-baked opencrate containers for your framework:",
-            choices=[{"name": f"{framework}", "value": framework} for framework in ML_FRAMEWORKS],
+            "● Select pre-baked opencrate containers for your framework:",
+            choices=[
+                {"name": f"{framework}", "value": framework}
+                for framework in ML_FRAMEWORKS
+            ],
             qmark="",
-            default={"name": f"{'PyTorch'}", "value": "PyTorch"},
+            default={"name": "PyTorch", "value": "PyTorch"},
         ).ask()
     )
 
     project_logging = safe_prompt(
         lambda: questionary.select(
-            "📜 Select your logging framework of choice:",
+            "● Select your logging framework of choice:",
             choices=[
-                *[{"name": f"{framework}", "value": framework} for framework in LOGGING_FRAMEWORKS.keys()],
+                {"name": f"{framework}", "value": framework}
+                for framework in LOGGING_FRAMEWORKS.keys()
             ],
             qmark="",
-            default={"name": "None", "value": None},
+            default={"name": "None", "value": "None"},
         ).ask()
     )
 
     project_python_version = safe_prompt(
         lambda: questionary.select(
-            "🐍 Select your python environment version:",
-            choices=[{"name": f"{version}", "value": f"{version}"} for version in PYTHON_VERSIONS],
+            "● Select your python environment version:",
+            choices=[
+                {"name": f"{version}", "value": f"{version}"}
+                for version in PYTHON_VERSIONS
+            ],
             qmark="",
             default={"name": "3.10", "value": "3.10"},
         ).ask()
@@ -178,8 +216,11 @@ def prompt_project_details():
 
     project_runtime = safe_prompt(
         lambda: questionary.select(
-            "⚡ Select your runtime environment:",
-            choices=[{"name": "CUDA", "value": "cuda"}, {"name": "CPU", "value": "cpu"}],
+            "● Select your runtime environment:",
+            choices=[
+                {"name": "CUDA", "value": "cuda"},
+                {"name": "CPU", "value": "cpu"},
+            ],
             qmark="",
             default={"name": "CUDA", "value": "cuda"},
         ).ask()
@@ -188,7 +229,7 @@ def prompt_project_details():
     if project_runtime == "cuda" and project_framework == "PyTorch":
         project_framework_runtime = safe_prompt(
             lambda: questionary.select(
-                "🟢 Select your cuda driver version",
+                "● Select your cuda driver version",
                 choices=[
                     {"name": "CUDA 12.4 [Latest]", "value": "12.4"},
                     {"name": "CUDA 12.1", "value": "12.1"},
@@ -206,12 +247,14 @@ def prompt_project_details():
 
     if not safe_prompt(
         lambda: questionary.confirm(
-            "❓ Initialize project in current directory?",
+            "● Initialize project in current directory?",
             qmark="",
         ).ask()
     ):
         project_dir = os.path.join(
-            questionary.path("⌨️ Enter the path to the root project directory:", qmark="").ask(),
+            questionary.path(
+                "● Enter the path to the root project directory:", qmark=""
+            ).ask(),
             project_name,
         )
     else:
@@ -219,14 +262,16 @@ def prompt_project_details():
 
     if os.path.exists(project_dir):
         if not questionary.confirm(
-            f"❓ OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
+            f"● OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
             qmark="",
         ).ask():
             sys.exit(0)
 
-    git_remote_url = safe_prompt(lambda: questionary.path("🔗 Set Git Remote URL:", qmark="", default="").ask())
+    git_remote_url = safe_prompt(
+        lambda: questionary.path("● Set Git Remote URL:", qmark="", default="").ask()
+    )
 
-    project_docker_image = f"oc-{project_name}:v0"
+    project_docker_image = f"oc-{project_name}:main"
     project_docker_container = f"{project_docker_image.replace(':', '-')}-container"
 
     return {
@@ -277,9 +322,9 @@ def create_project_structure(config):
         config_setting = ConfigSetting(
             title=config["project_title"],
             name=config["project_name"],
-            version="v0",
+            version="main",
             description=config["project_description"],
-            datatypes=config["project_datatypes"],
+            datatypes=", ".join(config["project_datatypes"]),
             task=config["project_task"],
             framework=config["project_framework"],
             logging=config["project_logging"],
@@ -307,7 +352,10 @@ def create_project_structure(config):
 
 
 def setup_git_repository(project_dir, git_remote_url):
-    utils.run_command(f"cd {project_dir} && bash {GIT_BASH_SCRIPT} {git_remote_url} && cd ..", show_output=True)
+    utils.run_command(
+        f"cd {project_dir} && bash {GIT_BASH_SCRIPT} {git_remote_url} && cd ..",
+        show_output=True,
+    )
 
 
 def start_project(config):
@@ -365,16 +413,16 @@ def display_summary(path: str):
 
             # Then add files
             for entry in files:
-                ext = os.path.splitext(entry.name)[1]
-                emoji = FILE_TYPE_EMOJIS.get(ext, "📄")
-                if entry.name == "Dockerfile":
-                    emoji = FILE_TYPE_EMOJIS.get("Dockerfile", "📄")
-                elif entry.name == "docker-compose.yml":
-                    emoji = FILE_TYPE_EMOJIS.get("docker-compose.yml", "📄")
-                tree.add(f"{emoji} {entry.name}")
+                # ext = os.path.splitext(entry.name)[1]
+                # emoji = FILE_TYPE_EMOJIS.get(ext, "📄")
+                # if entry.name == "Dockerfile":
+                #     emoji = FILE_TYPE_EMOJIS.get("Dockerfile", "📄")
+                # elif entry.name == "docker-compose.yml":
+                #     emoji = FILE_TYPE_EMOJIS.get("docker-compose.yml", "📄")
+                tree.add(f"/{entry.name}")
 
         except OSError as e:
-            console.print(f"⤬ [ERROR] > Unable to access {path}: {e}")
+            console.print(f"[ERROR] > Unable to access {path}: {e}")
             return
 
     tree = Tree(f"[bold]{os.path.basename(path)}[/bold]")  # Root node
@@ -385,18 +433,42 @@ def display_summary(path: str):
 @app.command()
 @utils.handle_exceptions(console)
 def init():
-    console.print(f"\n░▒▓█ [[bold]Initializing[/bold]]\n")
+    console.print("\n░▒▓█ [[bold]Initializing[/bold]]\n")
 
     config = prompt_project_details()
     try:
         create_project_structure(config)
-        setup_git_repository(config["project_dir"], config["git_remote_url"])
         start_project(config)
         display_summary(config["project_dir"])
-        console.print(f"\n🚀 [bold]Project initialized successfully![/]")
+        utils.run_command(
+            f"docker exec {config['project_docker_container']} pip freeze > {config['project_dir']}/.opencrate/requirements.txt",
+        )
+        requirements_path = os.path.join(
+            config["project_dir"], ".opencrate", "requirements.txt"
+        )
+        with open(requirements_path, "r") as file:
+            lines = file.readlines()
+        with open(requirements_path, "w") as file:
+            for line in lines:
+                if (
+                    "-e /home/opencrate" not in line
+                    and "# Editable install with no version control" not in line
+                ):
+                    file.write(line)
+        console.print("\n✔ [bold]OpenCrate initialized successfully![/]")
+
+        dockerfile_path = os.path.join(config["project_dir"], "Dockerfile")
+        with open(dockerfile_path, "r") as file:
+            lines = file.readlines()
+        with open(dockerfile_path, "w") as file:
+            for line in lines:
+                if "# " in line:
+                    line = line.replace("# ", "")
+                file.write(line)
+        setup_git_repository(config["project_dir"], config["git_remote_url"])
     except Exception as e:
         error_traceback = traceback.format_exc()
         if os.path.exists(config["project_name"]):
             rmtree(config["project_name"])
-        console.print(f"⤬ [ERROR] > Initializing the project: {e}")
+        console.print(f"[ERROR] > Initializing the project: {e}")
         console.print(f"[dim]\n{error_traceback}[/dim]")

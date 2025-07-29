@@ -195,6 +195,7 @@ class OpenCrate:
     use_config: str = "default"
     start: Optional[Union[str, int]] = None
     tag: Optional[str] = None
+    log_level: str = "info"
     replace: bool = False
     finetune: Optional[str] = None
     finetune_tag: Optional[str] = None

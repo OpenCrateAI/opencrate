@@ -1,20 +1,20 @@
 torch
 torchvision
-torchtext
-torchaudio
-torchdata
+# torchtext
+# torchaudio
+# torchdata
 
---extra-index-url https://pypi.org/simple
-torchinfo
-torchmetrics
-pytorch-lightning 
-huggingface
-datasets
-diffusers
-accelerate
-safetensors
-captum
-albumentations
+# --extra-index-url https://pypi.org/simple
+# torchinfo
+# torchmetrics
+# pytorch-lightning 
+# huggingface
+# datasets
+# diffusers
+# accelerate
+# safetensors
+# captum
+# albumentations
 
 docker
 

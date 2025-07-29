@@ -4,8 +4,12 @@ import docker
 from rich.console import Console
 from utils import CLInstall, spinner, stream_docker_logs, write_python_version
 
-parser = argparse.ArgumentParser(description="Build Dockerfile with specified configurations.")
-parser.add_argument("--python", type=float, default=3.10, help="Specify the Python version to use.")
+parser = argparse.ArgumentParser(
+    description="Build Dockerfile with specified configurations."
+)
+parser.add_argument(
+    "--python", type=float, default=3.10, help="Specify the Python version to use."
+)
 parser.add_argument("--runtime", type=str, default="cuda", help="Specify the runtime")
 
 args = parser.parse_args()
@@ -30,6 +34,7 @@ UBUNTU_POST_INSTALLATION = [
             "git",
             "speedtest-cli",
             "iputils-ping",
+            "libcairo2-dev",
         ],
         pre_installation_steps=[
             "apt update -y",
@@ -112,7 +117,9 @@ if python_version <= 7:
 PYTHON_INSTALL = CLInstall(
     install_cmd="apt install -y --no-install-recommends",
     packages=[
-        f"python{args.python}-distutils" if python_version <= 11 else f"python{args.python}",
+        f"python{args.python}-distutils"
+        if python_version <= 11
+        else f"python{args.python}",
         f"python{args.python}-dev",
         # f"python{args.python}-venv",
     ],
@@ -127,7 +134,7 @@ PYTHON_INSTALL = CLInstall(
             if python_version >= 8
             else f"curl -sS https://bootstrap.pypa.io/pip/{args.python}/get-pip.py | python{args.python}"
         ),
-        f"python{args.python} -m pip install --upgrade pip --root-user-action=ignore",
+        f"python{args.python} -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir",
         (
             "ENV PATH='/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin:/root/.cargo/bin:${PATH}'"
             if python_version <= 7
@@ -141,34 +148,34 @@ PYTHON_PACKAGES = [
         install_cmd=f"python{args.python} -m pip install --no-cache-dir --upgrade --root-user-action=ignore",
         packages=[
             "matplotlib",
-            "seaborn",
+            # "seaborn",
             "scikit-learn",
             "pandas",
             "ipython",
-            "scipy",
-            "opencv-python",
+            # "scipy",
+            # "opencv-python",
             "pillow",
             "jupyter",
-            "rich",
+            # "rich",
             "requests",
-            "loguru",
-            "onnxruntime-gpu" if args.runtime == "cuda" else "onnxruntime",
+            # "loguru",
+            # "onnxruntime-gpu" if args.runtime == "cuda" else "onnxruntime",
         ],
         post_installation_steps=[
             f"python{args.python} -m pip cache purge",
         ],
     ),
 ]
-if python_version >= 9 and python_version != 13 and args.runtime == "cuda":
-    PYTHON_PACKAGES.append(
-        CLInstall(
-            install_cmd=f"python{args.python} -m pip install --no-cache-dir --upgrade --root-user-action=ignore --extra-index-url=https://pypi.nvidia.com",
-            packages=["cudf-cu12"],
-            post_installation_steps=[
-                f"python{args.python} -m pip cache purge",
-            ],
-        ),
-    )
+# if python_version >= 9 and python_version != 13 and args.runtime == "cuda":
+#     PYTHON_PACKAGES.append(
+#         CLInstall(
+#             install_cmd=f"python{args.python} -m pip install --no-cache-dir --upgrade --root-user-action=ignore --extra-index-url=https://pypi.nvidia.com",
+#             packages=["cudf-cu12"],
+#             post_installation_steps=[
+#                 f"python{args.python} -m pip cache purge",
+#             ],
+#         ),
+#     )
 
 FROM_IMAGE = (
     """FROM nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
@@ -266,7 +273,9 @@ def main():
 
         dockerfile_content = clean_dockerfile(dockerfile_content)
 
-        dockerfile_path = f"./.docker/dockerfiles/Dockerfile:{image_name.replace('opencrate-', '')}"
+        dockerfile_path = (
+            f"./.docker/dockerfiles/Dockerfile:{image_name.replace('opencrate-', '')}"
+        )
 
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
