@@ -12,10 +12,7 @@ class ConfigSetting(BaseSettings):
     version: str
     description: str
     datatypes: str
-    task: str
     framework: str
-    logging: str
-    logging_package: str
     python_version: str
     pull_docker_image: str
     docker_image: str

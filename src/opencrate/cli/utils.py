@@ -13,7 +13,7 @@ from rich.tree import Tree
 
 
 @contextmanager
-def spinner(console, message):
+def spinner(console: Console, message: str):
     with console.status(message, spinner="dots"):
         try:
             yield
@@ -72,7 +72,7 @@ def run_command(
     show_output: bool = False,
     verbose: bool = False,
     ignore_error: bool = False,
-):
+) -> str:
     try:
         if verbose:
             process = subprocess.Popen(
@@ -90,7 +90,7 @@ def run_command(
                     break
                 if output:
                     print(output.strip())
-            return process.poll()
+            return str(process.poll())
         else:
             result = subprocess.run(
                 command,
@@ -99,10 +99,11 @@ def run_command(
                 text=True,
                 check=True,
             )
-            return result.stdout.strip() if not show_output else result.returncode
+            return result.stdout.strip() if not show_output else str(result.returncode)
     except subprocess.CalledProcessError as e:
         if not ignore_error:
             raise Exception(f"An error occurred: {e.stderr.strip()}")
+        return ""
 
 
 def create_file(path: str, content):

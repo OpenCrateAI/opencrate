@@ -23,11 +23,11 @@ UBUNTU_POST_INSTALLATION = [
             "software-properties-common",
             "ca-certificates",
             "build-essential",
-            "pkg-config",
-            "libgoogle-perftools-dev",
-            "cmake",
+            # "pkg-config",
+            # "libgoogle-perftools-dev",
+            # "cmake",
             "tzdata",
-            "gcc",
+            # "gcc",
             "wget",
             "curl",
             "vim",
@@ -53,7 +53,7 @@ CLI_PACKAGES = [
             "apt update -y",
         ],
         packages=[
-            "fontconfig",
+            # "fontconfig",
             "btop",
             "unrar",
             "make",
@@ -84,7 +84,6 @@ CLI_PACKAGES = [
         packages="zsh",
         pre_installation_steps=[
             "COPY .docker/cli/ /home/",
-            "COPY .docker/fonts/ /home/",
         ],
         post_installation_steps=[
             "chsh -s $(which zsh)",
@@ -92,7 +91,6 @@ CLI_PACKAGES = [
             "git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k",
             "git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions",
             "git clone https://github.com/zsh-users/zsh-syntax-highlighting.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-syntax-highlighting",
-            "git clone https://github.com/marlonrichert/zsh-autocomplete.git ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autocomplete",
             "curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh",
             "mv /home/zsh/.zshrc ~/.zshrc && mv /home/zsh/.p10k.zsh ~/.p10k.zsh && mv /home/zsh/.aliases.sh ~/ && mv /home/zsh/.exports.sh ~/",
             "mkdir -p ~/.config/btop/ && mkdir -p ~/.config/atuin/ && mkdir -p ~/.config/fastfetch/",
@@ -100,10 +98,6 @@ CLI_PACKAGES = [
             "cp -r /home/atuin/ ~/.config/",
             "cp -r /home/fastfetch/ ~/.config/",
             "rm -rf /home/zsh/",
-            "mkdir -p ~/.local/share/fonts",
-            "cp /home/*ttf ~/.local/share/fonts/",
-            "fc-cache -f -v",
-            "rm /home/*ttf",
         ],
     ),
 ]
@@ -147,18 +141,8 @@ PYTHON_PACKAGES = [
     CLInstall(
         install_cmd=f"python{args.python} -m pip install --no-cache-dir --upgrade --root-user-action=ignore",
         packages=[
-            "matplotlib",
-            # "seaborn",
-            "scikit-learn",
-            "pandas",
             "ipython",
-            # "scipy",
-            # "opencv-python",
-            "pillow",
             "jupyter",
-            # "rich",
-            "requests",
-            # "loguru",
             # "onnxruntime-gpu" if args.runtime == "cuda" else "onnxruntime",
         ],
         post_installation_steps=[
@@ -206,9 +190,9 @@ WORKDIR /home/opencrate/
 COPY src/ /home/opencrate/src
 COPY pyproject.toml /home/opencrate/
 COPY setup.cfg /home/opencrate/
-COPY setup.py /home/opencrate/
 COPY .docker/requirements/{requirements} /home/opencrate/
 RUN python{args.python} -m pip install -r {requirements} --no-cache-dir --root-user-action=ignore
+COPY setup.py /home/opencrate/
 RUN python{args.python} -m pip install -e . --no-cache-dir --root-user-action=ignore
 """
 
@@ -247,7 +231,7 @@ def main():
 
         dockerfile_base_content = clean_dockerfile(dockerfile_base_content)
 
-        dockerfile_base_path = f"./.docker/dockerfiles/Dockerfile:base"
+        dockerfile_base_path = "./.docker/dockerfiles/Dockerfile:base"
         with open(dockerfile_base_path, "w") as f:
             f.write(dockerfile_base_content)
         stream_docker_logs(
@@ -255,7 +239,7 @@ def main():
             command=docker_client.api.build(  # type: ignore
                 path=".",
                 dockerfile=dockerfile_base_path,
-                tag=f"opencrate-base:latest",
+                tag="opencrate-base:latest",
                 rm=True,
                 decode=True,
             ),

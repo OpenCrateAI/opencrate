@@ -94,7 +94,7 @@ class Snapshot:
             )
         try:
             start = int(start)
-        except:
+        except:  # noqa: E722
             pass
         if not isinstance(start, (int, str)) or (  # type: ignore
             isinstance(start, str) and start not in ["new", "last", "dev"]
