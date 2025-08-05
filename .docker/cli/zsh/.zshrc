@@ -88,7 +88,7 @@ plugins=(
   virtualenv
   docker
 
-  zsh-autosuggestions # even though we have atuinm, this is a good fallback
+  zsh-autosuggestions
   zsh-syntax-highlighting
 )
 
@@ -99,8 +99,6 @@ export PATH="/usr/local/bin:$PATH"
 if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi
-
-source ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autocomplete/zsh-autocomplete.plugin.zsh
 
 # To customize prompt, run `p10k configure` or edit ~/.p10k.zsh.
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh

@@ -4,32 +4,41 @@ from typing import List, Union
 
 import imageio
 import numpy as np
-import torch
 from PIL import Image, ImageSequence
 
 
-def _to_gif(images: List[Union[np.ndarray, torch.Tensor, Image.Image]], output_path: str, fps: int = 10):
+def _to_gif(
+    images: List[Union[np.ndarray, Image.Image]], output_path: str, fps: int = 10
+):
     images_ = []
     for img in images:
-        if isinstance(img, torch.Tensor):
-            if len(img.shape) == 3:
-                img = img.permute(1, 2, 0).numpy()
-            elif img.shape[0] == 1:
-                img = img[0].numpy()
-            else:
-                img = img.numpy()
-        elif isinstance(img, Image.Image):
+        if isinstance(img, Image.Image):
             img = np.array(img)
-        elif isinstance(img, np.ndarray) and img.shape[0] == 1:
+        elif isinstance(img, np.ndarray) and len(img.shape) == 3 and img.shape[0] == 1:
+            # Remove batch dimension if present (shape: [1, H, W] or [1, H, W, C])
             img = img[0]
 
-        img = (img - img.min()) / (img.max() - img.min())
-        images_.append((img * 255.0).astype("uint8"))
+        # Ensure img is numpy array at this point
+        if not isinstance(img, np.ndarray):
+            raise TypeError(
+                f"Unsupported image type: {type(img)}. Expected numpy.ndarray or PIL.Image"
+            )
+
+        # Normalize to [0, 1] range
+        img_min, img_max = img.min(), img.max()
+        if img_max > img_min:
+            img = (img - img_min) / (img_max - img_min)
+        else:
+            # Handle constant images
+            img = np.zeros_like(img)
+
+        # Convert to uint8 [0, 255] range
+        images_.append((img * 255.0).astype(np.uint8))
 
     imageio.mimsave(output_path, images_, fps=fps)
 
 
-def dir_to_gif(src_dir: os.PathLike, output_path: str, fps: int = 10):
+def dir_to_gif(src_dir: str, output_path: str, fps: int = 10):
     """
     Converts all images in a directory to a GIF.
 
@@ -42,7 +51,10 @@ def dir_to_gif(src_dir: os.PathLike, output_path: str, fps: int = 10):
 
     # Sort files to ensure correct sequence
     def natural_sort_key(s):
-        return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", str(s))]
+        return [
+            int(text) if text.isdigit() else text.lower()
+            for text in re.split(r"(\d+)", str(s))
+        ]
 
     for filename in sorted(os.listdir(src_dir), key=natural_sort_key):
         if filename.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff")):
@@ -51,18 +63,22 @@ def dir_to_gif(src_dir: os.PathLike, output_path: str, fps: int = 10):
             images.append(img)
 
     if not images:
-        raise ValueError(f"\n\nNo valid image files found in '{src_dir}' for creating the gif\n")
+        raise ValueError(
+            f"\n\nNo valid image files found in '{src_dir}' for creating the gif\n"
+        )
 
     # Use _to_gif helper function
     _to_gif(images, output_path, fps)
 
 
-def images_to_gif(images: List[Union[np.ndarray, torch.Tensor, Image.Image]], output_path: str, fps: int = 10):
+def images_to_gif(
+    images: List[Union[np.ndarray, Image.Image]], output_path: str, fps: int = 10
+):
     """
     Converts a list of images to a GIF.
 
     Args:
-        images: List of images (supports numpy arrays, PyTorch tensors, and PIL images)
+        images: List of images (supports numpy arrays and PIL images)
         output_path: Path where the GIF will be saved
         fps: Frames per second for the output GIF
     """
@@ -70,7 +86,7 @@ def images_to_gif(images: List[Union[np.ndarray, torch.Tensor, Image.Image]], ou
     _to_gif(images, output_path, fps)
 
 
-def gif_to_images(path: os.PathLike, transform=None):
+def gif_to_images(path: str, transform=None):
     images_ = []
     for frame in ImageSequence.Iterator(Image.open(path)):
         if transform:

@@ -3,7 +3,6 @@ from typing import List, Optional, Tuple, Union
 import cv2
 import matplotlib.pyplot as plt
 import numpy as np
-import torch
 from mpl_toolkits.axes_grid1 import ImageGrid
 from PIL import Image
 
@@ -21,12 +20,8 @@ def _get_cmap_alpha(cmap, alpha, cols):
     return cmap, alpha
 
 
-def _normalize(image: Union[np.ndarray, torch.Tensor]):
-    if isinstance(image, np.ndarray):
-        image = image.astype("float32")
-    elif isinstance(image, torch.Tensor):
-        image = image.float()
-
+def _normalize(image: np.ndarray):
+    image = image.astype("float32")
     return (image - image.min()) / (image.max() - image.min())
 
 
@@ -36,13 +31,6 @@ def _get_plt_image(image, bgr2rgb: bool = False, normalize_image: bool = True):
 
     if normalize_image and not isinstance(image, Image.Image):
         image = _normalize(image)
-
-    if isinstance(image, torch.Tensor):
-        image = (
-            image.detach().cpu().permute(1, 2, 0).numpy()
-            if len(image.shape) == 3
-            else image.detach().cpu().numpy()
-        )
 
     if isinstance(image, np.ndarray):
         if image.shape[-1] == 1:
@@ -54,7 +42,7 @@ def _get_plt_image(image, bgr2rgb: bool = False, normalize_image: bool = True):
 
 
 def image_stack(
-    stack_lists: List[Union[Image.Image, np.ndarray, torch.Tensor]],
+    stack_lists: List[Union[Image.Image, np.ndarray]],
     titles: Optional[List[str]] = None,
     shape: Tuple[float, float] = (8, 8),
     bgr2rgb: bool = True,
@@ -70,7 +58,7 @@ def image_stack(
 
     fig = plt.figure(figsize=shape)
     first_elem = stack_lists[0]
-    if isinstance(first_elem, (list, np.ndarray, torch.Tensor)):
+    if isinstance(first_elem, (list, np.ndarray)):
         shape = (len(first_elem), len(stack_lists))
     else:
         raise TypeError(f"Unsupported type {type(first_elem)} in stack_lists")
@@ -93,7 +81,7 @@ def image_stack(
 
 
 def image_grid(
-    grid_list: List[Union[Image.Image, np.ndarray, torch.Tensor]],
+    grid_list: List[Union[Image.Image, np.ndarray]],
     shape: Tuple[float, float] = (6, 6),
     size: int = 10,
     bgr2rgb: bool = True,
@@ -122,9 +110,9 @@ def image_grid(
 
 
 def labeled_images(
-    image_batch: torch.Tensor,
-    label_batch: torch.Tensor,
-    shape: Tuple[int],
+    image_batch: np.ndarray,
+    label_batch: np.ndarray,
+    shape: Tuple[int, int],
     label_names: Optional[List[str]] = None,
     size: int = 10,
     title: Optional[str] = None,

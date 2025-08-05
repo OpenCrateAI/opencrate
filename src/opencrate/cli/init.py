@@ -2,7 +2,7 @@ import os
 import sys
 import traceback
 from pathlib import Path
-from shutil import copy, copytree, rmtree
+from shutil import copytree, rmtree
 
 import questionary
 from rich.console import Console
@@ -16,85 +16,12 @@ console = Console()
 
 DATATYPES = ["Image", "Text", "Video", "Audio", "Tabular"]
 ML_FRAMEWORKS = ["PyTorch", "Tensorflow", "Default"]
-LOGGING_FRAMEWORKS = {
-    "None": "",
-    "WandB": "wandb",
-    "Comet": "comet-ml",
-    "Neptune": "neptune",
-    "TensorBoard": "tensorboard",
-    "MLflow": "mlflow",
-}
 PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/template"
-REQUIREMENTS_DIR = (
-    Path(__file__).resolve().parent.parent.parent / "opencrate/cli/requirements"
-)
 GIT_BASH_SCRIPT = (
     Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
 )
-
-EMOJIS = {
-    "Image": "🐶",
-    "Text": "📎",
-    "Video": "🎥",
-    "Audio": "🔊",
-    "Tabular": "📑",
-    "PyTorch": "🔴",
-    "Tensorflow": "🟠",
-    "Default": "🔵",
-    "WandB": "💛",
-    "Comet": "🌋",
-    "Neptune": "💧",
-    "TensorBoard": "🔥",
-    "MLflow": "🫐",
-    "Git": "📚",
-    "Docker": "🐳",
-}
-
-DATATYPE_TASKS = {
-    "Image": [
-        "Depth Estimation",
-        "Image Classification",
-        "Object Detection",
-        "Image Segmentation",
-        "Image Generation",
-        "Conditional Image Generative",
-        "Image-to-Text",
-        "Text-to-Image",
-        "Image-to-Image",
-        "Image Feature Extraction",
-        "Zero-Shot Image Classification",
-        "Image Feature Extraction",
-    ],
-    "Video": [
-        "Video Classification",
-        "Video-to-Text",
-        "Text-to-Video",
-        "Video Feature Extraction",
-    ],
-    "Text": [
-        "Text Classification",
-        "Context Question Answering",
-        "Zero-Shot Classification",
-        "Translation",
-        "Text Summarization",
-        "Text Feature Extraction",
-    ],
-    "Audio": [
-        "Text-to-Audio",
-        "Audio-to-Text",
-        "Audio-to-Audio",
-        "Audio Classification",
-        "Audio Feature Extraction",
-    ],
-    "Tabular": [
-        "Tabular Classification",
-        "Tabular Regression",
-        "Time Series Forecasting",
-        "Tabular Feature Extraction",
-    ],
-}
 
 
 def safe_prompt(prompt_func):
@@ -166,18 +93,6 @@ def prompt_project_details():
                 ).ask(),
             )
 
-    project_task = safe_prompt(
-        lambda: questionary.select(
-            f"● Select the specific task for your {' '.join(project_datatypes)} data type:",
-            choices=[
-                task
-                for datatype in project_datatypes
-                for task in DATATYPE_TASKS[datatype]
-            ],
-            qmark="",
-        ).ask()
-    )
-
     project_framework = safe_prompt(
         lambda: questionary.select(
             "● Select pre-baked opencrate containers for your framework:",
@@ -187,18 +102,6 @@ def prompt_project_details():
             ],
             qmark="",
             default={"name": "PyTorch", "value": "PyTorch"},
-        ).ask()
-    )
-
-    project_logging = safe_prompt(
-        lambda: questionary.select(
-            "● Select your logging framework of choice:",
-            choices=[
-                {"name": f"{framework}", "value": framework}
-                for framework in LOGGING_FRAMEWORKS.keys()
-            ],
-            qmark="",
-            default={"name": "None", "value": "None"},
         ).ask()
     )
 
@@ -268,10 +171,12 @@ def prompt_project_details():
             sys.exit(0)
 
     git_remote_url = safe_prompt(
-        lambda: questionary.path("● Set Git Remote URL:", qmark="", default="").ask()
+        lambda: questionary.path(
+            "● Set Git Remote URL (optional):", qmark="", default=""
+        ).ask()
     )
 
-    project_docker_image = f"oc-{project_name}:main"
+    project_docker_image = f"oc-{project_name}:main-v0"
     project_docker_container = f"{project_docker_image.replace(':', '-')}-container"
 
     return {
@@ -279,9 +184,7 @@ def prompt_project_details():
         "project_name": project_name,
         "project_description": project_description,
         "project_datatypes": project_datatypes,
-        "project_task": project_task,
         "project_framework": project_framework,
-        "project_logging": project_logging,
         "project_python_version": project_python_version,
         "project_runtime": project_runtime,
         "project_framework_runtime": project_framework_runtime,
@@ -311,24 +214,13 @@ def create_project_structure(config):
 
         copytree(TEMPLATE_DIR, config["project_dir"])
 
-        requirements_name = "requirements"
-        requirements_name += f"-{config['project_framework'].lower()}.txt"
-
-        copy(
-            REQUIREMENTS_DIR / requirements_name,
-            os.path.join(config["project_dir"], ".opencrate", "requirements.txt"),
-        )
-
         config_setting = ConfigSetting(
             title=config["project_title"],
             name=config["project_name"],
-            version="main",
+            version="main-v0",
             description=config["project_description"],
             datatypes=", ".join(config["project_datatypes"]),
-            task=config["project_task"],
             framework=config["project_framework"],
-            logging=config["project_logging"],
-            logging_package=LOGGING_FRAMEWORKS[config["project_logging"]],
             python_version=config["project_python_version"],
             docker_image=config["project_docker_image"],
             pull_docker_image=pull_docker_image,
@@ -342,8 +234,6 @@ def create_project_structure(config):
             config=config,
             template_item_paths=[
                 ".devcontainer/devcontainer.json",
-                ".devcontainer/docker-compose.yml",
-                ".opencrate/requirements.txt",
                 "docker-compose.yml",
                 "Dockerfile",
                 "README.md",
@@ -361,23 +251,6 @@ def setup_git_repository(project_dir, git_remote_url):
 def start_project(config):
     utils.run_command(f"cd {config['project_dir']} && oc build", show_output=True)
     utils.run_command(f"cd {config['project_dir']} && oc start", show_output=True)
-
-
-FILE_TYPE_EMOJIS = {
-    ".py": "🐍",  # Python
-    ".js": "📜",  # JavaScript
-    ".html": "🌐",  # HTML
-    ".css": "🎨",  # CSS
-    ".md": "📝",  # Markdown
-    "Dockerfile": "🐳",  # Docker
-    "docker-compose.yml": "🐳",  # Docker Compose
-    ".yml": "⚙️",  # YAML
-    ".json": "📦",  # JSON
-    ".txt": "📄",  # Text file
-    ".log": "🪵",  # Log file
-    ".sh": "❯",  # Shell script
-    ".git": "🗄️",  # Git Repo
-}
 
 
 def display_summary(path: str):
@@ -399,9 +272,6 @@ def display_summary(path: str):
             files = []
 
             for entry in os.scandir(path):
-                # if entry.name.startswith('.'):
-                #     continue
-
                 if entry.is_dir():
                     folders.append(entry)
                 else:
@@ -413,12 +283,6 @@ def display_summary(path: str):
 
             # Then add files
             for entry in files:
-                # ext = os.path.splitext(entry.name)[1]
-                # emoji = FILE_TYPE_EMOJIS.get(ext, "📄")
-                # if entry.name == "Dockerfile":
-                #     emoji = FILE_TYPE_EMOJIS.get("Dockerfile", "📄")
-                # elif entry.name == "docker-compose.yml":
-                #     emoji = FILE_TYPE_EMOJIS.get("docker-compose.yml", "📄")
                 tree.add(f"/{entry.name}")
 
         except OSError as e:
@@ -440,35 +304,16 @@ def init():
         create_project_structure(config)
         start_project(config)
         display_summary(config["project_dir"])
-        utils.run_command(
-            f"docker exec {config['project_docker_container']} pip freeze > {config['project_dir']}/.opencrate/requirements.txt",
-        )
-        requirements_path = os.path.join(
-            config["project_dir"], ".opencrate", "requirements.txt"
-        )
-        with open(requirements_path, "r") as file:
-            lines = file.readlines()
-        with open(requirements_path, "w") as file:
-            for line in lines:
-                if (
-                    "-e /home/opencrate" not in line
-                    and "# Editable install with no version control" not in line
-                ):
-                    file.write(line)
-        console.print("\n✔ [bold]OpenCrate initialized successfully![/]")
+        # utils.run_command(
+        #     f"docker exec {config['project_docker_container']} pip freeze > {config['project_dir']}/.opencrate/requirements.txt",
+        # )
 
-        dockerfile_path = os.path.join(config["project_dir"], "Dockerfile")
-        with open(dockerfile_path, "r") as file:
-            lines = file.readlines()
-        with open(dockerfile_path, "w") as file:
-            for line in lines:
-                if "# " in line:
-                    line = line.replace("# ", "")
-                file.write(line)
         setup_git_repository(config["project_dir"], config["git_remote_url"])
+
+        console.print("\n✔ [bold]OpenCrate initialized successfully![/]")
     except Exception as e:
-        # error_traceback = traceback.format_exc()
-        # if os.path.exists(config["project_name"]):
-        #     rmtree(config["project_name"])
+        error_traceback = traceback.format_exc()
+        if os.path.exists(config["project_name"]):
+            rmtree(config["project_name"])
         console.print(f"[ERROR] > Initializing the project: {e}")
-        # console.print(f"[dim]\n{error_traceback}[/dim]")
+        console.print(f"[dim]\n{error_traceback}[/dim]")
