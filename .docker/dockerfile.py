@@ -23,11 +23,12 @@ UBUNTU_POST_INSTALLATION = [
             "software-properties-common",
             "ca-certificates",
             "build-essential",
-            # "pkg-config",
-            # "libgoogle-perftools-dev",
-            # "cmake",
+            "pkg-config",
+            "libgoogle-perftools-dev",
+            "cmake",
             "tzdata",
-            # "gcc",
+            "gnupg",
+            "gcc",
             "wget",
             "curl",
             "vim",
@@ -125,7 +126,7 @@ PYTHON_INSTALL = CLInstall(
     post_installation_steps=[
         (
             f"curl -sS https://bootstrap.pypa.io/get-pip.py | python{args.python}"
-            if python_version >= 8
+            if python_version >= 9
             else f"curl -sS https://bootstrap.pypa.io/pip/{args.python}/get-pip.py | python{args.python}"
         ),
         f"python{args.python} -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir",
@@ -182,7 +183,6 @@ RUN mkdir /root/.hooks/
 COPY .docker/hooks/ /root/.hooks/
 """
 
-requirements = f"requirements-pytorch-{args.runtime}.txt"
 
 OPENCRATE = f"""
 RUN mkdir /home/opencrate/
@@ -190,8 +190,6 @@ WORKDIR /home/opencrate/
 COPY src/ /home/opencrate/src
 COPY pyproject.toml /home/opencrate/
 COPY setup.cfg /home/opencrate/
-COPY .docker/requirements/{requirements} /home/opencrate/
-RUN python{args.python} -m pip install -r {requirements} --no-cache-dir --root-user-action=ignore
 COPY setup.py /home/opencrate/
 RUN python{args.python} -m pip install -e . --no-cache-dir --root-user-action=ignore
 """
@@ -269,7 +267,7 @@ def main():
             command=docker_client.api.build(  # type: ignore
                 path=".",
                 dockerfile=dockerfile_path,
-                tag=f"{image_name}:latest",
+                tag=f"braindotai/{image_name}:latest",
                 rm=True,
                 decode=True,
             ),

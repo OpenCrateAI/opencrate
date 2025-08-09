@@ -1,2 +1,2 @@
-FROM {{pull_docker_image}}:latest
+FROM braindotai/{{pull_docker_image}}:latest
 

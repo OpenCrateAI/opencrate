@@ -126,7 +126,9 @@ def build():
     """
 
     # cli.console.print(f"\n░▒▓█ [bold]Building[/bold] > {cli.config.get('title')}\n")
-    with utils.spinner(cli.console, f"Building {cli.config.get('docker_image')} ..."):
+    with utils.spinner(
+        cli.console, f"Building {cli.config.get('version')} runtime ..."
+    ):
         utils.stream_docker_logs(
             command=cli.docker_client.api.build(
                 path=".", tag=cli.config.get("docker_image"), rm=True, decode=True
@@ -144,9 +146,7 @@ def start():
     """
 
     # cli.console.print(f"\n░▒▓█ [bold]Starting[/bold] > {cli.config.get('title')}\n")
-    with utils.spinner(
-        cli.console, f"Starting {cli.config.get('docker_container')} ..."
-    ):
+    with utils.spinner(cli.console, f"Starting {cli.config.get('version')} ..."):
         try:
             cli.docker_client.images.get(cli.config.get("docker_image"))
         except errors.ImageNotFound:
@@ -189,9 +189,9 @@ def stop(down: bool = False, all: bool = False):
     #     cli.console.print(f"\n░▒▓█ [bold]Stopping[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(
         cli.console,
-        f"Stopping {cli.config.get('docker_container')} ..."
+        f"Stopping {cli.config.get('version')} runtime ..."
         if not down
-        else f"Stopping and removing {cli.config.get('docker_container')} ...",
+        else f"Stopping and removing {cli.config.get('version')} runtime ...",
     ):
         try:
             container = cli.docker_client.containers.get(
@@ -199,7 +199,9 @@ def stop(down: bool = False, all: bool = False):
             )
             if container.status == "exited":
                 if not down:
-                    cli.console.print("✔ Container is already stopped")
+                    cli.console.print(
+                        f"✔ {cli.config.get('version')} runtime is already stopped"
+                    )
                     cli.get_help("start_container")()
                 else:
                     container.remove()
@@ -216,11 +218,11 @@ def stop(down: bool = False, all: bool = False):
                     utils.run_command(
                         f"docker compose --project-name={cli.config.get('name')} {'stop' if not down else 'down'}",
                     )
-                cli.console.print("✔ Stopped container")
+                cli.console.print(f"✔ Stopped {cli.config.get('version')} runtime")
                 cli.get_help("start_container")()
         except errors.NotFound:
             cli.console.print(
-                f"× Container {cli.config.get('docker_container')} not found, skipping...",
+                f"× Runtime {cli.config.get('version')} not found, skipping...",
             )
             if not down:
                 cli.get_help("start_container")()
@@ -234,7 +236,7 @@ def enter():
     """
 
     with utils.spinner(
-        cli.console, f"Checking {cli.config.get('docker_container')} status ..."
+        cli.console, f"Entering {cli.config.get('version')} runtime ..."
     ):
         try:
             container = cli.docker_client.containers.get(
@@ -291,7 +293,7 @@ def runtime(
         #     f"\n░▒▓█ [bold]Showing runtimes[/bold] > {cli.config.get('title')}"
         # )
 
-        with utils.spinner(cli.console, "Loading runtime images ..."):
+        with utils.spinner(cli.console, "Processing & loading runtimes commits ..."):
             # Get all images for current branch
             current_branch = cli.config.get("version").split("-v")[0]
             img_prefix = (
@@ -304,8 +306,6 @@ def runtime(
                 for tag in img.tags:
                     if img_prefix in tag:
                         matching_images.append(tag)
-
-        with utils.spinner(cli.console, "Processing runtime history ..."):
             # Generate logs for each image
             logs = []
             for image_name in matching_images:
@@ -408,7 +408,7 @@ def runtime(
         #     f"\n░▒▓█ [bold]Committing[/bold] > {cli.config.get('title')}\n"
         # )
 
-        with utils.spinner(cli.console, "Finding active container ..."):
+        with utils.spinner(cli.console, "Creating new runtime ..."):
             try:
                 container = cli.docker_client.containers.get(
                     cli.config.get("docker_container")
@@ -417,8 +417,6 @@ def runtime(
                 cli.console.print("[ERROR]: Container not found")
                 cli.get_help("start_container")()
                 return
-
-        with utils.spinner(cli.console, "Creating new runtime ..."):
             # Create new version and commit
             current_version = cli.config.get("version")
             current_image = cli.config.get("docker_image")
@@ -437,7 +435,7 @@ def runtime(
 
         stop(down=True)
 
-        with utils.spinner(cli.console, "Updating configuration files ..."):
+        with utils.spinner(cli.console, "Updating runtime configurations ..."):
             # Update configuration files
             for file_path in [
                 "docker-compose.yml",
@@ -513,7 +511,7 @@ def runtime(
 
         stop()
 
-        with utils.spinner(cli.console, "Finding target runtime commit ..."):
+        with utils.spinner(cli.console, f"Switching to {name} runtime ..."):
             # get git commit hash that has f"updated base image to {name}" in its commit message
             commit_id_tag = None
             git_log = utils.run_command("git log --oneline").strip().split("\n")
@@ -532,16 +530,15 @@ def runtime(
                         commit_id_tag = line.split()[0]
                         break
 
-        # run git checkout <commit_id_tag> -- Dockerfile docker-compose.yml .devcontainer/devcontainer.json .opencrate/config.json
-        if not commit_id_tag:
-            cli.console.print(
-                f"[ERROR]: No commit found with message 'updated base image to {name}'.",
-                style="bold red",
-            )
-            cli.get_help("show_runtime")()
-            return
+            # run git checkout <commit_id_tag> -- Dockerfile docker-compose.yml .devcontainer/devcontainer.json .opencrate/config.json
+            if not commit_id_tag:
+                cli.console.print(
+                    f"[ERROR]: No commit found with message 'updated base image to {name}'.",
+                    style="bold red",
+                )
+                cli.get_help("show_runtime")()
+                return
 
-        with utils.spinner(cli.console, "Switching runtime configuration ..."):
             utils.run_command(
                 f"git checkout {commit_id_tag} -- Dockerfile docker-compose.yml .devcontainer/devcontainer.json .opencrate/config.json"
             )
@@ -553,7 +550,7 @@ def runtime(
         cli.docker_client.images.prune()
 
         cli.console.print(
-            f"✔ Successfully restored environment to {cli.config.get('version')}"
+            f"✔ Successfully restored {cli.config.get('version')} runtime"
         )
     elif delete:
         # cli.console.print(f"\n░▒▓█ [bold]Deleting runtime[/bold] > {name}\n")
@@ -575,7 +572,7 @@ def runtime(
             cli.get_help("switch_runtime")()
             return
 
-        with utils.spinner(cli.console, "Finding runtime git commit ..."):
+        with utils.spinner(cli.console, f"Removing {name} runtime ..."):
             # Find git commit that belongs to this runtime
             commit_id_tag = None
             git_log = utils.run_command("git log --oneline").strip().split("\n")
@@ -584,7 +581,6 @@ def runtime(
                     commit_id_tag = line.split()[0]
                     break
 
-        with utils.spinner(cli.console, "Removing runtime container ..."):
             # Delete the running container if it exists
             try:
                 container_name = f"{cli.config.get('name')}-{name}-container"
@@ -596,7 +592,6 @@ def runtime(
                     f"× Container {container_name} not found, skipping..."
                 )
 
-        with utils.spinner(cli.console, "Removing runtime image ..."):
             # Delete the docker image
             try:
                 image_name = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
@@ -641,7 +636,9 @@ def kill(confirm: bool = False):
     # cli.console.print(f"\n░▒▓█ [bold]Killing[/bold] > {cli.config.get('title')}\n")
 
     try:
-        with utils.spinner(cli.console, "Checking Dockerfile configuration ..."):
+        with utils.spinner(
+            cli.console, f"Killing {cli.config.get('version')} runtime ..."
+        ):
             # check if "FROM opencrate" is in Dockerfile
             with open("Dockerfile", "r") as file:
                 dockerfile_content = file.read()
@@ -661,16 +658,18 @@ def kill(confirm: bool = False):
 
         stop(down=True, all=True)
 
-        with utils.spinner(cli.console, "Removing runtime image ..."):
+        with utils.spinner(
+            cli.console, f"Removing {cli.config.get('version')} runtime image ..."
+        ):
             cli.docker_client.images.remove(cli.config.get("docker_image"), force=True)
             cli.docker_client.images.prune()
 
-        cli.console.print(f"✔ Removed image {cli.config.get('docker_image')}")
+        cli.console.print(f"✔ Removed {cli.config.get('version')} image")
         if not has_commited_base_image:
             cli.get_help("build_image")()
     except errors.ImageNotFound:
         cli.console.print(
-            f"× Image {cli.config.get('docker_image')} not found, skipping...",
+            f"× {cli.config.get('version')} runtime image not found, skipping...",
             style="bold red",
         )
     except Exception as e:
@@ -760,14 +759,13 @@ def branch(
 
         stop()
 
-        with utils.spinner(cli.console, "Creating new branch ..."):
+        with utils.spinner(cli.console, f"Creating {name} branch ..."):
             utils.run_command(f"git checkout -b {name}")
 
             name = f"{name}-v0"
             new_docker_image = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
             new_docker_container = f"{new_docker_image.replace(':', '-')}-container"
 
-        with utils.spinner(cli.console, "Updating configuration files ..."):
             utils.replace_in_file(
                 file_path="docker-compose.yml",
                 replacements=[
@@ -798,7 +796,9 @@ def branch(
             cli.config.set("docker_container", new_docker_container)
             cli.config.write()
 
-        with utils.spinner(cli.console, "Committing changes to git ..."):
+        with utils.spinner(
+            cli.console, f"Committing changes to git for {name} branch ..."
+        ):
             utils.run_command("git add .", ignore_error=True)
             utils.run_command(
                 f"git commit -m 'opencrate new branch {name}'",
@@ -811,7 +811,7 @@ def branch(
         #     container.name for container in cli.docker_client.containers.list()
         # ]:
         # build only if image is not built
-        with utils.spinner(cli.console, "Checking for existing runtime image ..."):
+        with utils.spinner(cli.console, "Checking if runtime already exists ..."):
             image_exists = False
             for img in cli.docker_client.images.list():
                 for tag in img.tags:
@@ -832,9 +832,9 @@ def branch(
             "\n\nYou cannot delete a branch while creating a new one. Remove --create option.\n"
         )
 
-        cli.console.print(f"\n░▒▓█ [bold]Deleting branch[/bold]: {name}\n")
+        # cli.console.print(f"\n░▒▓█ [bold]Deleting branch[/bold]: {name}\n")
 
-        with utils.spinner(cli.console, "Checking branch status ..."):
+        with utils.spinner(cli.console, f"Checking {name} branch status ..."):
             current_branch = utils.run_command(
                 "git rev-parse --abbrev-ref HEAD"
             ).strip()
@@ -855,7 +855,7 @@ def branch(
                 cli.get_help("switch_branch")()
                 return
 
-        with utils.spinner(cli.console, "Removing branch containers ..."):
+        with utils.spinner(cli.console, f"Removing {name} branch runtimes ..."):
             img_prefix = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
 
             matching_containers = []
@@ -868,7 +868,6 @@ def branch(
                 container.remove(force=True)
                 cli.console.print(f"✔ Deleted container {container.name}")
 
-        with utils.spinner(cli.console, "Removing branch images ..."):
             try:
                 # Find matching images
                 matching_images = []
@@ -900,7 +899,7 @@ def branch(
             utils.run_command(f"git branch -D {name}")
             cli.console.print(f"✔ Deleted git branch {name}")
     elif switch:
-        with utils.spinner(cli.console, "Checking branch availability ..."):
+        with utils.spinner(cli.console, f"Checking {name} branch availability ..."):
             branch_exists = utils.run_command(
                 f"git branch --list {name}", ignore_error=True
             ).strip()
@@ -915,7 +914,9 @@ def branch(
                 )
                 return
 
-            with utils.spinner(cli.console, "Checking for uncommitted changes ..."):
+            with utils.spinner(
+                cli.console, "Checking for uncommitted changes current branch..."
+            ):
                 # Check for uncommitted changes before switching
                 git_status = utils.run_command(
                     "git status --porcelain", ignore_error=True
@@ -1000,63 +1001,53 @@ def status():
     """
 
     cli.console.print(f"\n░▒▓█ [bold]Status[/bold] > {cli.config.get('title')}\n")
-    cli.console.print(f"- Task:\t{cli.config.get('task')}")
     cli.console.print(f"- Framework:\t{cli.config.get('framework')}")
     cli.console.print(f"- Python:\t{cli.config.get('python_version')}")
     cli.console.print(f"- Version:\t{cli.config.get('version')}")
 
-    with utils.spinner(cli.console, "Checking runtime image ..."):
-        try:
-            image = cli.docker_client.images.get(cli.config.get("docker_image"))
-            cli.console.print(f"- Image name:\t{', '.join(image.tags)}")
-            cli.console.print(
-                f"- Image Size:\t{image.attrs['Size'] / (1024**2):.2f} MB"
-            )
-            cli.console.print(f"- Image ID:\t{image.id}")
-        except errors.ImageNotFound:
-            cli.console.print(
-                f"- Image {cli.config.get('docker_image')} [bold red]not found[/bold red]"
-            )
-            cli.get_help("build_image")()
-        except Exception as e:
-            cli.console.print(f"[ERROR] > Extracting image info: {e}", style="bold red")
+    try:
+        image = cli.docker_client.images.get(cli.config.get("docker_image"))
+        cli.console.print(f"- Image name:\t{', '.join(image.tags)}")
+        cli.console.print(f"- Image Size:\t{image.attrs['Size'] / (1024**2):.2f} MB")
+        cli.console.print(f"- Image ID:\t{image.id}")
+    except errors.ImageNotFound:
+        cli.console.print(
+            f"- Image {cli.config.get('docker_image')} [bold red]not found[/bold red]"
+        )
+        cli.get_help("build_image")()
+    except Exception as e:
+        cli.console.print(f"[ERROR] > Extracting image info: {e}", style="bold red")
 
-    with utils.spinner(cli.console, "Checking runtime container ..."):
-        try:
-            container = cli.docker_client.containers.get(
-                cli.config.get("docker_container")
-            )
-            cli.console.print(f"- Container Name:\t{container.name}")
-            cli.console.print(f"- Container Status:\t{container.status}")
-            cli.console.print(f"- Container ID:\t{container.id}")
-        except errors.NotFound:
-            cli.console.print(
-                f"- Container {cli.config.get('docker_container')} [bold red]not found[/bold red]"
-            )
-            cli.get_help("start_container")()
-        except Exception as e:
-            cli.console.print(
-                f"[ERROR] > Extracting container info: {e}", style="bold red"
-            )
+    try:
+        container = cli.docker_client.containers.get(cli.config.get("docker_container"))
+        cli.console.print(f"- Container Name:\t{container.name}")
+        cli.console.print(f"- Container Status:\t{container.status}")
+        cli.console.print(f"- Container ID:\t{container.id}")
+    except errors.NotFound:
+        cli.console.print(
+            f"- Container {cli.config.get('docker_container')} [bold red]not found[/bold red]"
+        )
+        cli.get_help("start_container")()
+    except Exception as e:
+        cli.console.print(f"[ERROR] > Extracting container info: {e}", style="bold red")
 
-    with utils.spinner(cli.console, "Checking git repository status ..."):
-        try:
-            git_remote_url = utils.run_command(
-                "git ls-remote --get-url origin", ignore_error=True
-            )
-            git_last_commit_date = utils.run_command(
-                "git log -1 --format=%cd", ignore_error=True
-            )
-            git_pull_requests_count = utils.run_command(
-                "git log --merges --oneline | wc -l", ignore_error=True
-            )
-            cli.console.print(
-                f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}"
-            )
-            cli.console.print(f"- Last Commit Date:\t{git_last_commit_date}")
-            cli.console.print(f"- Pull Requests Count:\t{git_pull_requests_count}")
-        except Exception as e:
-            cli.console.print(f"[ERROR] > Extracting git info: {e}", style="bold red")
+    try:
+        git_remote_url = utils.run_command(
+            "git ls-remote --get-url origin", ignore_error=True
+        )
+        git_last_commit_date = utils.run_command(
+            "git log -1 --format=%cd", ignore_error=True
+        )
+        git_pull_requests_count = utils.run_command(
+            "git log --merges --oneline | wc -l", ignore_error=True
+        )
+        cli.console.print(
+            f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}"
+        )
+        cli.console.print(f"- Last Commit Date:\t{git_last_commit_date}")
+        cli.console.print(f"- Pull Requests Count:\t{git_pull_requests_count}")
+    except Exception as e:
+        cli.console.print(f"[ERROR] > Extracting git info: {e}", style="bold red")
 
 
 @app.command()

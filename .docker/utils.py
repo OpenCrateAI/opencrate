@@ -6,7 +6,6 @@ from rich.console import Console
 
 
 class CLInstall:
-
     def __init__(
         self,
         install_cmd: Optional[str] = None,
@@ -20,25 +19,32 @@ class CLInstall:
         self.post_installation_steps = post_installation_steps
 
         self.packages = [pkg for pkg in self.packages if len(pkg)]
-        self.pre_installation_steps = [step for step in self.pre_installation_steps if len(step)]
-        self.post_installation_steps = [step for step in self.post_installation_steps if len(step)]
+        self.pre_installation_steps = [
+            step for step in self.pre_installation_steps if len(step)
+        ]
+        self.post_installation_steps = [
+            step for step in self.post_installation_steps if len(step)
+        ]
 
     def __call__(self):
         dockerfile_block = ""
 
         if all("COPY" in step for step in self.pre_installation_steps):
-            dockerfile_block += f'{" && ".join(self.pre_installation_steps)}'
+            dockerfile_block += f"{' && '.join(self.pre_installation_steps)}"
         else:
             dockerfile_block += " &&\\\n    ".join(self.pre_installation_steps)
 
-        if len(self.pre_installation_steps) and "COPY" in self.pre_installation_steps[-1]:
+        if (
+            len(self.pre_installation_steps)
+            and "COPY" in self.pre_installation_steps[-1]
+        ):
             dockerfile_block += "\nRUN "
         elif len(self.pre_installation_steps):
             dockerfile_block += " &&\\\n    "
 
         if self.install_cmd:
             self.packages = [pkg for pkg in self.packages if pkg]
-            dockerfile_block += f'{self.install_cmd} {" ".join(self.packages)}'
+            dockerfile_block += f"{self.install_cmd} {' '.join(self.packages)}"
 
             # if "apt install" in self.install_cmd:
             #     dockerfile_block += " &&\\\n    apt clean && rm -rf /var/lib/apt/lists/*"
@@ -73,7 +79,7 @@ def stream_docker_logs(console: Console, command: Union[List[str], dict[str, str
                 console.print(f"{clean_status}")
             elif "error" in line:
                 raise Exception(f"{line['error']}")  # type: ignore
-        console.print(f"    >> ● Build successful")
+        console.print("    >> ● Build successful")
     except Exception as e:
         console.print(f"\n    >> [red]●[red] Build failed:{e}", style="bold red")
 
@@ -84,6 +90,8 @@ def write_python_version(python_version: str):
     aliases_file_path = "./.docker/cli/zsh/.aliases.sh"
     with open(aliases_file_path, "r") as file:
         aliases_content = file.read()
-    aliases_content = re.sub(r"python\d+\.\d+", f"python{python_version}", aliases_content)
+    aliases_content = re.sub(
+        r"python\d+\.\d+", f"python{python_version}", aliases_content
+    )
     with open(aliases_file_path, "w") as file:
         file.write(aliases_content)

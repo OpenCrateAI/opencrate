@@ -22,13 +22,23 @@ check_python = \
 
 build-opencrate:
 	@$(check_python)
-	@python$${python_version} .docker/dockerfile.py --python=$${python:-3.10} --runtime=$${runtime:-cuda}
+	@python$${python_version} .docker/dockerfile.py --python=$${python:-3.10} --runtime=$${runtime:-cpu}
 
 build-opencrate-all:
 	@$(check_python)
 	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
-        for runtime in cuda cpu; do \
+        for runtime in cpu; do \
             python$${python_version} .docker/dockerfile.py --python=$$python --runtime=$$runtime; \
+        done \
+    done
+
+push-opencrate:
+	docker push braindotai/opencrate-pytorch-$${runtime:-cpu}-py$${python:-3.10}:latest
+
+push-opencrate-all:
+	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
+        for runtime in cpu; do \
+			docker push braindotai/opencrate-pytorch-$${runtime:-cpu}-py$${python:-3.10}:latest; \
         done \
     done
 

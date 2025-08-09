@@ -5,6 +5,7 @@ from pathlib import Path
 from shutil import copytree, rmtree
 
 import questionary
+from questionary import Style
 from rich.console import Console
 from rich.tree import Tree
 
@@ -23,6 +24,21 @@ GIT_BASH_SCRIPT = (
     Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
 )
 
+CUSTOM_STYLE = Style(
+    [
+        # Answer = User input text
+        ("answer", "bold fg:#ffffff"),
+        # Input field = Background for typing area
+        ("input", "bg:#000000"),
+        # Question = Prompt text
+        ("question", "fg:#bfbfbf"),
+        # Selected item = For selection prompts
+        ("selected", "bg:#000"),
+        # Pointer = Cursor indicator
+        ("pointer", "fg:#fff bold"),
+    ]
+)
+
 
 def safe_prompt(prompt_func):
     try:
@@ -34,23 +50,64 @@ def safe_prompt(prompt_func):
         sys.exit(0)
 
 
+def _validate_project_name(name: str):
+    """
+    Validates the project name to ensure it is not empty and does not contain invalid characters.
+    """
+
+    if len(name) == 0:
+        return "Please enter Project Name, can't be empty."
+    else:
+        project_dir = (
+            name.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
+        )
+        if os.path.exists(project_dir):
+            return f"Project {project_dir} already exists in current directory, please choose another name."
+
+    return True
+
+
 def prompt_project_details():
     project_title = safe_prompt(
         lambda: questionary.text(
             "● Project Name:",
             qmark="",
-            validate=lambda text: True
-            if len(text) > 0
-            else "Please enter Project Name, can't be empty.",
+            validate=_validate_project_name,
+            style=CUSTOM_STYLE,
         ).ask()
     )
     project_name = (
         project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
     )
 
+    # if not safe_prompt(
+    #     lambda: questionary.confirm(
+    #         "● Initialize project in current directory?",
+    #         qmark="",
+    #     ).ask()
+    # ):
+    #     project_dir = os.path.join(
+    #         questionary.path(
+    #             "● Enter the path to the root project directory:", qmark=""
+    #         ).ask(),
+    #         project_name,
+    #     )
+    # else:
+    project_dir = project_name
+
+    # if os.path.exists(project_dir):
+    #     if not questionary.confirm(
+    #         f"● OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
+    #         qmark="",
+    #     ).ask():
+    #         sys.exit(0)
+
     project_description = safe_prompt(
         lambda: questionary.text(
-            "● Give a brief description of your project:", multiline=True, qmark=""
+            "● Give a brief description of your project:",
+            multiline=True,
+            qmark="",
+            style=CUSTOM_STYLE,
         ).ask()
     )
 
@@ -69,6 +126,7 @@ def prompt_project_details():
             validate=lambda x: True
             if len(x) > 0
             else "Please select at least one datatype",
+            style=CUSTOM_STYLE,
         ).ask(),
     )
 
@@ -90,6 +148,7 @@ def prompt_project_details():
                     validate=lambda x: True
                     if len(x) > 0
                     else "Please select at least one datatype",
+                    style=CUSTOM_STYLE,
                 ).ask(),
             )
 
@@ -102,6 +161,7 @@ def prompt_project_details():
             ],
             qmark="",
             default={"name": "PyTorch", "value": "PyTorch"},
+            style=CUSTOM_STYLE,
         ).ask()
     )
 
@@ -114,6 +174,7 @@ def prompt_project_details():
             ],
             qmark="",
             default={"name": "3.10", "value": "3.10"},
+            style=CUSTOM_STYLE,
         ).ask()
     )
 
@@ -121,11 +182,12 @@ def prompt_project_details():
         lambda: questionary.select(
             "● Select your runtime environment:",
             choices=[
-                {"name": "CUDA", "value": "cuda"},
                 {"name": "CPU", "value": "cpu"},
+                {"name": "CUDA", "value": "cuda"},
             ],
             qmark="",
-            default={"name": "CUDA", "value": "cuda"},
+            default={"name": "CPU", "value": "cpu"},
+            style=CUSTOM_STYLE,
         ).ask()
     )
 
@@ -143,36 +205,18 @@ def prompt_project_details():
                 ],
                 qmark="",
                 default={"name": "CUDA 12.4 [Latest]", "value": "12.4"},
+                style=CUSTOM_STYLE,
             ).ask()
         )
     else:
         project_framework_runtime = "cpu"
 
-    if not safe_prompt(
-        lambda: questionary.confirm(
-            "● Initialize project in current directory?",
-            qmark="",
-        ).ask()
-    ):
-        project_dir = os.path.join(
-            questionary.path(
-                "● Enter the path to the root project directory:", qmark=""
-            ).ask(),
-            project_name,
-        )
-    else:
-        project_dir = project_name
-
-    if os.path.exists(project_dir):
-        if not questionary.confirm(
-            f"● OpenCrate with the name '{project_name}' already exists. Do you want to overwrite it?",
-            qmark="",
-        ).ask():
-            sys.exit(0)
-
     git_remote_url = safe_prompt(
         lambda: questionary.path(
-            "● Set Git Remote URL (optional):", qmark="", default=""
+            "● Set Git Remote URL (optional):",
+            qmark="",
+            default="",
+            style=CUSTOM_STYLE,
         ).ask()
     )
 
@@ -297,7 +341,7 @@ def display_summary(path: str):
 @app.command()
 @utils.handle_exceptions(console)
 def init():
-    console.print("\n░▒▓█ [[bold]Initializing[/bold]]\n")
+    # console.print("\n░▒▓█ [[bold]Initializing[/bold]]\n")
 
     config = prompt_project_details()
     try:

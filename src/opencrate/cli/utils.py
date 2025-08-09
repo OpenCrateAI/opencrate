@@ -8,7 +8,10 @@ from functools import wraps
 from typing import Any, Callable, List, Tuple
 
 from jinja2 import Template
+from rich.ansi import AnsiDecoder
 from rich.console import Console
+from rich.live import Live
+from rich.text import Text
 from rich.tree import Tree
 
 
@@ -21,30 +24,83 @@ def spinner(console: Console, message: str):
             pass
 
 
-def stream_docker_logs(command, console: Console, is_build=False):
-    ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
+PROGRESS_KEYWORDS = ("Downloading", "Extracting", "Pushing", "Pulling", "Waiting")
 
-    try:
-        for line in command:
-            if is_build:
-                if "stream" in line:
-                    clean_line = ansi_escape.sub("", line["stream"].rstrip())
-                    console.print(f"[#919191]{clean_line}[/]")
-                elif "status" in line:
-                    clean_line = ansi_escape.sub("", line["status"])
-                    console.print(f"[#919191]{clean_line}[/]")
-                elif "error" in line:
-                    raise Exception(f"{line['error']}")
-            else:
-                stdout, stderr = line
+
+def stream_docker_logs(command, console: Console, is_build=False):
+    """
+    Streams Docker logs with intelligent line handling. Progress lines update
+    in-place without a decorative panel.
+    """
+
+    decoder = AnsiDecoder()
+
+    if is_build:
+        with Live(console=console, transient=True, refresh_per_second=10) as live:
+            permanent_lines = []
+            current_progress = Text("")
+
+            try:
+                for line_data in command:
+                    if "error" in line_data:
+                        raise Exception(line_data["error"])
+
+                    raw_text = line_data.get("stream") or line_data.get("status")
+                    if not raw_text:
+                        continue
+
+                    decoded_parts = [part for part in decoder.decode(raw_text) if part]
+                    if not decoded_parts:
+                        continue
+
+                    full_line_text = Text("").join(decoded_parts)
+                    clean_line_str = full_line_text.plain.strip()
+
+                    if not clean_line_str:
+                        continue
+
+                    if clean_line_str.startswith(PROGRESS_KEYWORDS):
+                        current_progress = Text(
+                            clean_line_str, style="dim", no_wrap=True
+                        )
+                    else:
+                        full_line_text.stylize("dim")
+                        permanent_lines.append(full_line_text)
+                        current_progress = Text("")
+
+                    all_lines = permanent_lines + [current_progress]
+                    valid_lines = [line for line in all_lines if line is not None]
+
+                    output_renderable = Text("\n").join(valid_lines)
+                    live.update(output_renderable)
+                    # --- END OF CHANGE ---
+
+            except Exception as e:
+                error_message = str(e) if e else "Unknown build error."
+                console.print(
+                    f"\n[ERROR]: Build failed > {error_message}", style="bold red"
+                )
+                error_message = str(e)
+                console.print(
+                    f"\n[ERROR]: Command failed > {error_message}", style="bold red"
+                )
+    else:  # This logic remains unchanged
+        ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
+        try:
+            for stdout, stderr in command:
                 if stdout:
                     clean_stdout = ansi_escape.sub("", stdout.decode("utf-8").strip())
-                    console.print(f"[#919191]{clean_stdout}[/]")
+                    if clean_stdout:
+                        console.print(clean_stdout, style="dim")
                 if stderr:
                     clean_stderr = ansi_escape.sub("", stderr.decode("utf-8").strip())
-                    console.print(clean_stderr, style="bold red")
-    except Exception as e:
-        console.print(f"\n[ERROR]: Build failed > {e}", style="bold red")
+                    if clean_stderr:
+                        console.print(clean_stderr, style="bold red")
+        except Exception as e:
+            error_message = str(e)
+            console.print(
+                f"\n[ERROR]: Command failed > {error_message}", style="bold red"
+            )
 
 
 def handle_exceptions(console: Console) -> Callable[[Any], Any]:
