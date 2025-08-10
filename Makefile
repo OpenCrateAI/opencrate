@@ -1,6 +1,8 @@
 PYTHON_VERSION ?= 3.10 # as default we use python 3.10 for development
 HOST_GIT_EMAIL = $(shell git config user.email)
 HOST_GIT_NAME = $(shell git config user.name)
+VERSION_FILE := VERSION
+VERSION := $(shell cat $(VERSION_FILE) | tr -d '\n')
 
 .SILENT:
 .ONESHELL:
@@ -27,20 +29,27 @@ build-opencrate:
 build-opencrate-all:
 	@$(check_python)
 	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
-        for runtime in cpu; do \
+        for runtime in cpu cuda; do \
             python$${python_version} .docker/dockerfile.py --python=$$python --runtime=$$runtime; \
-        done \
-    done
+        done; \
+    done; \
+	docker container prune -f; \
+	docker image prune -f;
 
 push-opencrate:
-	docker push braindotai/opencrate-pytorch-$${runtime:-cpu}-py$${python:-3.10}:latest
+	docker push braindotai/opencrate-$${runtime:-cpu}-py$${python:-3.10}:latest
 
 push-opencrate-all:
 	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
-        for runtime in cpu; do \
-			docker push braindotai/opencrate-pytorch-$${runtime:-cpu}-py$${python:-3.10}:latest; \
-        done \
-    done
+        for runtime in cpu cuda; do \
+			docker push braindotai/opencrate-$${runtime}-py$${python}:v$(VERSION); \
+            \
+            if [ "$(latest)" = "True" ]; then \
+				docker tag braindotai/opencrate-$${runtime}-py$${python}:v$(VERSION) braindotai/opencrate-$${runtime}-py$${python}:latest; \
+				docker push braindotai/opencrate-$${runtime}-py$${python}:latest; \
+            fi; \
+        done; \
+    done;
 
 build:
 	@docker build -t opencrate-dev:latest .
@@ -68,14 +77,13 @@ install:
 	@echo "Using Python version: $${python_version}"
 	@python$${python_version} -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir
 	@python$${python_version} -m pip install -e .[dev] --root-user-action=ignore --no-cache-dir
-	@PYTHON_VERSIONS="3.5 3.6 3.7 3.8 3.9 3.11 3.12 3.13"; \
+	@PYTHON_VERSIONS="3.7 3.8 3.9 3.11 3.12 3.13"; \
 	echo "Installing Python versions: $$PYTHON_VERSIONS"; \
 	for version in $$PYTHON_VERSIONS; do \
 		if ! pyenv versions --bare | grep -q "^$$version\\."; then \
 			pyenv install $$version; \
 		fi; \
 	done; \
-	pyenv local $$PYTHON_VERSIONS
 	echo "\nDone installing the package with development environment and dependencies"
 
 mkdocs:
@@ -97,7 +105,6 @@ test: test-pytest test-black test-flake8 test-mypy
 
 test-all:
 	@tox
-
 
 help:
 	@echo "Usage: make [target]"

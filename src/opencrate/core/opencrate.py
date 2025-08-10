@@ -12,13 +12,20 @@ import lovelyplots  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
 import pynvml
-import torch
 from memory_profiler import profile
 from pyinstrument import Profiler
 from pyinstrument.renderers import SpeedscopeRenderer
 
 from .. import _configuration, config, snapshot, snp
 from .utils.progress import progress
+
+_has_torch = True
+
+try:
+    import torch  # type: ignore
+except ImportError:
+    _has_torch = False
+
 
 plt.style.use(["use_mathtext", "colors10-ls"])
 
@@ -68,7 +75,6 @@ class MemoryProfiler:
         self.output_dir = output_dir
         self.gpu_id = gpu_id
         self.gpu_handle = None
-        self.log_stream = None
 
     def __enter__(self):
         """Setup context: initialize NVML, get GPU handle, open log file."""
@@ -557,14 +563,10 @@ class OpenCrate:
             # Check if checkpoint exists
             if self.finetune is not None:
                 prefix = "Finetuning"
-                checkpoint_exists = False
             else:
                 meta_list = glob(
-                    os.path.join(self.snapshot.path.checkpoint(), "meta_*.pth")
+                    os.path.join(self.snapshot.path.checkpoint(), "meta_*.json")
                 )
-                # checkpoint_exists = os.path.isfile(
-                #     self.snapshot.path.checkpoint("meta.pth", check_exists=False)
-                # )
                 checkpoint_exists = len(meta_list) > 0
                 prefix = "Resuming" if checkpoint_exists else "Creating"
             config_path = f"config/{self.script_name}:{self.use_config}.yml"
@@ -618,11 +620,7 @@ class OpenCrate:
                         f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with custom config"
                     )
                 use_existing_config = True
-            elif (
-                self.use_config == "resume"
-                # and checkpoint_exists
-                and self.start not in ("reset", "new")
-            ):
+            elif self.use_config == "resume" and self.start not in ("reset", "new"):
                 # Use resume config from checkpoint
                 _configuration.read(config_name, load_from_use_version=True)
                 # _configuration.write(
@@ -751,7 +749,7 @@ class OpenCrate:
     def _save_checkpoint_decorator(self, func):
         def wrapper(*args, **kwargs):
             # self.snapshot.checkpoint(
-            #     {key: getattr(self, key) for key in self.meta_kwargs}, "meta.pth"
+            #     {key: getattr(self, key) for key in self.meta_kwargs}, "meta.json"
             # )
 
             job_name = func.__name__.replace("save_", "")
@@ -761,10 +759,10 @@ class OpenCrate:
                 del job_ckpt["batch_progress"]
                 job_ckpt_copy = deepcopy(job_ckpt)
                 self.jobs_meta_kwargs[job_name]["batch_progress"] = batch_progress
-                self.snapshot.checkpoint(job_ckpt_copy, f"meta_{job_name}.pth")
+                self.snapshot.checkpoint(job_ckpt_copy, f"meta_{job_name}.json")
                 del job_ckpt_copy
             else:
-                self.snapshot.checkpoint(job_ckpt, f"meta_{job_name}.pth")
+                self.snapshot.checkpoint(job_ckpt, f"meta_{job_name}.json")
             func(*args, **kwargs)
             self.snapshot.debug("Saved checkpoint successfully!")
 
@@ -772,7 +770,7 @@ class OpenCrate:
             # job_ckpt = deepcopy(self.jobs_meta_kwargs[job_name])
             # del job_ckpt["batch_progress"]  # remove batch progress from checkpoint
             # # del job_ckpt["batch_progress"]  # remove batch progress from checkpoint
-            # self.snapshot.checkpoint(job_ckpt, f"meta_{job_name}.pth")
+            # self.snapshot.checkpoint(job_ckpt, f"meta_{job_name}.json")
             # del job_ckpt
             # func(*args, **kwargs)
             # self.snapshot.debug("Saved checkpoint successfully!")
@@ -805,7 +803,7 @@ class OpenCrate:
                 else:
                     job_name = func.__name__.replace("load_", "")
                     meta_path = self.snapshot.path.checkpoint(
-                        f"meta_{job_name}.pth", check_exists=False
+                        f"meta_{job_name}.json", check_exists=False
                     )
                     # if self.finetune is not None:
                     #     assert os.path.isfile(
@@ -818,6 +816,9 @@ class OpenCrate:
                         return  # handle this return better, right now it just skips the job if the meta file is not found
                     # self.snapshot.debug(f"Loading meta variables from '{meta_path}'")
                     try:
+                        assert _has_torch, (
+                            "\n\nPyTorch is not installed. Please install PyTorch to load a checkpoint.\n\n"
+                        )
                         loaded_job_meta_kwargs = torch.load(
                             meta_path, weights_only=False
                         )

@@ -1,30 +1,24 @@
+import csv
 import json
 import os
 import pickle
 import sys
-from ast import Dict
 from functools import partial
 from shutil import copyfile, rmtree
-from typing import Any, List, Optional, Union
+from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
 import pandas as pd
 from loguru import logger
 from matplotlib.figure import Figure
+from PIL import Image
 
 _has_torch = True
-_has_pillow = True
-
 
 try:
     import torch  # type: ignore
 except ImportError:
     _has_torch = False
-
-try:
-    from PIL import Image
-except ImportError:
-    _has_pillow = False
 
 
 class Snapshot:
@@ -220,7 +214,9 @@ class Snapshot:
         path = os.path.join("snapshots", self.snapshot_name, f"v{self.version}")
         return os.path.isdir(path)
 
-    def checkpoint(self, checkpoint: Any, name: str) -> None:
+    def checkpoint(
+        self, checkpoint: Any, name: str, custom_saver: Optional[Callable] = None
+    ) -> None:
         """
         Saves the given checkpoint object to a file with the specified name
         within the "checkpoints" directory. If the directory or any necessary subdirectories
@@ -228,9 +224,11 @@ class Snapshot:
 
         Args:
             checkpoint (Any): The checkpoint object to be saved. This is typically a model state dictionary or any other serializable object.
-            name (str): The name of the file to save the checkpoint to. If the name contains directory separators, the necessary subdirectories will be created.
+            name (str): The name of the file to save the checkpoint to. If the name contains directory separators, the necessary directories will be created.
+                        Supported file extensions include: .json, .pkl/.pickle, .txt, .csv, .npy/.npz, and .pth/.pt
         Raises:
-            AssertionError: If PyTorch is not installed.
+            AssertionError: If PyTorch is not installed and the checkpoint is a PyTorch model state.
+            ValueError: If the name does not have a valid file extension or if the checkpoint type is unsupported.
 
         Example:
             ```python
@@ -243,9 +241,6 @@ class Snapshot:
             ```
         """
 
-        assert _has_torch, (
-            "\n\nPyTorch is not installed. Please install PyTorch to use this method.\n\n"
-        )
         self._get_version()
         path = self._get_version_path("checkpoints")
         os.makedirs(path, exist_ok=True)
@@ -253,9 +248,63 @@ class Snapshot:
         if os.path.sep in name:
             os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
 
-        torch.save(checkpoint, os.path.join(path, name))  # type: ignore
+        ckpt_path = os.path.join(path, name)
 
-    def json(self, data: Union[Dict, List[Any]], name: str) -> None:
+        if name.endswith(".pth") or name.endswith(".pt"):
+            assert _has_torch, (
+                "\n\nPyTorch is not installed. Please install PyTorch to save a checkpoint.\n\n"
+            )
+            torch.save(checkpoint, ckpt_path)
+        elif name.endswith(".json"):
+            if isinstance(checkpoint, dict):
+                with open(ckpt_path, "w") as f:
+                    json.dump(checkpoint, f, indent=4)
+            elif isinstance(checkpoint, list):
+                with open(ckpt_path, "w") as f:
+                    json.dump(checkpoint, f, indent=4)
+        elif name.endswith(".pkl") or name.endswith(".pickle"):
+            with open(ckpt_path, "wb") as f:
+                pickle.dump(checkpoint, f)
+        elif name.endswith(".txt"):
+            with open(ckpt_path, "w") as f:
+                f.write(str(checkpoint))
+        elif name.endswith(".csv"):
+            if pd and isinstance(checkpoint, pd.DataFrame):
+                checkpoint.to_csv(ckpt_path, index=False)
+            elif isinstance(checkpoint, (list, tuple)) and all(
+                isinstance(row, (list, tuple)) for row in checkpoint
+            ):
+                with open(ckpt_path, "w", newline="") as f:
+                    writer = csv.writer(f)
+                    writer.writerows(checkpoint)
+            else:
+                raise ValueError("\n\nCSV requires DataFrame or 2D iterable.\n")
+        elif name.endswith(".npy"):
+            if isinstance(checkpoint, np.ndarray):
+                np.save(ckpt_path, checkpoint)
+            else:
+                raise ValueError(
+                    f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npy file. Only numpy arrays are supported.\n"
+                )
+        elif name.endswith(".npz"):
+            if isinstance(checkpoint, dict):
+                for value in checkpoint.values():
+                    if not isinstance(value, np.ndarray):
+                        raise ValueError(
+                            f"\n\nUnsupported checkpoint type {type(value)} for .npz file. Only dictionaries with numpy arrays are supported but got.\n"
+                        )
+                np.savez(ckpt_path, **checkpoint)
+            else:
+                raise ValueError(
+                    f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npz file. Only dictionaries are supported.\n"
+                )
+        else:
+            assert custom_saver is not None, (
+                "\n\nUnsupported file extension. Please provide a valid file extension or a custom saver function - custom_saver(checkpoint, name).\n"
+            )
+            custom_saver(checkpoint, ckpt_path)
+
+    def json(self, data: Union[Dict[Any, Any], List[Any]], name: str) -> None:
         """
         Save a dictionary or list to a JSON file.
 
@@ -299,24 +348,28 @@ class Snapshot:
 
         df.to_csv(os.path.join(path, name), index=False)
 
-    def figure(self, image: Any, name: str) -> None:
+    def figure(
+        self,
+        image: Union[np.ndarray, Image.Image, Figure],
+        name: str,
+        dpi: Optional[int] = 500,
+    ) -> None:
         """
         Save an image to the specified path with the given name.
-        This method supports saving images of various types including numpy arrays, PIL images,
-        matplotlib figures, and torch tensors. The image is saved in the directory corresponding
-        to the current version under a subdirectory named "figures".
+        This method supports saving images of various types including numpy arrays, PIL images, and matplotlib figures.
+        The image is saved in the directory corresponding to the current version under a subdirectory named "figures".
 
         Args:
             image (Any): The image to be saved. Supported types are:
                 - numpy.ndarray: The image will be normalized to the range [0, 255] and saved as a PNG file.
+                  Supports formats: (H, W), (H, W, 1), (H, W, 3), (1, H, W), (3, H, W)
                 - PIL.Image.Image: The image will be saved directly.
-                - matplotlib.figure.Figure: The figure will be saved using the `savefig` method.
-                - torch.Tensor: The tensor will be converted to a numpy array, normalized, and saved as a PNG file.
+                - matplotlib.figure.Figure: The figure will be saved using matplotlib's savefig method.
             name (str): The name of the file to save the image as. If the name contains directory separators,
                 the necessary directories will be created.
         Raises:
-            AssertionError: If Pillow is not installed.
-            ValueError: If the image type is not supported.
+            AssertionError: If Pillow is not installed (for numpy arrays and PIL images).
+            ValueError: If the image type or format is not supported.
         """
 
         self._get_version()
@@ -326,42 +379,50 @@ class Snapshot:
         if os.path.sep in name:
             os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
 
-        if isinstance(image, np.ndarray):
-            assert _has_pillow, (
-                "\n\nPillow is not installed. Please install Pillow to save a numpy image.\n\n"
-            )
-            image = image.astype("float32")
-            image = (image - image.min()) / np.ptp(image)
-            image *= 255.0
-            image = image.astype("uint8")
-            image = Image.fromarray(image)
-            image.save(os.path.join(path, name))
+        if isinstance(image, Figure):
+            # Handle matplotlib figures
+            image.savefig(os.path.join(path, name), bbox_inches="tight", dpi=dpi)
+        elif isinstance(image, np.ndarray):
+            # Handle different numpy array formats
+            if image.ndim == 2:  # (H, W)
+                pass  # Keep as is
+            elif image.ndim == 3:
+                if image.shape[0] == 1:  # (1, H, W)
+                    image = np.transpose(image, (1, 2, 0))  # Convert to (H, W, 1)
+                    image = np.squeeze(image, axis=2)  # Convert to (H, W)
+                elif image.shape[0] == 3:  # (3, H, W)
+                    image = np.transpose(image, (1, 2, 0))  # Convert to (H, W, 3)
+                elif image.shape[2] == 1:  # (H, W, 1)
+                    image = np.squeeze(image, axis=2)  # Convert to (H, W)
+                elif image.shape[2] == 3:  # (H, W, 3)
+                    pass  # Keep as is
+                else:
+                    raise ValueError(
+                        f"\n\nUnsupported image shape {image.shape}. "
+                        f"Supported formats: (H, W), (H, W, 1), (H, W, 3), (1, H, W), (3, H, W)\n"
+                    )
+            else:
+                raise ValueError(
+                    f"\n\nUnsupported image dimensions {image.ndim}. "
+                    f"Only 2D and 3D arrays are supported.\n"
+                )
+
+            # Normalize to [0, 255]
+            np_image = image.astype("float32")
+            np_image = (np_image - np_image.min()) / np.ptp(np_image)
+            np_image *= 255.0
+            np_image = np_image.astype("uint8")
+
+            # Convert to PIL and save
+            pil_image = Image.fromarray(np_image)
+            pil_image.save(os.path.join(path, name))
+
         elif isinstance(image, Image.Image):
             image.save(os.path.join(path, name))
-        elif isinstance(image, Figure):
-            image.savefig(os.path.join(path, name), dpi=100)  # type: ignore
-        else:  # for torch images
-            assert isinstance(
-                image,
-                torch.Tensor,  # type: ignore
-            ), (
-                f"\n\nUnsupported image type {type(image)}. Only numpy, PIL, matplotlib, and torch tensors are supported.\n"
+        else:
+            raise ValueError(
+                f"\n\nUnsupported image type {type(image)}. Only numpy arrays, PIL images, and matplotlib figures are supported.\n"
             )
-            image = image.cpu().numpy()
-            if image.ndim == 3 and image.shape[0] in [
-                1,
-                3,
-                4,
-            ]:  # (3, H, W), (1, H, W) or (4, H, W)
-                image = np.transpose(
-                    image, (1, 2, 0)
-                )  # Convert to (H, W, 3), (H, W, 1) or (H, W, 4)
-            image = image.astype("float32")
-            image = (image - image.min()) / np.ptp(image)
-            image *= 255.0
-            image = image.astype("uint8")
-            image = Image.fromarray(image)
-            image.save(os.path.join(path, name))
 
     def reset(self, confirm: bool = False) -> None:
         assert os.path.isdir(self._config_dir), (

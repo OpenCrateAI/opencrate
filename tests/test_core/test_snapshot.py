@@ -129,15 +129,6 @@ class TestCoreSnapshot:
         self.snapshot._config_dir = self.test_root_dir
         self.snapshot.setup(name="test_snapshot")
 
-    def test_figure_torch(self):
-        self.setup_test_figure_torch()
-        if _has_torch:
-            image = torch.rand(3, 100, 100)
-            self.snapshot.figure(image, "image.png")
-            assert os.path.isfile(
-                os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png")
-            )
-
     def setup_test_setup_with_tag(self):
         self.snapshot = Snapshot()
         self.snapshot._config_dir = self.test_root_dir

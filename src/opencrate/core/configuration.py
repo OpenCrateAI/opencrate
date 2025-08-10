@@ -3,10 +3,13 @@ import os
 import re
 import time
 from functools import wraps
+from typing import Any, Dict
 
 import yaml
 from rich.console import Console
 from rich.tree import Tree
+
+from .snapshot import Snapshot
 
 
 class LiteralSafeDumper(yaml.SafeDumper):
@@ -25,7 +28,7 @@ class LiteralSafeDumper(yaml.SafeDumper):
 
 class Configuration:
     def __init__(self) -> None:
-        self._config = {}
+        self._config: Dict[str, Dict[str, Any]] = {}
         # Default mapping for built-in types.
         self.default_type_mapping = {
             "int": int,
@@ -40,14 +43,13 @@ class Configuration:
             "bytes": bytes,
             "bytearray": bytearray,
         }
-        self.non_default_imports = []
         self.globals = globals()
         self.globals["__builtins__"] = __builtins__
         self.opencrate_init_done = False
         self.config_eval_on = True
         self.config_eval_start = 0.0
         self.config_eval_timeout = 60
-        self.snapshot = None
+        self.snapshot: Snapshot
 
     def _extract_validation_info(self, docstring):
         """
@@ -156,7 +158,7 @@ class Configuration:
                     if param_type:
                         threshold = (
                             param_type(float(threshold_str))
-                            if param_type == int
+                            if param_type is int
                             else param_type(threshold_str)
                         )
                     else:
@@ -210,7 +212,7 @@ class Configuration:
             return t
 
         # Otherwise, attempt to resolve the custom type.
-        local_namespace = {}
+        local_namespace: Dict[str, Any] = {}
         try:
             # Now resolve the type using the updated self.globals
             src = f"resolved_type = {type_str}"
@@ -275,13 +277,13 @@ class Configuration:
 
                     # Convert file_path to be relative to the current working directory.
                     # Only do this if it's not the special 'jupyter_notebook' path.
-                    if "tmp/" in file_path:
+                    if "tmp/" in file_path:  # type: ignore
                         file_path = "jupyter_notebook"
                     else:
                         try:
                             # Get the path relative to the current working directory.
                             # This assumes os.getcwd() is the project's root.
-                            file_path = os.path.relpath(file_path, os.getcwd())
+                            file_path = os.path.relpath(file_path, os.getcwd())  # type: ignore
                         except ValueError:
                             # If the path cannot be made relative (e.g., on a different drive or
                             # outside the current working directory's scope),
@@ -487,7 +489,7 @@ class Configuration:
         """
 
         console = Console()
-        file_tree = {}
+        file_tree: Dict[str, Any] = {}
         base_dir = os.getcwd()
 
         for name, details in self._config.items():
@@ -558,7 +560,7 @@ class Configuration:
         The YAML file will contain all meta and config details.
         """
         # Prepare a serializable version of the configuration
-        config_yaml = {}
+        config_yaml: Dict[str, Dict[str, Any]] = {}
 
         for comp_name, comp_details in self._config.items():
             config_yaml[comp_name] = {}

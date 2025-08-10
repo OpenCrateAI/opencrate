@@ -54,7 +54,7 @@ FROM base AS python
 
 RUN add-apt-repository ppa:deadsnakes/ppa -y && \
     apt update -y && \
-    apt install -y --no-install-recommends python3.10-distutils python3.10-dev python3.7-dev && \
+    apt install -y --no-install-recommends python3.10-distutils python3.10-dev && \
     curl -sS https://bootstrap.pypa.io/get-pip.py | python3.10 && \
     python3.10 -m pip install --upgrade pip docker rich --root-user-action=ignore && \
     curl -fsSL https://pyenv.run | bash

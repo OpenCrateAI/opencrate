@@ -73,15 +73,17 @@ def stream_docker_logs(console: Console, command: Union[List[str], dict[str, str
         for line in command:  # type: ignore
             if "stream" in line:
                 clean_line = re.sub(r"\x1b\[[0-9;]*m", "", line["stream"]).strip()  # type: ignore
-                console.print(f"{clean_line}")
+                console.print(f"[dim]{clean_line}[/]")
             elif "status" in line:
                 clean_status = re.sub(r"\x1b\[[0-9;]*m", "", line["status"]).strip()  # type: ignore
-                console.print(f"{clean_status}")
+                console.print(f"[dim]{clean_status}[/]")
             elif "error" in line:
                 raise Exception(f"{line['error']}")  # type: ignore
         console.print("    >> ● Build successful")
+        return "Success"
     except Exception as e:
         console.print(f"\n    >> [red]●[red] Build failed:{e}", style="bold red")
+        return "Failed"
 
 
 def write_python_version(python_version: str):

@@ -1,0 +1,33 @@
+# Optimized single-stage build with aggressive cleanup
+FROM opencrate-base-cpu:v0.1.0
+ENV DEBIAN_FRONTEND=noninteractive
+ENV TZ=Asia/Kolkata
+# Install Python and dependencies in one optimized layer
+RUN add-apt-repository ppa:deadsnakes/ppa -y &&\
+    apt update -y &&\
+    apt install -y --no-install-recommends python3.13 python3.13-dev &&\
+    curl -sS https://bootstrap.pypa.io/get-pip.py | python3.13 &&\
+    python3.13 -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir &&\
+    apt-get autoremove -y &&\
+    apt-get clean &&\
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache ~/.cargo ~/.rustup
+# Install Python packages
+RUN python3.13 -m pip install --no-cache-dir --upgrade --root-user-action=ignore ipython jupyter &&\
+    python3.13 -m pip cache purge
+# Install application
+RUN mkdir -p /home/opencrate/
+WORKDIR /home/opencrate/
+COPY src/ /home/opencrate/src
+COPY pyproject.toml /home/opencrate/
+COPY setup.cfg /home/opencrate/
+COPY setup.py /home/opencrate/
+RUN python3.13 -m pip install -e . --no-cache-dir --root-user-action=ignore && \
+    python3.13 -m pip cache purge && \
+    # Final aggressive cleanup
+    apt-get autoremove -y && \
+    apt-get clean && \
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache
+RUN mkdir /root/.hooks/
+COPY .docker/hooks/ /root/.hooks/
+WORKDIR /home/workspace/
+RUN git config --global --add safe.directory '*' && git config --global init.defaultBranch main

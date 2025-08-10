@@ -5,6 +5,7 @@ from pathlib import Path
 from shutil import copytree, rmtree
 
 import questionary
+import yaml
 from questionary import Style
 from rich.console import Console
 from rich.tree import Tree
@@ -16,7 +17,6 @@ from .settings import ConfigSetting
 console = Console()
 
 DATATYPES = ["Image", "Text", "Video", "Audio", "Tabular"]
-ML_FRAMEWORKS = ["PyTorch", "Tensorflow", "Default"]
 PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/template"
@@ -152,19 +152,6 @@ def prompt_project_details():
                 ).ask(),
             )
 
-    project_framework = safe_prompt(
-        lambda: questionary.select(
-            "● Select pre-baked opencrate containers for your framework:",
-            choices=[
-                {"name": f"{framework}", "value": framework}
-                for framework in ML_FRAMEWORKS
-            ],
-            qmark="",
-            default={"name": "PyTorch", "value": "PyTorch"},
-            style=CUSTOM_STYLE,
-        ).ask()
-    )
-
     project_python_version = safe_prompt(
         lambda: questionary.select(
             "● Select your python environment version:",
@@ -191,25 +178,25 @@ def prompt_project_details():
         ).ask()
     )
 
-    if project_runtime == "cuda" and project_framework == "PyTorch":
-        project_framework_runtime = safe_prompt(
-            lambda: questionary.select(
-                "● Select your cuda driver version",
-                choices=[
-                    {"name": "CUDA 12.4 [Latest]", "value": "12.4"},
-                    {"name": "CUDA 12.1", "value": "12.1"},
-                    {"name": "CUDA 11.8", "value": "11.8"},
-                    {"name": "CUDA 11.7", "value": "11.7"},
-                    {"name": "CUDA 11.3", "value": "11.3"},
-                    {"name": "CUDA 10.2", "value": "10.2"},
-                ],
-                qmark="",
-                default={"name": "CUDA 12.4 [Latest]", "value": "12.4"},
-                style=CUSTOM_STYLE,
-            ).ask()
-        )
-    else:
-        project_framework_runtime = "cpu"
+    # if project_runtime == "cuda":
+    #     project_framework_runtime = safe_prompt(
+    #         lambda: questionary.select(
+    #             "● Select your cuda driver version",
+    #             choices=[
+    #                 {"name": "CUDA 12.4 [Latest]", "value": "12.4"},
+    #                 {"name": "CUDA 12.1", "value": "12.1"},
+    #                 {"name": "CUDA 11.8", "value": "11.8"},
+    #                 {"name": "CUDA 11.7", "value": "11.7"},
+    #                 {"name": "CUDA 11.3", "value": "11.3"},
+    #                 {"name": "CUDA 10.2", "value": "10.2"},
+    #             ],
+    #             qmark="",
+    #             default={"name": "CUDA 12.4 [Latest]", "value": "12.4"},
+    #             style=CUSTOM_STYLE,
+    #         ).ask()
+    #     )
+    # else:
+    #     project_framework_runtime = "cpu"
 
     git_remote_url = safe_prompt(
         lambda: questionary.path(
@@ -228,15 +215,34 @@ def prompt_project_details():
         "project_name": project_name,
         "project_description": project_description,
         "project_datatypes": project_datatypes,
-        "project_framework": project_framework,
         "project_python_version": project_python_version,
         "project_runtime": project_runtime,
-        "project_framework_runtime": project_framework_runtime,
         "project_dir": project_dir,
         "git_remote_url": git_remote_url,
         "project_docker_image": project_docker_image,
         "project_docker_container": project_docker_container,
     }
+
+
+class DockerComposeDumper(yaml.Dumper):
+    def increase_indent(self, flow=False, indentless=False):
+        return super().increase_indent(flow, indentless=False)
+
+
+def remove_cuda_from_dockercompose(dockercompose_path: str):
+    with open(dockercompose_path, "r") as f:
+        compose_data = yaml.safe_load(f)
+
+    for service_config in compose_data.get("services", {}).values():
+        if not isinstance(service_config, dict):
+            continue  # Skip malformed service entries
+
+        del service_config["deploy"]
+
+    with open(dockercompose_path, "w") as f:
+        yaml.dump(
+            compose_data, f, Dumper=DockerComposeDumper, sort_keys=False, indent=4
+        )
 
 
 def create_project_structure(config):
@@ -246,7 +252,7 @@ def create_project_structure(config):
                 config["project_name"],
             )
 
-        pull_docker_image = f"opencrate-{config['project_framework'].lower()}"
+        pull_docker_image = "opencrate"
 
         if config["project_runtime"] == "cuda":
             pull_docker_image += "-cuda"
@@ -264,14 +270,12 @@ def create_project_structure(config):
             version="main-v0",
             description=config["project_description"],
             datatypes=", ".join(config["project_datatypes"]),
-            framework=config["project_framework"],
             python_version=config["project_python_version"],
             docker_image=config["project_docker_image"],
             pull_docker_image=pull_docker_image,
             entry_command=entry_command,
             docker_container=config["project_docker_container"],
             runtime=config["project_runtime"],
-            framework_runtime=config["project_framework_runtime"],
             git_remote_url=config["git_remote_url"],
         )
         config_setting.write_template_settings(
@@ -283,6 +287,11 @@ def create_project_structure(config):
                 "README.md",
             ],
         )
+
+        if config["project_runtime"] == "cpu":
+            remove_cuda_from_dockercompose(
+                os.path.join(config["project_dir"], "docker-compose.yml")
+            )
 
 
 def setup_git_repository(project_dir, git_remote_url):

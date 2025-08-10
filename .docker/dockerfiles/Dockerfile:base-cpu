@@ -1,28 +1,28 @@
-FROM nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
-
+FROM ubuntu:22.04
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Kolkata
-ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
-
 RUN apt update -y &&\
     apt upgrade -y &&\
     apt install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gnupg gcc wget curl vim git speedtest-cli iputils-ping libcairo2-dev &&\
-    echo $TZ > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata
-
+    echo $TZ > /etc/timezone && dpkg-reconfigure -f noninteractive tzdata &&\
+    apt-get autoremove -y &&\
+    apt-get clean &&\
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /usr/share/doc /usr/share/man /usr/share/locale
 RUN apt update -y &&\
-    apt install -y --no-install-recommends btop unrar make tree htop bat tldr zoxide cpufetch jq nvtop
-
+    apt install -y --no-install-recommends btop unrar make tree htop bat tldr zoxide cpufetch jq zsh &&\
+    apt-get clean &&\
+    rm -rf /var/lib/apt/lists/*
 RUN mkdir -p /etc/apt/keyrings &&\
     wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg &&\
     echo 'deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main' | tee /etc/apt/sources.list.d/gierens.list &&\
     chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list &&\
     add-apt-repository ppa:zhangsongcui3371/fastfetch -y &&\
     apt update -y &&\
-    apt install -y --no-install-recommends eza fastfetch
-
+    apt install -y --no-install-recommends eza fastfetch &&\
+    apt-get clean &&\
+    rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 COPY .docker/cli/ /home/
-RUN apt install -y --no-install-recommends zsh &&\
-    chsh -s $(which zsh) &&\
+RUN chsh -s $(which zsh) &&\
     wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O - | zsh || true &&\
     git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k &&\
     git clone https://github.com/zsh-users/zsh-autosuggestions ${ZSH_CUSTOM:-~/.oh-my-zsh/custom}/plugins/zsh-autosuggestions &&\
@@ -33,4 +33,5 @@ RUN apt install -y --no-install-recommends zsh &&\
     cp -r /home/btop/ ~/.config/ &&\
     cp -r /home/atuin/ ~/.config/ &&\
     cp -r /home/fastfetch/ ~/.config/ &&\
-    rm -rf /home/zsh/
+    rm -rf /home/zsh/ &&\
+    rm -rf /tmp/* /var/tmp/* /root/.cache

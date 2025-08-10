@@ -1156,7 +1156,7 @@ def launch(
                     ):
                         crate_classes.append(inherited_class)
             else:
-                crate_classes.append(workflow)
+                crate_classes.append(workflow)  # type: ignore
 
         with utils.spinner(cli.console, "Validating workflow classes ..."):
             if len(crate_classes) == 0:
@@ -1177,7 +1177,7 @@ def launch(
                     filter(lambda x: x.__name__ == class_name, crate_classes)
                 )[0]
             else:
-                crate_class = workflow
+                crate_class = workflow  # type: ignore
 
             crate_class.use_config = use_config
             crate_class.start = start

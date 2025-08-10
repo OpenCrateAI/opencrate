@@ -1,7 +1,15 @@
-**__pycache__**
 .history
 .mypy_cache
 .pytest_cache
 .tox
 .venv
 .vscode
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+.git/
+.coverage
+tests/
+docs/
+*.md
+.env

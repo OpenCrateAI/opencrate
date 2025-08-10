@@ -12,14 +12,12 @@ class ConfigSetting(BaseSettings):
     version: str
     description: str
     datatypes: str
-    framework: str
     python_version: str
     pull_docker_image: str
     docker_image: str
     entry_command: str
     docker_container: str
     runtime: str
-    framework_runtime: str
     git_remote_url: str
 
     # docker_registry: str = "opencrate"

@@ -32,7 +32,7 @@ dependencies = [
     "matplotlib",
     "pandas",
     "numpy",
-    "opencv-python",
+    "opencv-python-headless",
     "rich",
     "typer",
     "loguru",
@@ -53,6 +53,7 @@ dev = [
     "tox",
     "mypy",
     "pytest",
+    "ruff",
     "pytest-cov",
     "types-requests",
     "torch",
@@ -77,7 +78,7 @@ include = ["opencrate", "opencrate.*"]
 
 [tool.black]
 line-length = 112
-target-version = ['py34', 'py35', 'py36', 'py37', 'py38', 'py39', 'py310', 'py311', 'py312', 'py313']
+target-version = ['py37', 'py38', 'py39', 'py310', 'py311', 'py312', 'py313']
 exclude = '''
 /(
     \.git
