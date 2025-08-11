@@ -26,4 +26,4 @@ RUN python3.12 -m pip install --no-cache-dir -e . \
 WORKDIR /home/workspace/
 RUN git config --global --add safe.directory '*' && git config --global init.defaultBranch main
 
-COPY .docker/hooks/ /root/.hooks/
+COPY docker/hooks/ /root/.hooks/

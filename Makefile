@@ -35,20 +35,31 @@ build-clean-local-all:
 
 build-opencrate-all:
 	@echo "Building all OpenCrate images for version v$(VERSION)..."
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
+
+	# --- STAGE 1: Build and load ALL base images first ---
+	# This ensures they are available locally before the app images try to use them.
+	@echo "\n--- Building all required base images ---"
+	@for runtime in cpu cuda; do \
+		echo "\n--- Building base image for runtime: $$runtime ---"; \
+		python3 .docker/dockerfile.py --python=3.10 --runtime=$$runtime --generate-only; \
+		BASE_IMAGE_TAG="braindotai/opencrate-base-$$runtime:v$(VERSION)"; \
+		DOCKERFILE_BASE_PATH="./.docker/dockerfiles/Dockerfile.base-$$runtime"; \
+		docker buildx build --platform linux/amd64 -f $$DOCKERFILE_BASE_PATH -t $$BASE_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
+	done
+
+	# --- STAGE 2: Now that all base images are loaded, build all app images ---
+	@echo "\n--- Building all application images ---"
+	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
-			python3 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
-			BASE_IMAGE_TAG="braindotai/opencrate-base-$$runtime:v$(VERSION)"; \
+			echo "\n--- Building for Python $$python_version, Runtime $$runtime ---"; \
+			python3 .docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
-			DOCKERFILE_BASE_PATH="./docker/dockerfiles/Dockerfile.base-$$runtime"; \
-			DOCKERFILE_APP_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_BASE_PATH -t $$BASE_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
+			DOCKERFILE_APP_PATH="./.docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
 			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_APP_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
 		done; \
 	done; \
-	echo "\n--- Cleaning up Docker system ---"; \
-	docker image prune -f;
+	@echo "\n--- Cleaning up Docker system ---"; \
 
 push-opencrate-all:
 	@echo "Pushing all OpenCrate images for version v$(VERSION)..."
