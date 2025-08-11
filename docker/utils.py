@@ -1,6 +1,6 @@
 import re
 from contextlib import contextmanager
-from typing import List, Optional, Union
+from typing import List, Literal, Optional, Union
 
 from rich.console import Console
 
@@ -68,28 +68,36 @@ def spinner(console: Console, message: str):
             pass
 
 
-def stream_docker_logs(console: Console, command: Union[List[str], dict[str, str]]):
+def stream_docker_logs(
+    logger, console: Console, command: Union[List[str], dict[str, str]]
+) -> Literal["Success"] | Literal["Failed"]:
     try:
         for line in command:  # type: ignore
             if "stream" in line:
                 clean_line = re.sub(r"\x1b\[[0-9;]*m", "", line["stream"]).strip()  # type: ignore
-                console.print(f"[dim]{clean_line}[/]")
+                logger.info(f"{clean_line}")
             elif "status" in line:
                 clean_status = re.sub(r"\x1b\[[0-9;]*m", "", line["status"]).strip()  # type: ignore
-                console.print(f"[dim]{clean_status}[/]")
+                logger.info(f"{clean_status}")
             elif "error" in line:
-                raise Exception(f"{line['error']}")  # type: ignore
-        console.print("    >> ● Build successful")
+                error_msg = line["error"]  # type: ignore
+                logger.error(f"{error_msg}")
+                console.print(
+                    f"[red] ● Build failed: {error_msg}[/red]", style="bold red"
+                )
+                raise Exception(error_msg)
+
+        logger.success("--- Successfully built ---")
+        console.print("[green] ● [Build successful][/green]")
         return "Success"
-    except Exception as e:
-        console.print(f"\n    >> [red]●[red] Build failed:{e}", style="bold red")
+    except Exception:
         return "Failed"
 
 
 def write_python_version(python_version: str):
     # Update .aliases.sh with the specified Python version
 
-    aliases_file_path = "./.docker/cli/zsh/.aliases.sh"
+    aliases_file_path = "./docker/cli/zsh/.aliases.sh"
     with open(aliases_file_path, "r") as file:
         aliases_content = file.read()
     aliases_content = re.sub(

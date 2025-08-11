@@ -1,3 +1,5 @@
+
+*logs*
 .history
 .ruff_cache
 .pytest_cache

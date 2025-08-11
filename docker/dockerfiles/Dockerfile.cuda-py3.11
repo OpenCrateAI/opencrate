@@ -1,5 +1,5 @@
 # Final application image
-FROM braindotai/opencrate-base-cpu:v0.1.0
+FROM braindotai/opencrate-base-cuda:v0.1.0
 
 # Install Python from deadsnakes PPA
 RUN add-apt-repository ppa:deadsnakes/ppa -y \
@@ -26,4 +26,4 @@ RUN python3.11 -m pip install --no-cache-dir -e . \
 WORKDIR /home/workspace/
 RUN git config --global --add safe.directory '*' && git config --global init.defaultBranch main
 
-COPY .docker/hooks/ /root/.hooks/
+COPY docker/hooks/ /root/.hooks/

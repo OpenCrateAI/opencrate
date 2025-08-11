@@ -34,9 +34,9 @@ RUN apt update -y && \
 
 # Stage 2: Copy configuration files
 FROM base AS config
-COPY .docker/cli/ /root/
-COPY .docker/fonts/ /root/
-COPY .docker/hooks/ /root/.hooks/
+COPY docker/cli/ /root/
+COPY docker/fonts/ /root/
+COPY docker/hooks/ /root/.hooks/
 
 RUN mv /root/zsh/.zshrc /root/.zshrc && \
     mv /root/zsh/.p10k.zsh /root/.p10k.zsh && \
