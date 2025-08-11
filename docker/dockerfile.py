@@ -88,8 +88,8 @@ CLI_PACKAGES = [
     "ripgrep",
     "fzf",
 ]
-if args.runtime == "cuda":
-    CLI_PACKAGES.append("nvtop")
+# if args.runtime == "cuda":
+#     CLI_PACKAGES.append("nvtop")
 
 PYTHON_PIP_PACKAGES = ["ipython", "jupyter"]
 
@@ -222,13 +222,9 @@ ENV TZ=Asia/Kolkata
     if args.runtime == "cuda":
         base_stage += "ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH\n"
 
-    cli_packages_for_run = CLI_PACKAGES[:]  # Create a copy to modify
-    if args.runtime == "cuda":
-        cli_packages_for_run.append("nvtop")
-
     base_stage += f"""
 # Install all Ubuntu & CLI packages in a single, optimized layer
-RUN apt-get update && apt-get install -y --no-install-recommends {" ".join(UBUNTU_PACKAGES)} {" ".join(cli_packages_for_run)} \\
+RUN apt-get update && apt-get install -y --no-install-recommends {" ".join(UBUNTU_PACKAGES)} {" ".join(CLI_PACKAGES)} \\
     # Add external repos for eza and fastfetch
     && mkdir -p /etc/apt/keyrings \\
     && wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg \\
@@ -377,7 +373,7 @@ def main():
 
     if args.generate_only:
         console.print(
-            f"\n[bold green]======== Dockerfile generated at {dockerfile_path} ========[/bold green]"
+            f"\n[bold green]======== ✔ Dockerfile generated at {dockerfile_path} ========[/bold green]"
         )
         return
 
