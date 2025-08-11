@@ -1,14 +1,17 @@
 import os
 import re
-from typing import List, Union
+from typing import Any, List, Sequence, Union
 
 import imageio
 import numpy as np
+import numpy.typing as npt
 from PIL import Image, ImageSequence
 
 
 def _to_gif(
-    images: List[Union[np.ndarray, Image.Image]], output_path: str, fps: int = 10
+    images: Sequence[Union[npt.NDArray[Any], Image.Image]],
+    output_path: str,
+    fps: int = 10,
 ):
     images_ = []
     for img in images:
@@ -27,13 +30,13 @@ def _to_gif(
         # Normalize to [0, 1] range
         img_min, img_max = img.min(), img.max()
         if img_max > img_min:
-            img = (img - img_min) / (img_max - img_min)
+            img_ = (img - img_min) / (img_max - img_min)
         else:
             # Handle constant images
-            img = np.zeros_like(img)
+            img_ = np.zeros_like(img)
 
         # Convert to uint8 [0, 255] range
-        images_.append((img * 255.0).astype(np.uint8))
+        images_.append((img_ * 255.0).astype(np.uint8))
 
     imageio.mimsave(output_path, images_, fps=fps)
 
@@ -72,7 +75,7 @@ def dir_to_gif(src_dir: str, output_path: str, fps: int = 10):
 
 
 def images_to_gif(
-    images: List[Union[np.ndarray, Image.Image]], output_path: str, fps: int = 10
+    images: List[Union[npt.NDArray[Any], Image.Image]], output_path: str, fps: int = 10
 ):
     """
     Converts a list of images to a GIF.
@@ -82,7 +85,7 @@ def images_to_gif(
         output_path: Path where the GIF will be saved
         fps: Frames per second for the output GIF
     """
-    # Directly use _to_gif helper function
+
     _to_gif(images, output_path, fps)
 
 

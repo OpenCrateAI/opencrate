@@ -59,6 +59,7 @@ dev = [
     "torch",
     "docker",
     "build",
+    "types-PyYAML",
     "mkdocs",
     "mkdocs-material",
     "mkdocstrings-python",
@@ -75,31 +76,6 @@ license-files = ["LICENCE"]
 [tool.setuptools.packages.find]
 where = ["src"]
 include = ["opencrate", "opencrate.*"]
-
-[tool.black]
-line-length = 112
-target-version = ['py37', 'py38', 'py39', 'py310', 'py311', 'py312', 'py313']
-exclude = '''
-/(
-    \.git
-    | \.mypy_cache
-    | \.tox
-    | \.venv
-    | \.docker
-    | \.history
-    | \.vscode
-    | \.pytest_cache
-    | \.idea
-    | build
-    | dist
-    | __pycache__
-)/
-'''
-
-[tool.flake8]
-exclude = ".git, __pycache__, build, dist, .mypy_cache, .tox, .venv"
-max-line-length = 112
-extend-ignore = ["E203", "W503", "F541", "E722", "E501"]
 
 [tool.mypy]
 exclude = ".git, __pycache__, build, dist, .mypy_cache, .tox, .venv"

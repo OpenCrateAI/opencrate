@@ -96,6 +96,7 @@ source $ZSH/oh-my-zsh.sh
 export TERM=xterm-256color
 
 export PATH="/usr/local/bin:$PATH"
+
 if [ -d "$HOME/.local/bin" ] ; then
     PATH="$HOME/.local/bin:$PATH"
 fi

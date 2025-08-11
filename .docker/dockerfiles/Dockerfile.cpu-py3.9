@@ -1,0 +1,29 @@
+# Final application image
+FROM braindotai/opencrate-base-cpu:v0.1.0
+
+# Install Python from deadsnakes PPA
+RUN add-apt-repository ppa:deadsnakes/ppa -y \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends python3.9 python3.9-dev python3.9-distutils \
+    && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.9 \
+    && python3.9 -m pip install --no-cache-dir --upgrade pip \
+    # Cleanup
+    && apt-get clean \
+    && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache
+
+# Install Python packages
+RUN python3.9 -m pip install --no-cache-dir --upgrade ipython jupyter \
+    && python3.9 -m pip cache purge
+
+# Copy and install the opencrate application
+WORKDIR /home/opencrate/
+COPY pyproject.toml setup.cfg setup.py ./
+COPY src/ ./src/
+RUN python3.9 -m pip install --no-cache-dir -e . \
+    && python3.9 -m pip cache purge
+
+# Setup final workspace and hooks
+WORKDIR /home/workspace/
+RUN git config --global --add safe.directory '*' && git config --global init.defaultBranch main
+
+COPY .docker/hooks/ /root/.hooks/

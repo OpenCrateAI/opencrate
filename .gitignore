@@ -1,4 +1,6 @@
 .history
+.ruff_cache
+.pytest_cache
 .venv
 tests/cli
 tests/pipelines

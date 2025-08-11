@@ -1,8 +1,6 @@
-from .core import concurrency
+from .core import concurrency, decorate, io, visualize
 from .core import configuration as cfg
-from .core import decorate, io
 from .core import snapshot as snp
-from .core import visualize
 
 snapshot: snp.Snapshot = snp.Snapshot()
 _configuration = cfg.Configuration()

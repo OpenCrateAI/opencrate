@@ -408,7 +408,7 @@ def runtime(
         #     f"\n░▒▓█ [bold]Committing[/bold] > {cli.config.get('title')}\n"
         # )
 
-        with utils.spinner(cli.console, "Creating new runtime ..."):
+        with utils.spinner(cli.console, "Commiting runtime changes ..."):
             try:
                 container = cli.docker_client.containers.get(
                     cli.config.get("docker_container")
@@ -426,7 +426,6 @@ def runtime(
             new_docker_image = current_image.replace(
                 f"-v{version_match}", f"-v{int(version_match) + 1}"
             )
-
             container.commit(
                 repository=new_docker_image,
                 author=os.environ["HOST_GIT_NAME"],
