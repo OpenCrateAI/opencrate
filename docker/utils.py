@@ -87,8 +87,7 @@ def stream_docker_logs(
                 )
                 raise Exception(error_msg)
 
-        logger.success("--- Successfully built ---")
-        console.print("[green] ● [Build successful][/green]")
+        logger.success("======== ✔ Successfully built ========")
         return "Success"
     except Exception:
         return "Failed"

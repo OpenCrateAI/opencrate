@@ -23,7 +23,7 @@ build-opencrate-local-all:
 			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime; \
 		done; \
 	done; \
-	echo "\n--- All local images built successfully! ---"; \
+	echo "\n======== All local images built successfully! ========"; \
 
 build-clean-local-all:
 	echo "Cleaning container cache"; \
@@ -37,42 +37,21 @@ build-opencrate-all:
 	@echo "Building all OpenCrate images for version v$(VERSION)..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
 
-	# --- STAGE 1: Build and load ALL base images first ---
-	# This ensures they are available locally before the app images try to use them.
-	@echo "\n--- Building all required base images ---"
-	@for runtime in cpu cuda; do \
-		echo "\n--- Building base image for runtime: $$runtime ---"; \
-		# Make sure this path is correct, e.g., docker/dockerfile.py
-		python3 docker/dockerfile.py --python=3.10 --runtime=$$runtime --generate-only; \
-		\
-		# FIX: Use the full repository name here to match the FROM line in the next stage.
-		BASE_IMAGE_TAG="braindotai/opencrate-base-$$runtime:v$(VERSION)"; \
-		\
-		# Make sure this path is correct, e.g., docker/dockerfiles/
-		DOCKERFILE_BASE_PATH="./docker/dockerfiles/Dockerfile.base-$$runtime"; \
-		\
-		docker buildx build --platform linux/amd64 -f $$DOCKERFILE_BASE_PATH -t $$BASE_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
-		echo "\n-- Successfully built and loaded base image: $$BASE_IMAGE_TAG --"; \
-	done
-
-	# --- STAGE 2: Now that all base images are loaded, build all app images ---
-	@echo "\n--- Building all application images ---"
+	# ======== Single build stage: Generate and build in one atomic loop ========
 	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
-			echo "\n--- Building for Python $$python_version, Runtime $$runtime ---"; \
-			# Make sure this path is correct
-			python3 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
-			\
-			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
-			\
-			# Make sure this path is correct
-			DOCKERFILE_APP_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			\
-			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_APP_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
-		done; \
-	done
+			# Step 1: Generate a single, combined multi-stage Dockerfile
+			python3 docker/dockerfile.py --python=$$python_version --runtime=$$runtime; \
 
-	@echo "\n--- Cleaning up Docker system ---"; \
+			# Step 2: Build the multi-stage Dockerfile with a single command
+			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
+			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
+
+			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
+		done; \
+	done; \
+
+	@echo "\n======== Cleaning up Docker system ========"; \
 	@docker image prune -f;
 
 push-opencrate-all:
