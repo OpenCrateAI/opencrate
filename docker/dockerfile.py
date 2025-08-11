@@ -207,7 +207,7 @@ def main():
         sys.exit(1)
 
     # --- Define image tags ---
-    base_image_tag = f"opencrate-base-{args.runtime}:v{version}"
+    base_image_tag = f"braindotai/opencrate-base-{args.runtime}:v{version}"
     final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:v{version}"
 
     # Update .aliases.sh before building anything
@@ -215,7 +215,7 @@ def main():
 
     # --- 1. Generate the Base Dockerfile ---
     console.print(
-        f"\n[bold yellow]--- Building locally for Python {args.python}, Runtime {args.runtime} ---[/]"
+        f"\n[bold yellow]--- Building for Python {args.python}, Runtime {args.runtime} ---[/]"
     )
     console.print(
         f"\n [blue]●[/blue] [[blue]Generating base Dockerfile for {args.runtime}[/blue]]"
@@ -241,7 +241,7 @@ def main():
     # --- Conditional Build Step ---
     if args.generate_only:
         console.print(
-            "\n[yellow]--generate-only flag detected. Skipping build steps.[/yellow]"
+            "\n [yellow]--generate-only flag detected. Skipping build steps.[/yellow]"
         )
         return
 
