@@ -1,0 +1,44 @@
+name: Build and Push OpenCrate Docker Images
+
+# This workflow runs on every push to the main branch
+on:
+  push:
+    branches: [ "main" ]
+
+jobs:
+  build-and-push:
+    name: Build and Push to Docker Hub
+    runs-on: ubuntu-latest # Use a standard Linux runner
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10' # The python version to run your build script
+
+      - name: Install Python dependencies
+        run: pip install docker rich # Install packages needed by dockerfile.py
+
+      - name: Set up QEMU
+        # This is used for multi-platform builds (not strictly needed now, but good practice)
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        # This enables more advanced build features and caching
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build all Docker images
+        run: make build-opencrate-all
+
+      - name: Push all Docker images
+        # The 'latest=True' argument tells your Makefile to also tag and push the 'latest' tag
+        run: make push-opencrate-all latest=True
