@@ -84,7 +84,7 @@ class MemoryProfiler:
             # print(
             #     f"GPU Profiling enabled for: {pynvml.nvmlDeviceGetName(self.gpu_handle)}"
             # )
-        except pynvml.NVMLError as error:
+        except pynvml.NVMLError:
             # print(f"Warning: Could not initialize NVML for GPU profiling. {error}")
             self.gpu_handle = None
 
@@ -149,7 +149,7 @@ class MemoryProfiler:
         if self.gpu_handle:
             mem_info_after = pynvml.nvmlDeviceGetMemoryInfo(self.gpu_handle)
             gpu_mem_after = mem_info_after.used
-            gpu_mem_increment = gpu_mem_after - gpu_mem_before
+            gpu_mem_increment = float(gpu_mem_after) - float(gpu_mem_before)
 
             self.log_stream.write(
                 f"\n\n\n[==================== GPU Memory Profiling for {self.target_function.__name__}() ====================]\n"
@@ -241,7 +241,7 @@ class OpenCrate:
                 self,
                 upstream_params: Optional[Dict[str, Any]] = None,
                 downstream_params: Optional[Dict[str, Any]] = None,
-                schedule: Optional[str] = "",
+                schedule: str = "",
                 schedule_timeout: Optional[str] = "",
                 schedule_runout: Optional[int] = None,
                 profile: Optional[bool] = False,
@@ -479,13 +479,15 @@ class OpenCrate:
 
     def _snapshot_reset(self, confirm):
         self.snapshot._name = self.script_name
-        return self._original_snapshot_reset(confirm)
+        if self._original_snapshot_reset is not None:
+            return self._original_snapshot_reset(confirm)
 
     def _snapshot_setup(self, *args, **kwargs):
         if "name" in kwargs:
             del kwargs["name"]
 
-        return self._original_snapshot_setup(*args, **kwargs, name=self.script_name)
+        if self._original_snapshot_setup is not None:
+            return self._original_snapshot_setup(*args, **kwargs, name=self.script_name)
 
     def save_meta(self, **kwargs):
         """
@@ -499,7 +501,7 @@ class OpenCrate:
         #     setattr(self, key, value)
         #     self.meta_kwargs[key] = getattr(self, key)
 
-        frame = inspect.currentframe().f_back
+        frame = inspect.currentframe().f_back  # type: ignore
         init_kwargs = inspect.getargvalues(frame).locals
         for key, value in init_kwargs.items():
             if key != "self" and key != "__class__":

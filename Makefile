@@ -92,16 +92,13 @@ mkdocs:
 test-pytest:
 	@PYTHONPATH=src pytest
 
-test-black:
-	@black --check src tests
-
-test-flake8:
-	@flake8 src tests
+test-ruff:
+	@ruff check src
 
 test-mypy:
-	@mypy src tests
+	@mypy src
 
-test: test-pytest test-black test-flake8 test-mypy
+test: test-pytest test-ruff test-mypy
 
 test-all:
 	@tox
@@ -119,9 +116,8 @@ help:
 	@echo "  stop            Stop the development container"
 	@echo "  kill            Remove the development container"
 	@echo "  test-pytest     Run pytest - for unit tests"
-	@echo "  test-black      Run black - for code formatting"
-	@echo "  test-flake8     Run flake8 - for linting"
+	@echo "  test-ruff       Run ruff - for code formatting"
 	@echo "  test-mypy       Run mypy - for static type checking"
-	@echo "  test            Run all tests - pytest, black, flake8, mypy"
+	@echo "  test            Run all tests - pytest, ruff, mypy"
 	@echo "  test-all        Run all tests with tox for multiple Python versions"
 	@echo "  help            Show this help message"

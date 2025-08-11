@@ -1,17 +1,18 @@
 import traceback
 from datetime import timedelta
-from typing import Dict, Iterator, List, Optional, Tuple
+from typing import Any, Dict, Iterable, Iterator, List, Optional, Sized, Tuple, Union
 
 import lovelyplots  # noqa: F401
 import matplotlib.pyplot as plt
 import numpy as np
+from matplotlib.figure import Figure
 from tqdm import tqdm
 
 plt.style.use(["use_mathtext", "colors10-ls"])
 
 
 class OpenCrateProgress:
-    _snapshot = None
+    _snapshot: Any = None
 
     def __init__(self, total: int, title: str = "", step_start: int = 0):
         self.total = total
@@ -52,7 +53,7 @@ class OpenCrateProgress:
             self.pbar.close()
             self.pbar = None
 
-    def monitor(self, **metrics: float):
+    def monitor(self, **metrics):
         # handle plot controls
         groups = metrics.get("plot_groups")
         samples = metrics.get("plot_samples")
@@ -70,14 +71,14 @@ class OpenCrateProgress:
         # update live metrics
         self.metrics_column.update(metrics)
 
-        display = {}
+        display: Dict[str, Union[float, int, str]] = {}
         for metric_name, metric_value in metrics.items():
             metric_value = (
                 np.mean(metric_value)
                 if isinstance(metric_value, (list, tuple, np.ndarray))
                 else metric_value
             )
-            self.metrics.setdefault(metric_name, []).append(metric_value)
+            self.metrics.setdefault(metric_name, []).append(float(metric_value))
             if len(self.metrics[metric_name]) % self.plot_samples == 0:
                 recent = self.metrics[metric_name][-self.plot_samples :]
                 avg = sum(recent) / len(recent)
@@ -98,9 +99,7 @@ class OpenCrateProgress:
             avg = sum(vals) / len(vals)
             self.metrics_accumulated.setdefault(k, []).append(avg)
 
-    def plot_accumulated_metrics(
-        self, **title_kwargs
-    ) -> Iterator[Tuple[str, plt.Figure]]:
+    def plot_accumulated_metrics(self, **title_kwargs) -> Iterator[Tuple[str, Figure]]:
         if not self.plot_groups:
             return
         if title_kwargs:
@@ -128,7 +127,7 @@ class OpenCrateProgress:
             plt.legend()
             yield ",".join(group), fig
 
-    def plot_metrics(self) -> Iterator[Tuple[str, plt.Figure]]:
+    def plot_metrics(self) -> Iterator[Tuple[str, Figure]]:
         if not self.plot_groups:
             return
         for group in self.plot_groups:
@@ -171,7 +170,7 @@ def _is_jupyter():
     """
     try:
         # Attempt to get the IPython shell instance.
-        shell = get_ipython().__class__.__name__
+        shell = get_ipython().__class__.__name__  # type: ignore[name-defined]
         # Check if the shell is the specific one used by Jupyter.
         if shell == "ZMQInteractiveShell":
             return True  # Jupyter Notebook or qtconsole
@@ -187,13 +186,13 @@ _IS_JUPYTER = _is_jupyter()
 
 
 def progress(
-    iterator: Iterator,
+    iterator: Iterable[Any],
     title: str,
     step: str = "Iter",
     step_start: int = 0,
     total_count: Optional[int] = None,
     job_name: str = "",
-) -> Iterator:
+) -> Iterable[Any]:
     """
     Create a progress bar that automatically advances and supports updating metrics.
 
@@ -213,11 +212,11 @@ def progress(
     if total_count is not None:
         total = total_count
     else:
-        try:
+        if isinstance(iterator, Sized):
             total = len(iterator)
-        except TypeError:
+        else:
             raise ValueError(
-                "Iterator does not support len(). Please provide total_count parameter."
+                "Iterator must have `__len__` method that returns if length of your iterator. Please define this method, or provide `total_count` parameter."
             )
 
     # Initialize progress bar with proper title and starting position
@@ -251,9 +250,12 @@ def progress(
         plt.close("all")
 
         # Log final summary
-        elapsed_str = str(
-            timedelta(seconds=int(progress_bar.pbar.format_dict["elapsed"]))
-        )
+        if progress_bar.pbar is not None:
+            elapsed_str = str(
+                timedelta(seconds=int(progress_bar.pbar.format_dict["elapsed"]))
+            )
+        else:
+            elapsed_str = "N/A"
         metrics_text = ", ".join(
             f"{k}: {v:.4f}" for k, v in progress_bar.metrics_column.items()
         )

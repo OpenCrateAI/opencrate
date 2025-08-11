@@ -8,6 +8,7 @@ from shutil import copyfile, rmtree
 from typing import Any, Callable, Dict, List, Optional, Union
 
 import numpy as np
+import numpy.typing as npt
 import pandas as pd
 from loguru import logger
 from matplotlib.figure import Figure
@@ -215,7 +216,10 @@ class Snapshot:
         return os.path.isdir(path)
 
     def checkpoint(
-        self, checkpoint: Any, name: str, custom_saver: Optional[Callable] = None
+        self,
+        checkpoint: Any,
+        name: str,
+        custom_saver: Optional[Callable[[Any, str], None]] = None,
     ) -> None:
         """
         Saves the given checkpoint object to a file with the specified name
@@ -350,7 +354,7 @@ class Snapshot:
 
     def figure(
         self,
-        image: Union[np.ndarray, Image.Image, Figure],
+        image: Union[npt.NDArray[Any], Image.Image, Figure],
         name: str,
         dpi: Optional[int] = 500,
     ) -> None:
@@ -525,7 +529,7 @@ class Snapshot:
         with open(config_path, "r") as f:
             return json.load(f)
 
-    def _write_config(self, config: Dict):
+    def _write_config(self, config: Dict[Any, Any]):
         if os.path.isdir(self._config_dir):
             config_path = os.path.join(self._config_dir, "config.json")
 
