@@ -356,10 +356,16 @@ def main():
     # console.print(f"   [dim]Dockerfile generated at {dockerfile_app_path}[/dim]")
 
     if args.generate_only:
+        logger.info(
+            f"======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========"
+        )
         console.print(
-            f"\n [bold yellow]======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========[/]"
+            f"\n[bold yellow]======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========[/]"
         )
     else:
+        logger.info(
+            f"======== ● Building image for Python {args.python}, Runtime {args.runtime} ========"
+        )
         console.print(
             f"\n[bold yellow]======== ● Building image for Python {args.python}, Runtime {args.runtime} ========[/]"
         )
@@ -422,6 +428,7 @@ def main():
         )
         sys.exit(1)
 
+    logger.info(f"======== ✔ Successfully built {final_image_tag} ========")
     console.print(
         f"[bold green]======== ✔ Successfully built {final_image_tag} ========[/bold green]"
     )

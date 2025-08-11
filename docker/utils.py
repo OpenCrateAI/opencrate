@@ -75,19 +75,18 @@ def stream_docker_logs(
         for line in command:  # type: ignore
             if "stream" in line:
                 clean_line = re.sub(r"\x1b\[[0-9;]*m", "", line["stream"]).strip()  # type: ignore
-                logger.info(f"{clean_line}")
+                logger.debug(f"{clean_line}")
             elif "status" in line:
                 clean_status = re.sub(r"\x1b\[[0-9;]*m", "", line["status"]).strip()  # type: ignore
-                logger.info(f"{clean_status}")
+                logger.debug(f"{clean_status}")
             elif "error" in line:
                 error_msg = line["error"]  # type: ignore
                 logger.error(f"{error_msg}")
                 console.print(
-                    f"[red] ● Build failed: {error_msg}[/red]", style="bold red"
+                    f"[red]======== 𐄂 Build failed: {error_msg} ========[/red]",
+                    style="bold red",
                 )
                 raise Exception(error_msg)
-
-        logger.success("======== ✔ Successfully built ========")
         return "Success"
     except Exception:
         return "Failed"
