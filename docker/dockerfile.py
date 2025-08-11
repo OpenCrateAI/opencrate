@@ -412,9 +412,10 @@ def main():
         console,
         command=docker_client.api.build(  # type: ignore
             path=".",
-            dockerfile=dockerfile_path,  # $$DOCKERFILE_APP_PATH
-            tag=final_image_tag,  # $$FINAL_IMAGE_TAG
-            rm=True,  # Remove intermediate containers (default)
+            dockerfile=dockerfile_path,
+            tag=final_image_tag,
+            rm=True,
+            forcerm=True,
             decode=True,
             platform="linux/amd64",
             buildargs=dict(arg.split("=", 1) for arg in args.build_args.split())
