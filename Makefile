@@ -1,58 +1,72 @@
-PYTHON_VERSION ?= 3.10 # we use python 3.10 for development
+PYTHON_VERSION ?= 3.10
 HOST_GIT_EMAIL = $(shell git config user.email)
 HOST_GIT_NAME = $(shell git config user.name)
-VERSION_FILE := VERSION
-VERSION := $(shell cat $(VERSION_FILE) | tr -d '\n')
+
+# Allow VERSION to be overridden by the CI environment (from git tag)
+# Otherwise, fall back to the VERSION file
+VERSION ?= $(shell cat VERSION | tr -d '\n')
+
+# Allow DOCKER_BUILD_ARGS to be passed in from the CI environment for caching
+DOCKER_BUILD_ARGS ?=
 
 .SILENT:
 .ONESHELL:
 
-check_python = \
-    if [ -z "$${python_version}" ]; then \
-        python_version=$(PYTHON_VERSION); \
-        echo "Using default Python version $${python_version}"; \
-    else \
-        echo "Using provided Python version $${python_version}"; \
-    fi; \
-    if ! command -v python$${python_version} >/dev/null 2>&1; then \
-        echo "Error: Python $${python_version} is not installed on your system"; \
-        echo "Please install Python $${python_version} or use a different version"; \
-        exit 1; \
-    fi; \
-    export python_version=$${python_version}
+build-opencrate-local:
+	@python3 docker/dockerfile.py --python=${python:-3.10} --runtime=${runtime:-cpu}
 
+build-opencrate-local-all:
+	@echo "Building all OpenCrate images locally for all supported versions..."
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
+		for runtime in cpu cuda; do \
+			python3 docker/dockerfile.py --python=$$python_version --runtime=$$runtime; \
+		done; \
+	done; \
+	echo "\n--- All local images built successfully! ---"; \
 
-build-opencrate:
-	@$(check_python)
-	@python$${python_version} .docker/dockerfile.py --python=$${python:-3.10} --runtime=$${runtime:-cpu}
-
-build-opencrate-all:
-	@$(check_python)
-	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
-        for runtime in cpu cuda; do \
-            python$${python_version} .docker/dockerfile.py --python=$$python --runtime=$$runtime; \
-        done; \
-    done; \
-	docker container prune -f; \
+build-clean-local-all:
+	echo "Cleaning container cache"; \
+	docker container prune -f;
+	echo "Cleaning buildx cache"; \
+	docker buildx prune -f;
+	echo "Cleaning image cache"; \
 	docker image prune -f;
 
-push-opencrate:
-	docker push braindotai/opencrate-$${runtime:-cpu}-py$${python:-3.10}:latest
+build-opencrate-all:
+	@echo "Building all OpenCrate images for version v$(VERSION)..."
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
+		for runtime in cpu cuda; do \
+			python3 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
+			BASE_IMAGE_TAG="braindotai/opencrate-base-$$runtime:v$(VERSION)"; \
+			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
+			DOCKERFILE_BASE_PATH="./docker/dockerfiles/Dockerfile.base-$$runtime"; \
+			DOCKERFILE_APP_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
+			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_BASE_PATH -t $$BASE_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
+			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_APP_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
+		done; \
+	done; \
+	echo "\n--- Cleaning up Docker system ---"; \
+	docker image prune -f;
 
 push-opencrate-all:
-	@for python in 3.7 3.8 3.9 3.10 3.11 3.12 3.13; do \
-        for runtime in cpu cuda; do \
-			docker push braindotai/opencrate-$${runtime}-py$${python}:v$(VERSION); \
-            \
-            if [ "$(latest)" = "True" ]; then \
-				docker tag braindotai/opencrate-$${runtime}-py$${python}:v$(VERSION) braindotai/opencrate-$${runtime}-py$${python}:latest; \
-				docker push braindotai/opencrate-$${runtime}-py$${python}:latest; \
-            fi; \
-        done; \
-    done;
-
-build:
-	@docker build -t opencrate-dev:latest .
+	@echo "Pushing all OpenCrate images for version v$(VERSION)..."
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
+		for runtime in cpu cuda; do \
+			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
+			echo "Pushing $$IMAGE_TAG"; \
+			docker push $$IMAGE_TAG; \
+			\
+			if [ "$(latest)" = "True" ]; then \
+				LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
+				echo "Tagging $$IMAGE_TAG as $$LATEST_TAG and pushing"; \
+				docker tag $$IMAGE_TAG $$LATEST_TAG; \
+				docker push $$LATEST_TAG; \
+			fi; \
+		done; \
+	done;
 
 start:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
@@ -106,18 +120,20 @@ test-all:
 help:
 	@echo "Usage: make [target]"
 	@echo ""
-	@echo "Targets:"
-	@echo "  install         Install the package with development environment and dependencies"
-	@echo "  build           Build the Docker image (opencrate-dev:latest)"
-	@echo "  build-opencrate Build OpenCrate Docker image with specified Python and runtime"
-	@echo "  build-opencrate-all Build all OpenCrate Docker images for all supported Python versions and runtimes"
-	@echo "  start           Start the development container"
-	@echo "  enter           Enter the development container"
-	@echo "  stop            Stop the development container"
-	@echo "  kill            Remove the development container"
-	@echo "  test-pytest     Run pytest - for unit tests"
-	@echo "  test-ruff       Run ruff - for code formatting"
-	@echo "  test-mypy       Run mypy - for static type checking"
-	@echo "  test            Run all tests - pytest, ruff, mypy"
-	@echo "  test-all        Run all tests with tox for multiple Python versions"
-	@echo "  help            Show this help message"
+	@echo "Targets for CI/CD:"
+	@echo "  build-opencrate-all   			Build all production images with buildx"
+	@echo "  push-opencrate-all    			Push all versioned images to the registry"
+	@echo ""
+	@echo "Targets for Local Development:"
+	@echo "  build-opencrate-local 			Build a single image locally (e.g., make build-opencrate-local python=3.12 runtime=cuda)"
+	@echo "  build-opencrate-local-all   	Build all images locally for all supported Python versions"
+	@echo "  start           				Start the development container"
+	@echo "  enter           				Enter the development container"
+	@echo "  stop            				Stop the development container"
+	@echo "  kill            				Remove the development container"
+	@echo "  test-pytest     				Run pytest - for unit tests"
+	@echo "  test-ruff       				Run ruff - for code formatting"
+	@echo "  test-mypy       				Run mypy - for static type checking"
+	@echo "  test            				Run all tests - pytest, ruff, mypy"
+	@echo "  test-all        				Run all tests with tox for multiple Python versions"
+	@echo "  help            				Show this help message"

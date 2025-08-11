@@ -1,11 +1,12 @@
 # Base image with OS dependencies and CLI tools.
-FROM ubuntu:22.04
+FROM nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04
 
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Asia/Kolkata
+ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH
 
 # Install all Ubuntu & CLI packages in a single, optimized layer
-RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gnupg wget curl vim git speedtest-cli iputils-ping btop unrar make tree htop bat tldr zoxide cpufetch jq zsh ripgrep fzf \
+RUN apt-get update && apt-get install -y --no-install-recommends software-properties-common ca-certificates build-essential pkg-config libgoogle-perftools-dev cmake tzdata gnupg wget curl vim git speedtest-cli iputils-ping btop unrar make tree htop bat tldr zoxide cpufetch jq zsh ripgrep fzf nvtop \
     # Add external repos for eza and fastfetch
     && mkdir -p /etc/apt/keyrings \
     && wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg \
@@ -26,7 +27,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends software-proper
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Setup user shell environment (zsh, atuin, etc.)
-COPY .docker/cli/ /home/
+COPY docker/cli/ /home/
 RUN chsh -s $(which zsh) || true \
     && wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O - | zsh || true \
     && git clone --depth=1 https://github.com/romkatv/powerlevel10k.git $HOME/.oh-my-zsh/custom/themes/powerlevel10k \

@@ -1,9 +1,12 @@
 import argparse
+import os
 import sys
 
-import docker
+from loguru import logger
 from rich.console import Console
 from utils import stream_docker_logs, write_python_version
+
+import docker
 
 parser = argparse.ArgumentParser(
     description="Build Dockerfile with specified configurations."
@@ -18,7 +21,34 @@ parser.add_argument(
     choices=["cuda", "cpu"],
     help="Specify the runtime",
 )
+parser.add_argument(
+    "--generate-only",
+    action="store_true",
+    help="Only generate the Dockerfiles, do not build them.",
+)
+parser.add_argument(
+    "--log-level",
+    type=str,
+    default="INFO",
+    choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
+    help="Only generate the Dockerfiles, do not build them.",
+)
 args = parser.parse_args()
+
+log_file = os.path.join(f"docker/logs/build-{args.runtime}-py{args.python}.log")
+os.makedirs(os.path.dirname(log_file), exist_ok=True)
+
+# Remove default handler and add file handler
+logger.remove()
+logger.add(
+    log_file,
+    level=args.log_level,
+    format="{time:YYYY-MM-DD HH:mm:ss} - {level: <8} {message}",
+    colorize=False,
+    backtrace=False,
+    diagnose=True,
+    mode="w",
+)
 
 UBUNTU_PACKAGES = [
     "software-properties-common",
@@ -99,7 +129,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends {" ".join(UBUNT
     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
 
 # Setup user shell environment (zsh, atuin, etc.)
-COPY .docker/cli/ /home/
+COPY docker/cli/ /home/
 RUN chsh -s $(which zsh) || true \\
     && wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O - | zsh || true \\
     && git clone --depth=1 https://github.com/romkatv/powerlevel10k.git $HOME/.oh-my-zsh/custom/themes/powerlevel10k \\
@@ -161,14 +191,13 @@ RUN python{args.python} -m pip install --no-cache-dir -e . \\
 WORKDIR /home/workspace/
 RUN git config --global --add safe.directory '*' && git config --global init.defaultBranch main
 
-COPY .docker/hooks/ /root/.hooks/
+COPY docker/hooks/ /root/.hooks/
 """
     return dockerfile.strip()
 
 
 def main():
     console = Console()
-    docker_client = docker.from_env()
 
     try:
         with open("VERSION", "r") as version_file:
@@ -184,18 +213,47 @@ def main():
     # Update .aliases.sh before building anything
     write_python_version(args.python)
 
-    # --- 1. Build the Base Image ---
+    # --- 1. Generate the Base Dockerfile ---
     console.print(
-        f"\n [blue]●[/blue] [[blue]Step 1: Building base image[/blue]] > {base_image_tag}"
+        f"\n[bold yellow]--- Building locally for Python {args.python}, Runtime {args.runtime} ---[/]"
+    )
+    console.print(
+        f"\n [blue]●[/blue] [[blue]Generating base Dockerfile for {args.runtime}[/blue]]"
     )
     dockerfile_base_content = generate_base_dockerfile()
-    dockerfile_base_path = f"./.docker/dockerfiles/Dockerfile.base-{args.runtime}"
+    dockerfile_base_path = f"./docker/dockerfiles/Dockerfile.base-{args.runtime}"
     with open(dockerfile_base_path, "w") as f:
         f.write(dockerfile_base_content)
-
     console.print(f"   [dim]Dockerfile generated at {dockerfile_base_path}[/dim]")
 
+    # --- 2. Generate the Final Application Dockerfile ---
+    console.print(
+        f"\n [blue]●[/blue] [[blue]Generating app Dockerfile for {args.runtime}-py{args.python}[/blue]]"
+    )
+    dockerfile_app_content = generate_app_dockerfile(base_image_tag)
+    dockerfile_app_path = (
+        f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
+    )
+    with open(dockerfile_app_path, "w") as f:
+        f.write(dockerfile_app_content)
+    console.print(f"   [dim]Dockerfile generated at {dockerfile_app_path}[/dim]")
+
+    # --- Conditional Build Step ---
+    if args.generate_only:
+        console.print(
+            "\n[yellow]--generate-only flag detected. Skipping build steps.[/yellow]"
+        )
+        return
+
+    # This part below will now only be used for local development builds, not in CI.
+    docker_client = docker.from_env()
+
+    # Build Base Image
+    console.print(
+        f"\n [blue]●[/blue] [[blue]Building base image[/blue]] > {base_image_tag}"
+    )
     build_result = stream_docker_logs(
+        logger,
         console,
         command=docker_client.api.build(  # type: ignore
             path=".",
@@ -209,20 +267,12 @@ def main():
         console.print("[bold red]Exiting due to base image build failure.[/bold red]")
         sys.exit(1)
 
-    # --- 2. Build the Final Application Image ---
+    # Build Final Application Image
     console.print(
-        f"\n [blue]●[/blue] [[blue]Step 2: Building application image[/blue]] > {final_image_tag}"
+        f"\n [blue]●[/blue] [[blue]Building application image[/blue]] > {final_image_tag}"
     )
-    dockerfile_app_content = generate_app_dockerfile(base_image_tag)
-    dockerfile_app_path = (
-        f"./.docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
-    )
-    with open(dockerfile_app_path, "w") as f:
-        f.write(dockerfile_app_content)
-
-    console.print(f"   [dim]Dockerfile generated at {dockerfile_app_path}[/dim]")
-
     build_result = stream_docker_logs(
+        logger,
         console,
         command=docker_client.api.build(  # type: ignore
             path=".",
@@ -232,14 +282,15 @@ def main():
             decode=True,
         ),
     )
-
     if build_result == "Failed":
         console.print(
-            "[bold red]Exiting due to application image build failure.[/bold red]"
+            "[bold red] ● Exiting due to application image build failure![/bold red]"
         )
         sys.exit(1)
 
-    console.print(f"\n[bold green]Successfully built {final_image_tag}[/bold green]")
+    console.print(
+        f"\n[bold green]--- Successfully built {final_image_tag}[/bold green]  ---"
+    )
 
 
 if __name__ == "__main__":
