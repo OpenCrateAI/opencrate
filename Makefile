@@ -40,7 +40,7 @@ build-opencrate-all:
 	# ======== Single build stage: Generate and build in one atomic loop ========
 	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
-			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --build-args=$(DOCKER_BUILD_ARGS); \
+			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --build-args='$(DOCKER_BUILD_ARGS)'; \
 		done; \
 	done; \
 
