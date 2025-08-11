@@ -52,7 +52,7 @@ jobs:
               run: |
                   make build-opencrate-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
-                      DOCKER_BUILD_ARGS="--cache-from type=registry,ref=${{ env.CACHE_IMAGE }} --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
+                      DOCKER_BUILD_ARGS="--cache-from type=registry,ref=${{ env.CACHE_IMAGE }} --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max,compression=zstd"
 
             - name: Install Trivy for vulnerability scanning
               run: |

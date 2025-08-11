@@ -33,31 +33,38 @@ build-clean-local-all:
 	echo "Cleaning image cache"; \
 	docker image prune -f;
 
-build-opencrate-all:
+generate-dockerfiles:
+	@echo "======== ● Generating all Dockerfiles ========"
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
+	@# Ensure the target directory exists before writing to it
+	@mkdir -p ./docker/dockerfiles
+	@for python_version in $$SUPPORTED_PYTHONS; do \
+		for runtime in cpu cuda; do \
+			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
+		done; \
+	done
+	@echo "======== ✔ All Dockerfiles generated successfully ========"
+
+
+# This target now correctly depends on the one above.
+build-opencrate-all: generate-dockerfiles
 	@echo "Building all OpenCrate images for version v$(VERSION)..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
 
-	# ======== Single build stage: Generate and build in one atomic loop ========
 	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			echo "======== ● Building for Python $$python_version, Runtime $$runtime ========"; \
-			# Step 1: Generate a single, combined multi-stage Dockerfile
-			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
-
-			# Step 2: Build the multi-stage Dockerfile with a single command
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
 
 			if ! docker buildx build --platform linux/amd64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; then \
 				echo "======== ✗ Error: Failed to build $$FINAL_IMAGE_TAG ========"; \
+				exit 1; \
 			else \
 				echo "======== ✔ Successfully built $$FINAL_IMAGE_TAG ========"; \
 			fi; \
 		done; \
-	done; \
-
-	@echo "\n======== Cleaning up Docker system ========"; \
-	@docker image prune -f;
+	done;
 
 push-opencrate-all:
 	@echo "Pushing all OpenCrate images for version v$(VERSION)..."
