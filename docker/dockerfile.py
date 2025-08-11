@@ -207,7 +207,7 @@ def main():
         sys.exit(1)
 
     # --- Define image tags ---
-    base_image_tag = f"braindotai/opencrate-base-{args.runtime}:v{version}"
+    base_image_tag = f"opencrate-base-{args.runtime}:v{version}"
     final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:v{version}"
 
     # Update .aliases.sh before building anything
