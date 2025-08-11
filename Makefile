@@ -1,4 +1,4 @@
-PYTHON_VERSION ?= 3.10 # as default we use python 3.10 for development
+PYTHON_VERSION ?= 3.10 # we use python 3.10 for development
 HOST_GIT_EMAIL = $(shell git config user.email)
 HOST_GIT_NAME = $(shell git config user.name)
 VERSION_FILE := VERSION
