@@ -1,288 +1,288 @@
 name: Build and Push OpenCrate Docker Images
 
 on:
-  push:
-    branches: [ main ]
-    paths:
-      - 'dockerfile.py'
-      - 'Makefile.txt'
-      - 'VERSION'
-      - 'src/**'
-      - 'pyproject.toml'
-      - 'setup.cfg'
-      - 'setup.py'
-      - '.docker/**'
-  workflow_dispatch:
-    inputs:
-      build_type:
-        description: 'Build type'
-        required: true
-        default: 'single'
-        type: choice
-        options:
-          - 'single'
-          - 'all'
-      python_version:
-        description: 'Python version (for single build)'
-        required: false
-        default: '3.10'
-        type: choice
-        options:
-          - '3.7'
-          - '3.8'
-          - '3.9'
-          - '3.10'
-          - '3.11'
-          - '3.12'
-          - '3.13'
-      runtime:
-        description: 'Runtime (for single build)'
-        required: false
-        default: 'cpu'
-        type: choice
-        options:
-          - 'cpu'
-          - 'cuda'
-      push_latest:
-        description: 'Also tag as latest'
-        required: false
-        default: false
-        type: boolean
+    push:
+        branches: [ main ]
+        paths:
+            - 'dockerfile.py'
+            - 'Makefile.txt'
+            - 'VERSION'
+            - 'src/**'
+            - 'pyproject.toml'
+            - 'setup.cfg'
+            - 'setup.py'
+            - '.docker/**'
+    workflow_dispatch:
+        inputs:
+            build_type:
+                description: 'Build type'
+                required: true
+                default: 'single'
+                type: choice
+                options:
+                    - 'single'
+                    - 'all'
+            python_version:
+                description: 'Python version (for single build)'
+                required: false
+                default: '3.10'
+                type: choice
+                options:
+                    - '3.7'
+                    - '3.8'
+                    - '3.9'
+                    - '3.10'
+                    - '3.11'
+                    - '3.12'
+                    - '3.13'
+            runtime:
+                description: 'Runtime (for single build)'
+                required: false
+                default: 'cpu'
+                type: choice
+                options:
+                    - 'cpu'
+                    - 'cuda'
+            push_latest:
+                description: 'Also tag as latest'
+                required: false
+                default: false
+                type: boolean
 
 env:
-  REGISTRY: docker.io
+    REGISTRY: docker.io
 
 jobs:
-  determine-build-strategy:
-    runs-on: ubuntu-latest
-    outputs:
-      build-all: ${{ steps.strategy.outputs.build-all }}
-      python-version: ${{ steps.strategy.outputs.python-version }}
-      runtime: ${{ steps.strategy.outputs.runtime }}
-      push-latest: ${{ steps.strategy.outputs.push-latest }}
-      version: ${{ steps.version.outputs.version }}
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    determine-build-strategy:
+        runs-on: ubuntu-latest
+        outputs:
+            build-all: ${{ steps.strategy.outputs.build-all }}
+            python-version: ${{ steps.strategy.outputs.python-version }}
+            runtime: ${{ steps.strategy.outputs.runtime }}
+            push-latest: ${{ steps.strategy.outputs.push-latest }}
+            version: ${{ steps.version.outputs.version }}
+        steps:
+            - name: Checkout repository
+                uses: actions/checkout@v4
 
-      - name: Read version
-        id: version
-        run: |
-          VERSION=$(cat VERSION | tr -d '\n')
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
-          echo "📦 Version: $VERSION"
+            - name: Read version
+                id: version
+                run: |
+                    VERSION=$(cat VERSION | tr -d '\n')
+                    echo "version=$VERSION" >> $GITHUB_OUTPUT
+                    echo "📦 Version: $VERSION"
 
-      - name: Determine build strategy
-        id: strategy
-        run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.build_type }}" = "all" ]; then
-              echo "build-all=true" >> $GITHUB_OUTPUT
-              echo "🏗️ Manual trigger: Building all images"
-            else
-              echo "build-all=false" >> $GITHUB_OUTPUT
-              echo "python-version=${{ github.event.inputs.python_version }}" >> $GITHUB_OUTPUT
-              echo "runtime=${{ github.event.inputs.runtime }}" >> $GITHUB_OUTPUT
-              echo "🔨 Manual trigger: Building single image (Python ${{ github.event.inputs.python_version }}, ${{ github.event.inputs.runtime }})"
-            fi
-            echo "push-latest=${{ github.event.inputs.push_latest }}" >> $GITHUB_OUTPUT
-          else
-            # Auto-build strategy for main branch pushes
-            if git diff --name-only HEAD~1 HEAD | grep -q "^VERSION$"; then
-              echo "build-all=true" >> $GITHUB_OUTPUT
-              echo "push-latest=true" >> $GITHUB_OUTPUT
-              echo "🚀 Version changed: Building all images and tagging as latest"
-            else
-              echo "build-all=false" >> $GITHUB_OUTPUT
-              echo "python-version=3.10" >> $GITHUB_OUTPUT
-              echo "runtime=cpu" >> $GITHUB_OUTPUT
-              echo "push-latest=false" >> $GITHUB_OUTPUT
-              echo "🔄 Code changes: Building default image (Python 3.10, CPU)"
-            fi
-          fi
+            - name: Determine build strategy
+                id: strategy
+                run: |
+                    if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+                        if [ "${{ github.event.inputs.build_type }}" = "all" ]; then
+                            echo "build-all=true" >> $GITHUB_OUTPUT
+                            echo "🏗️ Manual trigger: Building all images"
+                        else
+                            echo "build-all=false" >> $GITHUB_OUTPUT
+                            echo "python-version=${{ github.event.inputs.python_version }}" >> $GITHUB_OUTPUT
+                            echo "runtime=${{ github.event.inputs.runtime }}" >> $GITHUB_OUTPUT
+                            echo "🔨 Manual trigger: Building single image (Python ${{ github.event.inputs.python_version }}, ${{ github.event.inputs.runtime }})"
+                        fi
+                        echo "push-latest=${{ github.event.inputs.push_latest }}" >> $GITHUB_OUTPUT
+                    else
+                        # Auto-build strategy for main branch pushes
+                        if git diff --name-only HEAD~1 HEAD | grep -q "^VERSION$"; then
+                            echo "build-all=true" >> $GITHUB_OUTPUT
+                            echo "push-latest=true" >> $GITHUB_OUTPUT
+                            echo "🚀 Version changed: Building all images and tagging as latest"
+                        else
+                            echo "build-all=false" >> $GITHUB_OUTPUT
+                            echo "python-version=3.10" >> $GITHUB_OUTPUT
+                            echo "runtime=cpu" >> $GITHUB_OUTPUT
+                            echo "push-latest=false" >> $GITHUB_OUTPUT
+                            echo "🔄 Code changes: Building default image (Python 3.10, CPU)"
+                        fi
+                    fi
 
-  build-all:
-    needs: determine-build-strategy
-    runs-on: ubuntu-latest
-    if: needs.determine-build-strategy.outputs.build-all == 'true'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+    build-all:
+        needs: determine-build-strategy
+        runs-on: ubuntu-latest
+        if: needs.determine-build-strategy.outputs.build-all == 'true'
+        steps:
+            - name: Checkout repository
+                uses: actions/checkout@v4
 
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
+            - name: Set up Python 3.10
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.10'
 
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install docker rich
+            - name: Install build dependencies
+                run: |
+                    python -m pip install --upgrade pip
+                    pip install docker rich
 
-      - name: Create required directories
-        run: |
-          mkdir -p .docker/dockerfiles
-          mkdir -p .docker/cli
-          mkdir -p .docker/hooks
+            - name: Create required directories
+                run: |
+                    mkdir -p .docker/dockerfiles
+                    mkdir -p .docker/cli
+                    mkdir -p .docker/hooks
 
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
+            - name: Log in to Docker Hub
+                uses: docker/login-action@v3
+                with:
+                    username: ${{ secrets.DOCKER_USERNAME }}
+                    password: ${{ secrets.DOCKER_PASSWORD }}
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+            - name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
 
-      - name: Build all OpenCrate images
-        run: |
-          echo "🏗️ Building all OpenCrate Docker images using Makefile..."
-          
-          # Use the Makefile command to build all images
-          # Note: We need to rename Makefile.txt to Makefile or adjust the command
-          if [ -f "Makefile" ]; then
-            make build-opencrate-all python_version=3.10
-          elif [ -f "Makefile.txt" ]; then
-            # Use make with -f flag to specify the Makefile
-            make -f Makefile.txt build-opencrate-all python_version=3.10
-          else
-            echo "❌ No Makefile found"
-            exit 1
-          fi
+            - name: Build all OpenCrate images
+                run: |
+                    echo "🏗️ Building all OpenCrate Docker images using Makefile..."
+                    
+                    # Use the Makefile command to build all images
+                    # Note: We need to rename Makefile.txt to Makefile or adjust the command
+                    if [ -f "Makefile" ]; then
+                        make build-opencrate-all python_version=3.10
+                    elif [ -f "Makefile.txt" ]; then
+                        # Use make with -f flag to specify the Makefile
+                        make -f Makefile.txt build-opencrate-all python_version=3.10
+                    else
+                        echo "❌ No Makefile found"
+                        exit 1
+                    fi
 
-      - name: Push all images to Docker Hub
-        env:
-          VERSION: ${{ needs.determine-build-strategy.outputs.version }}
-          PUSH_LATEST: ${{ needs.determine-build-strategy.outputs.push-latest }}
-        run: |
-          echo "🚀 Pushing all images to Docker Hub..."
-          
-          # Use Makefile to push all images
-          if [ -f "Makefile" ]; then
-            make push-opencrate-all latest=$PUSH_LATEST
-          else
-            make -f Makefile.txt push-opencrate-all latest=$PUSH_LATEST
-          fi
+            - name: Push all images to Docker Hub
+                env:
+                    VERSION: ${{ needs.determine-build-strategy.outputs.version }}
+                    PUSH_LATEST: ${{ needs.determine-build-strategy.outputs.push-latest }}
+                run: |
+                    echo "🚀 Pushing all images to Docker Hub..."
+                    
+                    # Use Makefile to push all images
+                    if [ -f "Makefile" ]; then
+                        make push-opencrate-all latest=$PUSH_LATEST
+                    else
+                        make -f Makefile.txt push-opencrate-all latest=$PUSH_LATEST
+                    fi
 
-      - name: Clean up
+            - name: Clean up
+                if: always()
+                run: |
+                    docker container prune -f
+                    docker image prune -f
+
+    build-single:
+        needs: determine-build-strategy
+        runs-on: ubuntu-latest
+        if: needs.determine-build-strategy.outputs.build-all == 'false'
+        steps:
+            - name: Checkout repository
+                uses: actions/checkout@v4
+
+            - name: Set up Python 3.10
+                uses: actions/setup-python@v4
+                with:
+                    python-version: '3.10'
+
+            - name: Install build dependencies
+                run: |
+                    python -m pip install --upgrade pip
+                    pip install docker rich
+
+            - name: Create required directories
+                run: |
+                    mkdir -p .docker/dockerfiles
+                    mkdir -p .docker/cli
+                    mkdir -p .docker/hooks
+
+            - name: Log in to Docker Hub
+                uses: docker/login-action@v3
+                with:
+                    username: ${{ secrets.DOCKER_USERNAME }}
+                    password: ${{ secrets.DOCKER_PASSWORD }}
+
+            - name: Set up Docker Buildx
+                uses: docker/setup-buildx-action@v3
+
+            - name: Build single OpenCrate image
+                env:
+                    PYTHON_VERSION: ${{ needs.determine-build-strategy.outputs.python-version }}
+                    RUNTIME: ${{ needs.determine-build-strategy.outputs.runtime }}
+                run: |
+                    echo "🔨 Building OpenCrate for Python $PYTHON_VERSION with $RUNTIME runtime..."
+                    
+                    # Use Makefile to build single image
+                    if [ -f "Makefile" ]; then
+                        make build-opencrate python_version=3.10 python=$PYTHON_VERSION runtime=$RUNTIME
+                    else
+                        make -f Makefile.txt build-opencrate python_version=3.10 python=$PYTHON_VERSION runtime=$RUNTIME
+                    fi
+
+            - name: Push single image to Docker Hub
+                env:
+                    PYTHON_VERSION: ${{ needs.determine-build-strategy.outputs.python-version }}
+                    RUNTIME: ${{ needs.determine-build-strategy.outputs.runtime }}
+                    PUSH_LATEST: ${{ needs.determine-build-strategy.outputs.push-latest }}
+                run: |
+                    echo "🚀 Pushing image to Docker Hub..."
+                    
+                    # Push the specific image
+                    if [ -f "Makefile" ]; then
+                        make push-opencrate python=$PYTHON_VERSION runtime=$RUNTIME
+                    else
+                        make -f Makefile.txt push-opencrate python=$PYTHON_VERSION runtime=$RUNTIME
+                    fi
+                    
+                    # Tag as latest if requested
+                    if [ "$PUSH_LATEST" = "true" ]; then
+                        VERSION=$(cat VERSION | tr -d '\n')
+                        docker tag braindotai/opencrate-${RUNTIME}-py${PYTHON_VERSION}:v${VERSION} braindotai/opencrate-${RUNTIME}-py${PYTHON_VERSION}:latest
+                        docker push braindotai/opencrate-${RUNTIME}-py${PYTHON_VERSION}:latest
+                        echo "✅ Also tagged and pushed as latest"
+                    fi
+
+            - name: Clean up
+                if: always()
+                run: |
+                    docker container prune -f
+                    docker image prune -f
+
+    summary:
+        needs: [determine-build-strategy, build-all, build-single]
+        runs-on: ubuntu-latest
         if: always()
-        run: |
-          docker container prune -f
-          docker image prune -f
-
-  build-single:
-    needs: determine-build-strategy
-    runs-on: ubuntu-latest
-    if: needs.determine-build-strategy.outputs.build-all == 'false'
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Python 3.10
-        uses: actions/setup-python@v4
-        with:
-          python-version: '3.10'
-
-      - name: Install build dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install docker rich
-
-      - name: Create required directories
-        run: |
-          mkdir -p .docker/dockerfiles
-          mkdir -p .docker/cli
-          mkdir -p .docker/hooks
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKER_USERNAME }}
-          password: ${{ secrets.DOCKER_PASSWORD }}
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Build single OpenCrate image
-        env:
-          PYTHON_VERSION: ${{ needs.determine-build-strategy.outputs.python-version }}
-          RUNTIME: ${{ needs.determine-build-strategy.outputs.runtime }}
-        run: |
-          echo "🔨 Building OpenCrate for Python $PYTHON_VERSION with $RUNTIME runtime..."
-          
-          # Use Makefile to build single image
-          if [ -f "Makefile" ]; then
-            make build-opencrate python_version=3.10 python=$PYTHON_VERSION runtime=$RUNTIME
-          else
-            make -f Makefile.txt build-opencrate python_version=3.10 python=$PYTHON_VERSION runtime=$RUNTIME
-          fi
-
-      - name: Push single image to Docker Hub
-        env:
-          PYTHON_VERSION: ${{ needs.determine-build-strategy.outputs.python-version }}
-          RUNTIME: ${{ needs.determine-build-strategy.outputs.runtime }}
-          PUSH_LATEST: ${{ needs.determine-build-strategy.outputs.push-latest }}
-        run: |
-          echo "🚀 Pushing image to Docker Hub..."
-          
-          # Push the specific image
-          if [ -f "Makefile" ]; then
-            make push-opencrate python=$PYTHON_VERSION runtime=$RUNTIME
-          else
-            make -f Makefile.txt push-opencrate python=$PYTHON_VERSION runtime=$RUNTIME
-          fi
-          
-          # Tag as latest if requested
-          if [ "$PUSH_LATEST" = "true" ]; then
-            VERSION=$(cat VERSION | tr -d '\n')
-            docker tag braindotai/opencrate-${RUNTIME}-py${PYTHON_VERSION}:v${VERSION} braindotai/opencrate-${RUNTIME}-py${PYTHON_VERSION}:latest
-            docker push braindotai/opencrate-${RUNTIME}-py${PYTHON_VERSION}:latest
-            echo "✅ Also tagged and pushed as latest"
-          fi
-
-      - name: Clean up
-        if: always()
-        run: |
-          docker container prune -f
-          docker image prune -f
-
-  summary:
-    needs: [determine-build-strategy, build-all, build-single]
-    runs-on: ubuntu-latest
-    if: always()
-    steps:
-      - name: Build Summary
-        env:
-          VERSION: ${{ needs.determine-build-strategy.outputs.version }}
-          BUILD_ALL: ${{ needs.determine-build-strategy.outputs.build-all }}
-          PYTHON_VERSION: ${{ needs.determine-build-strategy.outputs.python-version }}
-          RUNTIME: ${{ needs.determine-build-strategy.outputs.runtime }}
-        run: |
-          echo "## 🐳 OpenCrate Docker Build Summary" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "📦 **Version:** \`v$VERSION\`" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          
-          if [ "$BUILD_ALL" = "true" ]; then
-            if [ "${{ needs.build-all.result }}" = "success" ]; then
-              echo "✅ **All images built and pushed successfully!**" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### 📋 Built Images:" >> $GITHUB_STEP_SUMMARY
-              echo "- \`braindotai/opencrate-cpu-py{3.7,3.8,3.9,3.10,3.11,3.12,3.13}:v$VERSION\`" >> $GITHUB_STEP_SUMMARY
-              echo "- \`braindotai/opencrate-cuda-py{3.7,3.8,3.9,3.10,3.11,3.12,3.13}:v$VERSION\`" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "❌ **Build failed** - Check logs above" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            if [ "${{ needs.build-single.result }}" = "success" ]; then
-              echo "✅ **Single image built and pushed successfully!**" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### 📋 Built Image:" >> $GITHUB_STEP_SUMMARY
-              echo "- \`braindotai/opencrate-$RUNTIME-py$PYTHON_VERSION:v$VERSION\`" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "❌ **Build failed** - Check logs above" >> $GITHUB_STEP_SUMMARY
-            fi
-          fi
-          
-          echo "" >> $GITHUB_STEP_SUMMARY
-          echo "🔗 **View images:** [Docker Hub](https://hub.docker.com/u/braindotai)" >> $GITHUB_STEP_SUMMARY
+        steps:
+            - name: Build Summary
+                env:
+                    VERSION: ${{ needs.determine-build-strategy.outputs.version }}
+                    BUILD_ALL: ${{ needs.determine-build-strategy.outputs.build-all }}
+                    PYTHON_VERSION: ${{ needs.determine-build-strategy.outputs.python-version }}
+                    RUNTIME: ${{ needs.determine-build-strategy.outputs.runtime }}
+                run: |
+                    echo "## 🐳 OpenCrate Docker Build Summary" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "📦 **Version:** \`v$VERSION\`" >> $GITHUB_STEP_SUMMARY
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    
+                    if [ "$BUILD_ALL" = "true" ]; then
+                        if [ "${{ needs.build-all.result }}" = "success" ]; then
+                            echo "✅ **All images built and pushed successfully!**" >> $GITHUB_STEP_SUMMARY
+                            echo "" >> $GITHUB_STEP_SUMMARY
+                            echo "### 📋 Built Images:" >> $GITHUB_STEP_SUMMARY
+                            echo "- \`braindotai/opencrate-cpu-py{3.7,3.8,3.9,3.10,3.11,3.12,3.13}:v$VERSION\`" >> $GITHUB_STEP_SUMMARY
+                            echo "- \`braindotai/opencrate-cuda-py{3.7,3.8,3.9,3.10,3.11,3.12,3.13}:v$VERSION\`" >> $GITHUB_STEP_SUMMARY
+                        else
+                            echo "❌ **Build failed** - Check logs above" >> $GITHUB_STEP_SUMMARY
+                        fi
+                    else
+                        if [ "${{ needs.build-single.result }}" = "success" ]; then
+                            echo "✅ **Single image built and pushed successfully!**" >> $GITHUB_STEP_SUMMARY
+                            echo "" >> $GITHUB_STEP_SUMMARY
+                            echo "### 📋 Built Image:" >> $GITHUB_STEP_SUMMARY
+                            echo "- \`braindotai/opencrate-$RUNTIME-py$PYTHON_VERSION:v$VERSION\`" >> $GITHUB_STEP_SUMMARY
+                        else
+                            echo "❌ **Build failed** - Check logs above" >> $GITHUB_STEP_SUMMARY
+                        fi
+                    fi
+                    
+                    echo "" >> $GITHUB_STEP_SUMMARY
+                    echo "🔗 **View images:** [Docker Hub](https://hub.docker.com/u/braindotai)" >> $GITHUB_STEP_SUMMARY
