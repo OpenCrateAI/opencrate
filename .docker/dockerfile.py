@@ -232,6 +232,7 @@ def main():
             decode=True,
         ),
     )
+
     if build_result == "Failed":
         console.print(
             "[bold red]Exiting due to application image build failure.[/bold red]"
