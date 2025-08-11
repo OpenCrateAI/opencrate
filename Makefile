@@ -42,9 +42,9 @@ build-opencrate-all:
 	@echo "\n--- Building all required base images ---"
 	@for runtime in cpu cuda; do \
 		echo "\n--- Building base image for runtime: $$runtime ---"; \
-		python3 .docker/dockerfile.py --python=3.10 --runtime=$$runtime --generate-only; \
+		python3 docker/dockerfile.py --python=3.10 --runtime=$$runtime --generate-only; \
 		BASE_IMAGE_TAG="braindotai/opencrate-base-$$runtime:v$(VERSION)"; \
-		DOCKERFILE_BASE_PATH="./.docker/dockerfiles/Dockerfile.base-$$runtime"; \
+		DOCKERFILE_BASE_PATH="./docker/dockerfiles/Dockerfile.base-$$runtime"; \
 		docker buildx build --platform linux/amd64 -f $$DOCKERFILE_BASE_PATH -t $$BASE_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
 	done
 
@@ -53,9 +53,9 @@ build-opencrate-all:
 	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			echo "\n--- Building for Python $$python_version, Runtime $$runtime ---"; \
-			python3 .docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
+			python3 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --generate-only; \
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
-			DOCKERFILE_APP_PATH="./.docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
+			DOCKERFILE_APP_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
 			docker buildx build --platform linux/amd64 -f $$DOCKERFILE_APP_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) .; \
 		done; \
 	done; \
