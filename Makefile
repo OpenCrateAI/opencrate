@@ -1,12 +1,11 @@
 PYTHON_VERSION ?= 3.10
 HOST_GIT_EMAIL = $(shell git config user.email)
 HOST_GIT_NAME = $(shell git config user.name)
+
 VERSION ?= $(shell cat VERSION | tr -d '\n')
-DOCKER_BUILD_ARGS ?=
 
-.SILENT:
-.ONESHELL:
-
+CACHE_IMAGE ?= braindotai/opencrate-build-cache:latest
+DOCKER_BUILD_ARGS ?= --cache-from type=registry,ref=$(CACHE_IMAGE),ignore-error=true --cache-to type=registry,ref=$(CACHE_IMAGE),mode=max
 
 build-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
@@ -21,7 +20,7 @@ build-generate:
 
 
 build-opencrate:
-	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --build-args="$(DOCKER_BUILD_ARGS)" --log-level=DEBUG
+	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --log-level=DEBUG
 
 
 build-opencrate-all: build-generate
@@ -29,7 +28,7 @@ build-opencrate-all: build-generate
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
 	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
-			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --build-args="$(DOCKER_BUILD_ARGS)" --log-level=DEBUG; \
+			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
 		done; \
 	done; \
 	echo "\n======== ✔ All local images built successfully! ========\n";
@@ -50,7 +49,9 @@ gh-build-opencrate-all: build-generate
 	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			echo "-------- ● Building & Pushing: Python $$python_version, Runtime $$runtime --------"; \
-			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --build-args="$(DOCKER_BUILD_ARGS)" \
+			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
+			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
+			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) . \
 			|| (echo "-------- ✗ Error: Failed to build and push in CI --------" && exit 1); \
 		done; \
 	done;
