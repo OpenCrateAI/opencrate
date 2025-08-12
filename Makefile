@@ -44,7 +44,7 @@ build-clean-all:
 	docker image prune -f;
 
 
-gh-build-opencrate-all: generate-dockerfiles
+gh-build-opencrate-all: build-generate
 	@echo "======== ● Building all OpenCrate images for Docker Registry for version $(VERSION) ========..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
 	@for python_version in $$SUPPORTED_PYTHONS; do \
