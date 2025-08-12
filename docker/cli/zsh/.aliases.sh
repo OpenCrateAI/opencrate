@@ -10,16 +10,16 @@ alias szdir='du -sh'
 
 # python
 alias ipy='clear && ipython'
-alias py='clear && python3.12'
-alias pyi='python3.12 -m pip install'
-alias pyinc='python3.12 -m pip install --no-cache-dir'
-alias pyup='python3.12 -m pip install --upgrade'
-alias pyun='python3.12 -m pip uninstall'
-alias pyupip='python3.12 -m pip install --upgrade pip'
-alias pyvc='python3.12 -m venv .venv && source .venv/bin/activate && pyupip'
+alias py='clear && python3.8'
+alias pyi='python3.8 -m pip install'
+alias pyinc='python3.8 -m pip install --no-cache-dir'
+alias pyup='python3.8 -m pip install --upgrade'
+alias pyun='python3.8 -m pip uninstall'
+alias pyupip='python3.8 -m pip install --upgrade pip'
+alias pyvc='python3.8 -m venv .venv && source .venv/bin/activate && pyupip'
 alias pyva='source .venv/bin/activate'
-alias pyf='python3.12 -m pip freeze'
-alias pyfr='python3.12 -m pip freeze > requirements.txt'
+alias pyf='python3.8 -m pip freeze'
+alias pyfr='python3.8 -m pip freeze > requirements.txt'
 
 # files
 extract ()

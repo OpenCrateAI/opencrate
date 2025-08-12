@@ -33,7 +33,7 @@ jobs:
                   python-version: '3.10'
 
             - name: Install Python dependencies
-              run: pip install docker rich loguru
+              run: pip install rich loguru
 
             - name: Set up QEMU
               uses: docker/setup-qemu-action@v3

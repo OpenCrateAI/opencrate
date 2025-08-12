@@ -6,8 +6,6 @@ from loguru import logger
 from rich.console import Console
 from utils import stream_docker_logs, write_python_version
 
-import docker
-
 parser = argparse.ArgumentParser(
     description="Build Dockerfile with specified configurations."
 )
@@ -27,10 +25,10 @@ parser.add_argument(
     help="Only generate the Dockerfiles, do not build them.",
 )
 parser.add_argument(
-    "--build-args",
+    "--build-command",
     type=str,
     default=None,
-    help="Additional build arguments for the Dockerfile.",
+    help="Actual docker build command to execute.",
 )
 parser.add_argument(
     "--log-level",
@@ -39,7 +37,16 @@ parser.add_argument(
     choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
     help="Only generate the Dockerfiles, do not build them.",
 )
+parser.add_argument(
+    "--log-workflow",
+    action="store_true",
+    help="If true then it will show full log of docker builts in the github action build workflow.",
+)
 args = parser.parse_args()
+
+assert args.generate_only or args.build_command, (
+    "Either --generate-only or --build-command must be specified."
+)
 
 log_file = os.path.join(f"docker/logs/build-{args.runtime}-py{args.python}.log")
 os.makedirs(os.path.dirname(log_file), exist_ok=True)
@@ -55,6 +62,15 @@ logger.add(
     diagnose=True,
     mode="w",
 )
+if args.log_workflow:  # this means its a github action workflow
+    logger.add(
+        lambda msg: print(msg, end=""),  # Use print instead of sys.stderr.write
+        format="{message}",
+        level=args.log_level,
+        colorize=True,
+        backtrace=False,  # Show full stack traces for exceptions
+        diagnose=True,  # Show detailed information about variables in stack traces
+    )
 
 UBUNTU_PACKAGES = [
     "software-properties-common",
@@ -92,114 +108,6 @@ CLI_PACKAGES = [
 #     CLI_PACKAGES.append("nvtop")
 
 PYTHON_PIP_PACKAGES = ["ipython", "jupyter"]
-
-
-# def generate_base_dockerfile() -> str:
-#     """Generates the Dockerfile for the base image with OS packages and CLI tools."""
-#     base_image = (
-#         "nvcr.io/nvidia/cuda:12.4.1-base-ubuntu22.04"
-#         if args.runtime == "cuda"
-#         else "ubuntu:22.04"
-#     )
-
-#     dockerfile = f"""
-# # Base image with OS dependencies and CLI tools.
-# FROM {base_image}
-
-# ENV DEBIAN_FRONTEND=noninteractive
-# ENV TZ=Asia/Kolkata
-# """
-#     if args.runtime == "cuda":
-#         dockerfile += "ENV LD_LIBRARY_PATH=/usr/local/cuda/lib64:$LD_LIBRARY_PATH\n"
-
-#     dockerfile += f"""
-# # Install all Ubuntu & CLI packages in a single, optimized layer
-# RUN apt-get update && apt-get install -y --no-install-recommends {" ".join(UBUNTU_PACKAGES)} {" ".join(CLI_PACKAGES)} \\
-#     # Add external repos for eza and fastfetch
-#     && mkdir -p /etc/apt/keyrings \\
-#     && wget -qO- https://raw.githubusercontent.com/eza-community/eza/main/deb.asc | gpg --dearmor -o /etc/apt/keyrings/gierens.gpg \\
-#     && echo 'deb [signed-by=/etc/apt/keyrings/gierens.gpg] http://deb.gierens.de stable main' | tee /etc/apt/sources.list.d/gierens.list \\
-#     && chmod 644 /etc/apt/keyrings/gierens.gpg /etc/apt/sources.list.d/gierens.list \\
-#     && add-apt-repository ppa:zhangsongcui3371/fastfetch -y \\
-#     && apt-get update \\
-#     && apt-get install -y --no-install-recommends eza fastfetch \\
-#     # Install lazygit
-#     && LAZYGIT_VERSION=$(curl -s "https://api.github.com/repos/jesseduffield/lazygit/releases/latest" | grep -Po \'"tag_name": *"v\\K[^\"]*\') \\
-#     && curl -Lo lazygit.tar.gz "https://github.com/jesseduffield/lazygit/releases/download/v${{LAZYGIT_VERSION}}/lazygit_${{LAZYGIT_VERSION}}_Linux_x86_64.tar.gz" \\
-#     && tar xf lazygit.tar.gz lazygit \\
-#     && install lazygit /usr/local/bin \\
-#     && rm lazygit.tar.gz \\
-#     # Aggressive cleanup
-#     && apt-get autoremove -y \\
-#     && apt-get clean \\
-#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/*
-
-# # Setup user shell environment (zsh, atuin, etc.)
-# COPY docker/cli/ /home/
-# RUN chsh -s $(which zsh) || true \\
-#     && wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O - | zsh || true \\
-#     && git clone --depth=1 https://github.com/romkatv/powerlevel10k.git $HOME/.oh-my-zsh/custom/themes/powerlevel10k \\
-#     && git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions \\
-#     && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \\
-#     && curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh \\
-#     && mv /home/zsh/.zshrc ~/.zshrc \\
-#     && mv /home/zsh/.p10k.zsh ~/.p10k.zsh \\
-#     && mv /home/zsh/.aliases.sh ~/ \\
-#     && mv /home/zsh/.exports.sh ~/ \\
-#     && mkdir -p ~/.config/btop/ ~/.config/atuin/ ~/.config/fastfetch/ \\
-#     && cp -r /home/btop/ ~/.config/ \\
-#     && cp -r /home/atuin/ ~/.config/ \\
-#     && cp -r /home/fastfetch/ ~/.config/ \\
-#     # Cleanup copied files
-#     && rm -rf /home/zsh /home/btop /home/atuin /home/fastfetch
-# """
-#     return dockerfile.strip()
-
-
-# def generate_app_dockerfile(base_image_tag: str) -> str:
-#     """Generates the Dockerfile for the final application image."""
-#     py_ver_int = int(str(args.python).split(".")[-1])
-
-#     # Use the appropriate get-pip.py script for older Python versions
-#     get_pip_url = "https://bootstrap.pypa.io/get-pip.py"
-#     if py_ver_int < 9:
-#         get_pip_url = f"https://bootstrap.pypa.io/pip/{args.python}/get-pip.py"
-
-#     # Determine if we need distutils (only for Python < 3.12)
-#     distutils_package = f" python{args.python}-distutils" if py_ver_int < 12 else ""
-
-#     dockerfile = f"""
-# # Final application image
-# FROM {base_image_tag}
-
-# # Install Python from deadsnakes PPA
-# RUN add-apt-repository ppa:deadsnakes/ppa -y \\
-#     && apt-get update \\
-#     && apt-get install -y --no-install-recommends python{args.python} python{args.python}-dev{distutils_package} \\
-#     && curl -sS {get_pip_url} | python{args.python} \\
-#     && python{args.python} -m pip install --no-cache-dir --upgrade pip \\
-#     # Cleanup
-#     && apt-get clean \\
-#     && rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* /root/.cache
-
-# # Install Python packages
-# RUN python{args.python} -m pip install --no-cache-dir --upgrade {" ".join(PYTHON_PIP_PACKAGES)} \\
-#     && python{args.python} -m pip cache purge
-
-# # Copy and install the opencrate application
-# WORKDIR /home/opencrate/
-# COPY pyproject.toml setup.cfg setup.py ./
-# COPY src/ ./src/
-# RUN python{args.python} -m pip install --no-cache-dir -e . \\
-#     && python{args.python} -m pip cache purge
-
-# # Setup final workspace and hooks
-# WORKDIR /home/workspace/
-# RUN git config --global --add safe.directory '*' && git config --global init.defaultBranch main
-
-# COPY docker/hooks/ /root/.hooks/
-# """
-#     return dockerfile.strip()
 
 
 def generate_combined_dockerfile() -> str:
@@ -325,99 +233,41 @@ def main():
     # Update .aliases.sh before building anything
     write_python_version(args.python)
 
-    # --- 1. Generate the Base Dockerfile ---
-    # if not args.generate_only:
-    #     console.print(
-    #         f"\n[bold yellow]--- Building for Python {args.python}, Runtime {args.runtime} ---[/]"
-    #     )
-    # console.print(
-    #     f"\n [blue]●[/blue] [[blue]Generating base Dockerfile for {args.runtime}[/blue]]"
-    # )
-    # dockerfile_base_content = generate_base_dockerfile()
-    # dockerfile_base_path = f"./docker/dockerfiles/Dockerfile.base-{args.runtime}"
-    # with open(dockerfile_base_path, "w") as f:
-    #     f.write(dockerfile_base_content)
-    # console.print(f"   [dim]Dockerfile generated at {dockerfile_base_path}[/dim]")
-
-    # # --- 2. Generate the Final Application Dockerfile ---
-    # console.print(
-    #     f"\n [blue]●[/blue] [[blue]Generating app Dockerfile for {args.runtime}-py{args.python}[/blue]]"
-    # )
-    # dockerfile_app_content = generate_app_dockerfile(base_image_tag)
-    # dockerfile_app_path = (
-    #     f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
-    # )
-    # with open(dockerfile_app_path, "w") as f:
-    #     f.write(dockerfile_app_content)
-    # console.print(f"   [dim]Dockerfile generated at {dockerfile_app_path}[/dim]")
-
     if args.generate_only:
         logger.info(
             f"======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========"
         )
-        console.print(
-            f"\n[bold yellow]======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========[/]"
-        )
+        if not args.log_workflow:
+            console.print(
+                f"\n[bold yellow]======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========[/]"
+            )
     else:
         logger.info(
             f"======== ● Building image for Python {args.python}, Runtime {args.runtime} ========"
         )
-        console.print(
-            f"\n[bold yellow]======== ● Building image for Python {args.python}, Runtime {args.runtime} ========[/]"
-        )
+        if not args.log_workflow:
+            console.print(
+                f"\n[bold yellow]======== ● Building image for Python {args.python}, Runtime {args.runtime} ========[/]"
+            )
 
     dockerfile_content = generate_combined_dockerfile()
     dockerfile_path = f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
     with open(dockerfile_path, "w") as f:
         f.write(dockerfile_content)
 
-    if args.generate_only:
+    if args.generate_only and not args.log_workflow:
         console.print(
             f"\n[bold green]======== ✔ Dockerfile generated at {dockerfile_path} ========[/bold green]"
         )
         return
 
-    # This part below will now only be used for local development builds, not in CI.
-    docker_client = docker.from_env()
-
-    # # Build Base Image
-    # console.print(
-    #     f"\n [blue]●[/blue] [[blue]Building base image[/blue]] > {base_image_tag}"
-    # )
-    # build_result = stream_docker_logs(
-    #     logger,
-    #     console,
-    #     command=docker_client.api.build(  # type: ignore
-    #         path=".",
-    #         dockerfile=dockerfile_path,
-    #         tag=base_image_tag,
-    #         rm=True,
-    #         decode=True,
-    #     ),
-    # )
-    # if build_result == "Failed":
-    #     console.print("[bold red]Exiting due to base image build failure.[/bold red]")
-    #     sys.exit(1)
-
-    # Build Final Application Image
-    # console.print(
-    #     f"\n [blue]●[/blue] [[blue]Building application image[/blue]] > {final_image_tag}"
-    # )
+    build_command = args.build_command or (
+        f"docker buildx build --platform linux/amd64 -f {dockerfile_path} -t {final_image_tag} --load"
+    )
     build_result = stream_docker_logs(
         logger,
         console,
-        command=docker_client.api.build(  # type: ignore
-            path=".",
-            dockerfile=dockerfile_path,
-            tag=final_image_tag,
-            rm=True,
-            forcerm=True,
-            decode=True,
-            platform="linux/amd64",
-            buildargs=dict(arg.split("=", 1) for arg in args.build_args.split())
-            if args.build_args
-            else None,
-        ),
+        command=build_command,
     )
     if build_result == "Failed":
         console.print(
@@ -426,9 +276,10 @@ def main():
         sys.exit(1)
 
     logger.info(f"======== ✔ Successfully built {final_image_tag} ========")
-    console.print(
-        f"[bold green]======== ✔ Successfully built {final_image_tag} ========[/bold green]"
-    )
+    if not args.log_workflow:
+        console.print(
+            f"[bold green]======== ✔ Successfully built {final_image_tag} ========[/bold green]"
+        )
 
 
 if __name__ == "__main__":
