@@ -56,7 +56,7 @@ gh-build-opencrate-all: generate-dockerfiles
 	done;
 	@echo "\n======== ● All images have been built for Docker Registry for version $(VERSION) ========\n";
 
-gh-tag-latest:
+gh-release-latest:
 	@echo "Tagging 'latest' for all images with version $(VERSION)..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
 	for python_version in $$SUPPORTED_PYTHONS; do \

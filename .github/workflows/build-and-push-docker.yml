@@ -46,12 +46,12 @@ jobs:
 
             - name: Build and Push Multi-Platform Images
               run: |
-                  make build-and-push-all \
+                  make gh-build-opencrate-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
                       DOCKER_BUILD_ARGS="--push --cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
 
             - name: Tag and Push "latest" tag
               if: success() && github.ref_type == 'tag'
               run: |
-                  make tag-latest \
+                  make gh-release-latest \
                       VERSION=${{ steps.get_version.outputs.VERSION }}
