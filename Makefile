@@ -59,7 +59,7 @@ build-opencrate-all: generate-dockerfiles
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
 			BUILD_COMMAND="docker buildx build --platform linux/amd64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) ."; \
-			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --build-command="$$BUILD_COMMAND" --log-workflow; \
+			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --build-command="$$BUILD_COMMAND" --log-level=DEBUG --log-workflow; \
 		done; \
 	done;
 
