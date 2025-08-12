@@ -31,6 +31,9 @@ jobs:
               with:
                   python-version: '3.10'
 
+            - name: Install Python dependencies
+              run: pip install rich loguru
+
             - name: Set up QEMU for Multi-Platform Builds
               uses: docker/setup-qemu-action@v3
 
