@@ -25,6 +25,11 @@ parser.add_argument(
     help="Only generate the Dockerfiles, do not build them.",
 )
 parser.add_argument(
+    "--build-only",
+    action="store_true",
+    help="Only generate the Dockerfiles, do not build them.",
+)
+parser.add_argument(
     "--build-command",
     type=str,
     default=None,
@@ -250,10 +255,13 @@ def main():
                 f"\n[bold yellow]======== ● Building image for Python {args.python}, Runtime {args.runtime} ========[/]"
             )
 
-    dockerfile_content = generate_combined_dockerfile()
-    dockerfile_path = f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
-    with open(dockerfile_path, "w") as f:
-        f.write(dockerfile_content)
+    if not args.build_only:
+        dockerfile_content = generate_combined_dockerfile()
+        dockerfile_path = (
+            f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
+        )
+        with open(dockerfile_path, "w") as f:
+            f.write(dockerfile_content)
 
     if args.generate_only and not args.log_workflow:
         console.print(
