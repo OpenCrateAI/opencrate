@@ -52,7 +52,6 @@ gh-build-opencrate-all: build-generate
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
 			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) . \
-			|| (echo "-------- ✗ Error: Failed to build and push in CI --------" && exit 1); \
 		done; \
 	done;
 	@echo "\n======== ● All images have been built for Docker Registry for version $(VERSION) ========\n";
