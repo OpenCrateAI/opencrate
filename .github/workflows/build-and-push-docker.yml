@@ -1,16 +1,12 @@
 name: Build, Scan, and Push OpenCrate Docker Images
 
-# This workflow runs on pushes to tags like "v1.0.0", "v1.2.3", etc.
-# It can also be triggered manually from the GitHub Actions UI.
 on:
     push:
         tags:
             - 'v*.*.*'
     workflow_dispatch:
 
-# Define environment variables for the entire job
 env:
-    # The name of the Docker Hub image used for build caching
     CACHE_IMAGE: braindotai/opencrate-build-cache:latest
 
 jobs:
@@ -23,7 +19,6 @@ jobs:
               uses: actions/checkout@v4
 
             - name: Get the version from the Git tag
-              # This extracts the tag name (e.g., "v1.2.3") and sets it as an output.
               id: get_version
               run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
@@ -52,9 +47,10 @@ jobs:
               run: |
                   make build-opencrate-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
-                      DOCKER_BUILD_ARGS="--cache-from type=registry,ref=${{ env.CACHE_IMAGE }} --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max,compression=zstd"
+                      DOCKER_BUILD_ARGS="--cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
 
             - name: Install Trivy for vulnerability scanning
+              # ... (this step and the following ones are correct and remain the same)
               run: |
                   sudo apt-get install wget apt-transport-https gnupg lsb-release -y
                   wget -qO - https://aquasecurity.github.io/trivy-repo/deb/public.key | sudo apt-key add -
@@ -80,8 +76,6 @@ jobs:
                   echo "All images scanned successfully. No high or critical vulnerabilities found."
 
             - name: Push all Docker images
-              # This step only runs if the scan step above succeeds
-              # The 'latest=True' argument tells the Makefile to also tag and push the 'latest' tag
               run: |
                   make push-opencrate-all \
                       latest=True \
