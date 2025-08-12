@@ -51,10 +51,11 @@ gh-build-opencrate-all: build-generate
 			echo "-------- ● Building & Pushing: Python $$python_version, Runtime $$runtime --------"; \
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) . \
+			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) .; \
+			echo "-------- ✔ Image is buit and pushed $$FINAL_IMAGE_TAG --------"; \
 		done; \
 	done;
-	@echo "\n======== ● All images have been built for Docker Registry for version $(VERSION) ========\n";
+	@echo "\n======== ✔ All images have been built for Docker Registry for version $(VERSION) ========\n";
 
 gh-release-latest:
 	@echo "Tagging 'latest' for all images with version $(VERSION)..."
