@@ -50,13 +50,13 @@ build-clean-local-all:
 
 # This target now correctly depends on the one above.
 build-opencrate-all: generate-dockerfiles
-	@echo "Building all OpenCrate images for version v$(VERSION)..."
+	@echo "Building all OpenCrate images for version $(VERSION)..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
 
 	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			echo "======== ● Building for Python $$python_version, Runtime $$runtime ========"; \
-			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
+			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
 			BUILD_COMMAND="docker buildx build --platform linux/amd64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --load $(DOCKER_BUILD_ARGS) ."; \
 			python3.10 docker/dockerfile.py --python=$$python_version --runtime=$$runtime --build-command="$$BUILD_COMMAND" --log-workflow; \
@@ -64,11 +64,11 @@ build-opencrate-all: generate-dockerfiles
 	done;
 
 push-opencrate-all:
-	@echo "Pushing all OpenCrate images for version v$(VERSION)..."
+	@echo "Pushing all OpenCrate images for version $(VERSION)..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
 	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
-			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:v$(VERSION)"; \
+			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			echo "Pushing $$IMAGE_TAG"; \
 			docker push $$IMAGE_TAG; \
 			\
