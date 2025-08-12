@@ -1,5 +1,7 @@
-name: Build, Scan, and Push OpenCrate Docker Images
+name: Build and Push OpenCrate Docker Images
 
+# This workflow runs ONLY on pushes to tags like "v1.0.0", "v1.2.3", etc.
+# It can also be triggered manually from the GitHub Actions UI for testing.
 on:
     push:
         tags:
@@ -10,15 +12,17 @@ env:
     CACHE_IMAGE: braindotai/opencrate-build-cache:latest
 
 jobs:
-    build-scan-and-push:
-        name: Build, Scan and Push to Docker Hub
+    build-and-push:
+        name: Build and Push to Docker Hub
         runs-on: ubuntu-latest
 
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            - name: Get the version from the Git tag
+            - name: Get the version from the Git ref
+              # For tags like 'v1.2.3', VERSION becomes 'v1.2.3'.
+              # For manual runs on a branch, VERSION becomes the branch name (e.g., 'main').
               id: get_version
               run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
 
@@ -27,10 +31,7 @@ jobs:
               with:
                   python-version: '3.10'
 
-            - name: Install Python dependencies
-              run: pip install rich loguru
-
-            - name: Set up QEMU
+            - name: Set up QEMU for Multi-Platform Builds
               uses: docker/setup-qemu-action@v3
 
             - name: Set up Docker Buildx
@@ -43,14 +44,14 @@ jobs:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Generate Dockerfiles and Build Images with Cache
+            - name: Build and Push Multi-Platform Images
               run: |
-                  make build-opencrate-all \
+                  make build-and-push-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
-                      DOCKER_BUILD_ARGS="--cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
+                      DOCKER_BUILD_ARGS="--push --cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
 
-            - name: Push all Docker images
+            - name: Tag and Push "latest" tag
+              if: success() && github.ref_type == 'tag'
               run: |
-                  make push-opencrate-all \
-                      latest=True \
+                  make tag-latest \
                       VERSION=${{ steps.get_version.outputs.VERSION }}

@@ -1,12 +1,18 @@
-import re
+import shlex
+import subprocess
+from collections import deque
 from contextlib import contextmanager
 from typing import Literal
 
 from rich.console import Console
+from rich.live import Live
+from rich.panel import Panel
+from rich.text import Text
 
 
 @contextmanager
 def spinner(console: Console, message: str):
+    # This function is fine and remains the same
     with console.status(message, spinner="dots"):
         try:
             yield
@@ -14,70 +20,70 @@ def spinner(console: Console, message: str):
             pass
 
 
-def stream_docker_logs(
-    logger, console: Console, command: str
+def stream_shell_command_logs(
+    logger, console: Console, command_str: str, log_level: str = "DEBUG"
 ) -> Literal["Success"] | Literal["Failed"]:
-    import subprocess
+    """
+    Executes a shell command and streams its output live to the console.
+    This is used to run `docker buildx` and provide rich, real-time feedback.
+    """
+    log_lines = deque(maxlen=15)
+
+    def create_log_panel():
+        # ======================================================================
+        # THE FIX IS HERE: Use Text.join() instead of str.join()
+        # ======================================================================
+        # This correctly joins an iterable of Text objects with a newline Text object.
+        log_text = Text("\n").join(log_lines)
+        # ======================================================================
+
+        return Panel(
+            log_text,
+            title="[bold blue]Docker Buildx Logs[/bold blue]",
+            border_style="dim blue",
+            title_align="left",
+        )
 
     try:
-        # Use shell=True for complex commands, passed as a single string.
+        cmd_list = shlex.split(command_str)
+
         process = subprocess.Popen(
-            command,
-            shell=True,
+            cmd_list,
             stdout=subprocess.PIPE,
-            stderr=subprocess.STDOUT,  # Redirect stderr to stdout
-            universal_newlines=True,
-            bufsize=1,  # Line-buffered
+            stderr=subprocess.STDOUT,
+            text=True,
+            encoding="utf-8",
+            bufsize=1,
         )
-        logs = []
 
-        # Continuously read from the process's stdout
-        for line in iter(process.stdout.readline, ""):
-            clean_line = line.strip()
-            if not clean_line:
-                continue
-            logs.append(clean_line)
-            logs = logs[-50:]
-            # Docker buildx often prints progress to what would be stderr.
-            # Since we redirected it, we check all lines for error keywords.
-            if (
-                "error:" in clean_line.lower()
-                or "failed to build" in clean_line.lower()
-                or "failed to solve" in clean_line.lower()
-                or "error response from daemon" in clean_line.lower()
-            ):
-                logger.error(clean_line)
-                console.print(
-                    f"[red]======== 𐄂 Build failed: {clean_line} ========[/red]",
-                    style="bold red",
-                )
-                console.print("[red]" + "\n".join(logs) + "[/red]")
-            else:
-                # Log all other output as debug
-                logger.debug(clean_line)
+        if log_level == "DEBUG":
+            with Live(
+                create_log_panel(), refresh_per_second=10, console=console
+            ) as live:
+                for line in process.stdout:
+                    clean_line = line.strip()
+                    if clean_line:
+                        logger.debug(clean_line)
 
-        # Wait for the process to complete and get the return code
-        process.wait()
-        if process.returncode != 0:
-            raise subprocess.CalledProcessError(process.returncode, command)
+                        line_text = Text()
+                        line_text.append("▶ ", style="dim blue")
+                        line_text.append(clean_line, style="dim")
+
+                        log_lines.append(line_text)
+
+                        live.update(create_log_panel())
+        else:
+            for line in process.stdout:
+                print(line.strip())
+
+        return_code = process.wait()
+        if return_code != 0:
+            error_msg = f"Build command failed with exit code {return_code}."
+            logger.error(error_msg)
+            console.print(f"[bold red]======== 𐄂 {error_msg} ========[/bold red]")
+            raise subprocess.CalledProcessError(return_code, cmd_list)
 
         return "Success"
-    except subprocess.CalledProcessError as e:
-        logger.error(f"Build command failed with exit code {e.returncode}")
+    except (Exception, subprocess.CalledProcessError, KeyboardInterrupt) as e:
+        logger.exception(str(e))
         return "Failed"
-    except Exception as e:
-        logger.exception(f"An unexpected error occurred: {e}")
-        return "Failed"
-
-
-def write_python_version(python_version: str):
-    # Update .aliases.sh with the specified Python version
-
-    aliases_file_path = "./docker/cli/zsh/.aliases.sh"
-    with open(aliases_file_path, "r") as file:
-        aliases_content = file.read()
-    aliases_content = re.sub(
-        r"python\d+\.\d+", f"python{python_version}", aliases_content
-    )
-    with open(aliases_file_path, "w") as file:
-        file.write(aliases_content)

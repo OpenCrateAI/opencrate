@@ -49,9 +49,10 @@ RUN chsh -s $(which zsh) || true \
 FROM base
 
 # Install Python from deadsnakes PPA
-RUN add-apt-repository ppa:deadsnakes/ppa -y \
+RUN sed -i -e 's/python3.10/python3.9/g' ~/.aliases.sh \
+    && add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update \
-    && apt-get install -y --no-install-recommends python3.9 python3.9-dev python3.9-distutils \
+    && apt-get install -y --no-install-recommends python3.9 python3.9-dev python3.9-distutils nvtop \
     && curl -sS https://bootstrap.pypa.io/get-pip.py | python3.9 \
     && python3.9 -m pip install --no-cache-dir --upgrade pip \
     # Cleanup

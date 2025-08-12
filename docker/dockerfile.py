@@ -4,7 +4,7 @@ import sys
 
 from loguru import logger
 from rich.console import Console
-from utils import stream_docker_logs, write_python_version
+from utils import stream_shell_command_logs
 
 parser = argparse.ArgumentParser(
     description="Build Dockerfile with specified configurations."
@@ -20,62 +20,43 @@ parser.add_argument(
     help="Specify the runtime",
 )
 parser.add_argument(
-    "--generate-only",
+    "--generate",
     action="store_true",
-    help="Only generate the Dockerfiles, do not build them.",
+    help="Whether to generate the Dockerfile or not.",
 )
 parser.add_argument(
-    "--build-only",
+    "--build",
     action="store_true",
-    help="Only generate the Dockerfiles, do not build them.",
+    help="Whether to build the Dockerfile or not.",
 )
 parser.add_argument(
-    "--build-command",
+    "--build-args",
     type=str,
-    default=None,
-    help="Actual docker build command to execute.",
+    default="--load",  # Default to loading locally if not specified
+    help="Additional build arguments for Docker buildx, e.g., '--push' or '--load'.",
 )
 parser.add_argument(
     "--log-level",
     type=str,
     default="INFO",
     choices=["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"],
-    help="Only generate the Dockerfiles, do not build them.",
-)
-parser.add_argument(
-    "--log-workflow",
-    action="store_true",
-    help="If true then it will show full log of docker builts in the github action build workflow.",
+    help="Log level for the pipeline.",
 )
 args = parser.parse_args()
-
-assert args.generate_only or args.build_command, (
-    "Either --generate-only or --build-command must be specified."
-)
 
 log_file = os.path.join(f"docker/logs/build-{args.runtime}-py{args.python}.log")
 os.makedirs(os.path.dirname(log_file), exist_ok=True)
 
-# Remove default handler and add file handler
 logger.remove()
 logger.add(
     log_file,
     level=args.log_level,
     format="{time:YYYY-MM-DD HH:mm:ss} - {level: <8} {message}",
     colorize=False,
-    backtrace=False,
+    backtrace=True,
     diagnose=True,
     mode="w",
 )
-if args.log_workflow:  # this means its a github action workflow
-    logger.add(
-        lambda msg: print(msg, end=""),  # Use print instead of sys.stderr.write
-        format="{message}",
-        level=args.log_level,
-        colorize=True,
-        backtrace=False,  # Show full stack traces for exceptions
-        diagnose=True,  # Show detailed information about variables in stack traces
-    )
 
 UBUNTU_PACKAGES = [
     "software-properties-common",
@@ -109,8 +90,6 @@ CLI_PACKAGES = [
     "ripgrep",
     "fzf",
 ]
-# if args.runtime == "cuda":
-#     CLI_PACKAGES.append("nvtop")
 
 PYTHON_PIP_PACKAGES = ["ipython", "jupyter"]
 
@@ -190,9 +169,10 @@ RUN chsh -s $(which zsh) || true \\
 FROM base
 
 # Install Python from deadsnakes PPA
-RUN add-apt-repository ppa:deadsnakes/ppa -y \\
+RUN sed -i -e 's/python3.10/python{args.python}/g' ~/.aliases.sh \\
+    && add-apt-repository ppa:deadsnakes/ppa -y \\
     && apt-get update \\
-    && apt-get install -y --no-install-recommends python{args.python} python{args.python}-dev{distutils_package} \\
+    && apt-get install -y --no-install-recommends python{args.python} python{args.python}-dev{distutils_package} {"nvtop " if args.runtime == "cuda" else ""}\\
     && curl -sS {get_pip_url} | python{args.python} \\
     && python{args.python} -m pip install --no-cache-dir --upgrade pip \\
     # Cleanup
@@ -231,62 +211,53 @@ def main():
         console.print("[bold red]Error: VERSION file not found.[/bold red]")
         sys.exit(1)
 
-    # --- Define image tags ---
-    # base_image_tag = f"braindotai/opencrate-base-{args.runtime}:v{version}"
-    final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:v{version}"
+    dockerfile_path = f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
 
-    # Update .aliases.sh before building anything
-    write_python_version(args.python)
-
-    if args.generate_only:
-        logger.info(
-            f"======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========"
+    if args.generate:
+        console.print(
+            f"\n[yellow]-------- ● Generating dockerfile for {args.runtime}-py{args.python} --------[/]"
         )
-        if not args.log_workflow:
-            console.print(
-                f"\n[bold yellow]======== ● Generating dockerfile for runtime {args.runtime} and python{args.python} ========[/]"
-            )
-    else:
-        logger.info(
-            f"======== ● Building image for Python {args.python}, Runtime {args.runtime} ========"
-        )
-        if not args.log_workflow:
-            console.print(
-                f"\n[bold yellow]======== ● Building image for Python {args.python}, Runtime {args.runtime} ========[/]"
-            )
-
-    if not args.build_only:
         dockerfile_content = generate_combined_dockerfile()
-        dockerfile_path = (
-            f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
-        )
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
-
-    if args.generate_only and not args.log_workflow:
         console.print(
-            f"\n[bold green]======== ✔ Dockerfile generated at {dockerfile_path} ========[/bold green]"
+            f"[green]-------- ✔ Dockerfile generated at {dockerfile_path} --------[/green]"
         )
-        return
 
-    build_command = args.build_command or (
-        f"docker buildx build --platform linux/amd64 -f {dockerfile_path} -t {final_image_tag} --load"
-    )
-    build_result = stream_docker_logs(
-        logger,
-        console,
-        command=build_command,
-    )
-    if build_result == "Failed":
-        console.print(
-            "[bold red]======== 𐄂 Exiting due to application image build failure ========[/bold red]"
+    if args.build:
+        final_image_tag = (
+            f"braindotai/opencrate-{args.runtime}-py{args.python}:v{version}"
         )
-        sys.exit(1)
 
-    logger.info(f"======== ✔ Successfully built {final_image_tag} ========")
-    if not args.log_workflow:
+        logger.info(
+            f"-------- ● Building image for {args.runtime}-py{args.python} --------"
+        )
         console.print(
-            f"[bold green]======== ✔ Successfully built {final_image_tag} ========[/bold green]"
+            f"\n[yellow]-------- ● Building image for {args.runtime}-py{args.python} --------[/]"
+        )
+
+        build_command = (
+            f"docker buildx build --platform linux/amd64 "
+            f"-f {dockerfile_path} "
+            f"-t {final_image_tag} "
+            f"--load {args.build_args} ."
+        )
+
+        logger.info(f"> Executing build command: {build_command}")
+
+        build_result = stream_shell_command_logs(
+            logger, console, command_str=build_command, log_level=args.log_level
+        )
+
+        if build_result == "Failed":
+            console.print(
+                "[bold red]-------- 𐄂 Exiting due to build failure --------[/bold red]"
+            )
+            sys.exit(1)
+
+        logger.info(f"-------- ✔ Successfully built {final_image_tag} --------")
+        console.print(
+            f"[bold green]-------- ✔ Successfully built {final_image_tag} --------[/bold green]"
         )
 
 
