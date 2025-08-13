@@ -51,7 +51,7 @@ jobs:
               run: |
                   make gh-build-opencrate-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
-                      DOCKER_BUILD_ARGS="--push --cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
+                      DOCKER_BUILD_ARGS="--push --progress=plain --cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
 
             - name: Tag and Push "latest" tag
               if: success() && github.ref_type == 'tag'
