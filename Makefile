@@ -9,9 +9,9 @@ DOCKER_BUILD_ARGS ?= --cache-from type=registry,ref=$(CACHE_IMAGE),ignore-error=
 
 build-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
-	@mkdir -p ./docker/dockerfiles
-	@for python_version in $$SUPPORTED_PYTHONS; do \
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	mkdir -p ./docker/dockerfiles; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
@@ -36,43 +36,46 @@ build-opencrate-all: build-generate
 
 build-clean-all:
 	echo "Cleaning container cache"; \
-	docker container prune -f;
+	docker container prune -f; \
 	echo "Cleaning buildx cache"; \
-	docker buildx prune -f;
+	docker buildx prune -f; \
 	echo "Cleaning image cache"; \
 	docker image prune -f;
 
 
 gh-build-opencrate-all: build-generate
-	@echo "======== ● Building all OpenCrate images for Docker Registry for version $(VERSION) ========..."
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
-	
-	@for python_version in $$SUPPORTED_PYTHONS; do \
+	@echo "======== ● Building all OpenCrate images for Docker Registry for version $(VERSION) ========"
+	@set -e; \
+	SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			echo "-------- ● Building & Pushing: Python $$python_version, Runtime $$runtime --------"; \
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			\
-			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) . \
-			|| (echo "-------- ✗ Error: Failed to build and push $$FINAL_IMAGE_TAG --------" && exit 1); \
-			\
-			echo "-------- ✔ Image is built and pushed $$FINAL_IMAGE_TAG --------"; \
+			echo "Building: $$FINAL_IMAGE_TAG from $$DOCKERFILE_PATH"; \
+			if docker buildx build --platform linux/amd64,linux/arm64 -f "$$DOCKERFILE_PATH" -t "$$FINAL_IMAGE_TAG" $(DOCKER_BUILD_ARGS) .; then \
+				echo "-------- ✔ Image built and pushed: $$FINAL_IMAGE_TAG --------"; \
+			else \
+				echo "-------- ✗ Error: Failed to build and push $$FINAL_IMAGE_TAG --------"; \
+				exit 1; \
+			fi; \
 		done; \
-	done;
-	
-	@echo "\n======== ✔ All images have been built for Docker Registry for version $(VERSION) ========\n";
+	done; \
+	echo "\n======== ✔ All images have been built for Docker Registry for version $(VERSION) ========\n"
 
 gh-release-latest:
 	@echo "Tagging 'latest' for all images with version $(VERSION)..."
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	@set -e; \
+	SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
 	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
-			echo "Tagging ${IMAGE_TAG} as ${LATEST_TAG}"; \
-			docker buildx imagetools create -t ${LATEST_TAG} ${IMAGE_TAG}; \
+			echo "Tagging $$IMAGE_TAG as $$LATEST_TAG"; \
+			docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
 		done; \
-	done;
+	done; \
+	echo "✔ All images tagged as latest"
 
 
 start:

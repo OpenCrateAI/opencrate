@@ -47,8 +47,30 @@ jobs:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Build and Push Multi-Platform Images
+            - name: Verify Docker Login
               run: |
+                  echo "Verifying Docker Hub login..."
+                  docker info
+                  echo "Docker buildx version:"
+                  docker buildx version
+
+            - name: Debug Environment
+              run: |
+                  echo "VERSION: ${{ steps.get_version.outputs.VERSION }}"
+                  echo "CACHE_IMAGE: ${{ env.CACHE_IMAGE }}"
+                  echo "Current directory contents:"
+                  ls -la
+                  echo "Docker directory contents:"
+                  ls -la docker/ || echo "Docker directory not found"
+                  echo "Make version:"
+                  make --version
+
+            - name: Build and Push Multi-Platform Images
+              env:
+                  DOCKER_BUILDKIT: 1
+              run: |
+                  # Enable detailed logging
+                  set -x
                   make gh-build-opencrate-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
                       DOCKER_BUILD_ARGS="--push --progress=plain --cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
@@ -56,5 +78,20 @@ jobs:
             - name: Tag and Push "latest" tag
               if: success() && github.ref_type == 'tag'
               run: |
+                  set -x
                   make gh-release-latest \
                       VERSION=${{ steps.get_version.outputs.VERSION }}
+
+            - name: Verify Images in Registry
+              if: success()
+              run: |
+                  echo "Verifying images were pushed to registry..."
+                  # List some of the expected images
+                  SUPPORTED_PYTHONS="3.10 3.11"
+                  for python_version in $SUPPORTED_PYTHONS; do
+                      for runtime in cpu cuda; do
+                          IMAGE_TAG="braindotai/opencrate-${runtime}-py${python_version}:${{ steps.get_version.outputs.VERSION }}"
+                          echo "Checking if $IMAGE_TAG exists..."
+                          docker buildx imagetools inspect "$IMAGE_TAG" || echo "Failed to inspect $IMAGE_TAG"
+                      done
+                  done
