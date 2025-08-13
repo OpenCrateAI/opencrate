@@ -1,30 +1,18 @@
-name: Build and Push OpenCrate Images (Two-Stage)
+name: Build and Push OpenCrate Docker Images (Fully Parallel)
 
 on:
-    workflow_dispatch:
-        inputs:
-            REBUILD_BASE:
-                description: 'Force rebuild of base layers (ignore remote cache)?'
-                required: true
-                type: boolean
-                default: false # Default to using cache
     push:
         tags:
-            - 'v*.*.*' # On tag push, we should always rebuild the base
-
-env:
-    CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
-    CACHE_IMAGE_CUDA: braindotai/opencrate-build-cache:cuda-latest
+            - 'v*.*.*'
+    workflow_dispatch:
 
 jobs:
-    # Job 1: A quick setup job to generate files and determine the version
-    setup:
-        name: Setup
+    # Job 1: Run once to generate all Dockerfiles needed by the build jobs
+    generate-files:
+        name: Generate Dockerfiles
         runs-on: ubuntu-latest
         outputs:
             version: ${{ steps.get_version.outputs.VERSION }}
-            # Determine if we should rebuild. True for manual dispatch with 'true' OR any tag push.
-            rebuild_flag: ${{ (github.event_name == 'workflow_dispatch' && github.event.inputs.REBUILD_BASE == 'true') || github.event_name == 'push' }}
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
@@ -50,107 +38,58 @@ jobs:
                   name: dockerfiles
                   path: ./docker/dockerfiles
 
-    # Job 2: Build the 'base' images (py3.7) in parallel. This warms the cache.
-    build-base:
-        name: Build Base (${{ matrix.runtime }})
-        runs-on: ubuntu-latest
-        needs: setup
-        strategy:
-            fail-fast: false
-            matrix:
-                runtime: [cpu, cuda]
-        steps:
-            - uses: actions/checkout@v4
-            - uses: actions/download-artifact@v4
-              with: { name: dockerfiles, path: ./docker/dockerfiles }
-            - uses: docker/setup-qemu-action@v3
-            - uses: docker/setup-buildx-action@v3
-            - uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-            - name: Build and Push Base Image
-              run: |
-                set -x
-                # Select correct cache image based on runtime
-                if [[ "${{ matrix.runtime }}" == "cpu" ]]; then
-                  CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CPU }}"
-                else
-                  CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CUDA }}"
-                fi
-
-                # Define caching arguments based on the REBUILD flag
-                if [[ "${{ needs.setup.outputs.rebuild_flag }}" == "true" ]]; then
-                  echo "REBUILDING BASE: Pushing fresh cache to registry."
-                  EXTRA_ARGS="--cache-to type=registry,ref=$CACHE_IMAGE_VAR,mode=max"
-                else
-                  echo "USING CACHE: Pulling from registry, not pushing cache."
-                  EXTRA_ARGS="--cache-from type=registry,ref=$CACHE_IMAGE_VAR,ignore-error=true"
-                fi
-                
-                # FIX IS HERE: Changed $$EXTRA_ARGS to $EXTRA_ARGS
-                make ci-build-one \
-                  RUNTIME=${{ matrix.runtime }} \
-                  PYTHON_VERSION=3.7 \
-                  VERSION=${{ needs.setup.outputs.version }} \
-                  DOCKER_BUILD_EXTRA_ARGS="$EXTRA_ARGS"
-
-    # Job 3: Build all other images in parallel, after the base build is complete.
-    build-others:
+    # Job 2: Build all images in a parallel matrix
+    build-images:
         name: Build ${{ matrix.runtime }}-py${{ matrix.python_version }}
         runs-on: ubuntu-latest
-        needs: build-base # This is the critical dependency
+        needs: generate-files # Wait for files to be generated
         strategy:
-            fail-fast: false
+            fail-fast: false # IMPORTANT: Let all builds finish even if one fails
             matrix:
                 runtime: [cpu, cuda]
-                python_version: ['3.8', '3.9', '3.10', '3.11', '3.12']
+                python_version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+
         steps:
-            - uses: actions/checkout@v4
-            - uses: actions/download-artifact@v4
-              with: { name: dockerfiles, path: ./docker/dockerfiles }
-            - uses: docker/setup-qemu-action@v3
-            - uses: docker/setup-buildx-action@v3
-            - uses: docker/login-action@v3
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Download Dockerfiles artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: dockerfiles
+                  path: ./docker/dockerfiles
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v3
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
               with:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Build and Push Image
+            - name: Build and Push Single Image
               run: |
-                set -x
-                # Select correct cache image based on runtime
-                if [[ "${{ matrix.runtime }}" == "cpu" ]]; then
-                  CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CPU }}"
-                else
-                  CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CUDA }}"
-                fi
-
-                # These builds ALWAYS use the remote cache (warmed by the previous job)
-                if [[ "${{ needs.setup.outputs.rebuild_flag }}" == "true" ]]; then
-                    EXTRA_ARGS="--cache-from type=registry,ref=$CACHE_IMAGE_VAR,ignore-error=true --cache-to type=registry,ref=$CACHE_IMAGE_VAR,mode=max"
-                else
-                    EXTRA_ARGS="--cache-from type=registry,ref=$CACHE_IMAGE_VAR,ignore-error=true"
-                fi
-
-                # FIX IS HERE: Changed $$EXTRA_ARGS to $EXTRA_ARGS
                 make ci-build-one \
                   RUNTIME=${{ matrix.runtime }} \
                   PYTHON_VERSION=${{ matrix.python_version }} \
-                  VERSION=${{ needs.setup.outputs.version }} \
-                  DOCKER_BUILD_EXTRA_ARGS="$EXTRA_ARGS"
+                  VERSION=${{ needs.generate-files.outputs.version }}
 
-    # Job 4: Tag 'latest' only after ALL build jobs have succeeded
+    # Job 3: Tag 'latest' only after ALL build jobs have succeeded
     release-latest:
         name: Tag "latest"
         runs-on: ubuntu-latest
-        needs: [setup, build-others] # Depends on the final build job
+        needs: [generate-files, build-images] # Depends on both previous jobs
         if: success() && github.ref_type == 'tag'
         steps:
-            - uses: docker/login-action@v3
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
               with:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
+
             - name: Tag and Push "latest" tag
-              run: make gh-release-latest VERSION=${{ needs.setup.outputs.version }}
+              run: make gh-release-latest VERSION=${{ needs.generate-files.outputs.version }}
