@@ -46,15 +46,20 @@ build-clean-all:
 gh-build-opencrate-all: build-generate
 	@echo "======== ● Building all OpenCrate images for Docker Registry for version $(VERSION) ========..."
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
+	
 	@for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
 			echo "-------- ● Building & Pushing: Python $$python_version, Runtime $$runtime --------"; \
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) .; \
-			echo "-------- ✔ Image is buit and pushed $$FINAL_IMAGE_TAG --------"; \
+			\
+			docker buildx build --platform linux/amd64,linux/arm64 -f $$DOCKERFILE_PATH -t $$FINAL_IMAGE_TAG --push $(DOCKER_BUILD_ARGS) . \
+			|| (echo "-------- ✗ Error: Failed to build and push $$FINAL_IMAGE_TAG --------" && exit 1); \
+			\
+			echo "-------- ✔ Image is built and pushed $$FINAL_IMAGE_TAG --------"; \
 		done; \
 	done;
+	
 	@echo "\n======== ✔ All images have been built for Docker Registry for version $(VERSION) ========\n";
 
 gh-release-latest:
