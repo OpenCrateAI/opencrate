@@ -73,7 +73,7 @@ jobs:
             - name: Build and Push Base Image
               run: |
                 set -x
-                # FIX: Select correct cache image based on runtime
+                # Select correct cache image based on runtime
                 if [[ "${{ matrix.runtime }}" == "cpu" ]]; then
                   CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CPU }}"
                 else
@@ -89,11 +89,12 @@ jobs:
                   EXTRA_ARGS="--cache-from type=registry,ref=$CACHE_IMAGE_VAR,ignore-error=true"
                 fi
                 
+                # FIX IS HERE: Changed $$EXTRA_ARGS to $EXTRA_ARGS
                 make ci-build-one \
                   RUNTIME=${{ matrix.runtime }} \
                   PYTHON_VERSION=3.7 \
                   VERSION=${{ needs.setup.outputs.version }} \
-                  DOCKER_BUILD_EXTRA_ARGS="$$EXTRA_ARGS"
+                  DOCKER_BUILD_EXTRA_ARGS="$EXTRA_ARGS"
 
     # Job 3: Build all other images in parallel, after the base build is complete.
     build-others:
@@ -119,23 +120,26 @@ jobs:
             - name: Build and Push Image
               run: |
                 set -x
+                # Select correct cache image based on runtime
                 if [[ "${{ matrix.runtime }}" == "cpu" ]]; then
                   CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CPU }}"
                 else
                   CACHE_IMAGE_VAR="${{ env.CACHE_IMAGE_CUDA }}"
                 fi
 
+                # These builds ALWAYS use the remote cache (warmed by the previous job)
                 if [[ "${{ needs.setup.outputs.rebuild_flag }}" == "true" ]]; then
                     EXTRA_ARGS="--cache-from type=registry,ref=$CACHE_IMAGE_VAR,ignore-error=true --cache-to type=registry,ref=$CACHE_IMAGE_VAR,mode=max"
                 else
                     EXTRA_ARGS="--cache-from type=registry,ref=$CACHE_IMAGE_VAR,ignore-error=true"
                 fi
 
+                # FIX IS HERE: Changed $$EXTRA_ARGS to $EXTRA_ARGS
                 make ci-build-one \
                   RUNTIME=${{ matrix.runtime }} \
                   PYTHON_VERSION=${{ matrix.python_version }} \
                   VERSION=${{ needs.setup.outputs.version }} \
-                  DOCKER_BUILD_EXTRA_ARGS="$$EXTRA_ARGS"
+                  DOCKER_BUILD_EXTRA_ARGS="$EXTRA_ARGS"
 
     # Job 4: Tag 'latest' only after ALL build jobs have succeeded
     release-latest:
