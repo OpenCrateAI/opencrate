@@ -32,16 +32,25 @@ ci-build-one:
 	FINAL_IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"
 	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"
 
+	if [ "$(RUNTIME)" = "cpu" ]; then \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
+	else \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
+	fi; \
+
 	echo "Image Tag: $$FINAL_IMAGE_TAG"
 	echo "Dockerfile: $$DOCKERFILE_PATH"
 	echo "Remote Cache: $$CACHE_IMAGE_VAR"
+	echo "Extra Build Args: $(DOCKER_BUILD_EXTRA_ARGS)"
 
+	# DOCKER_BUILD_EXTRA_ARGS is injected here
 	docker buildx build \
 		--platform linux/amd64,linux/arm64 \
 		-f "$$DOCKERFILE_PATH" \
 		-t "$$FINAL_IMAGE_TAG" \
 		--push \
 		--progress=plain \
+		$(DOCKER_BUILD_EXTRA_ARGS) \
 		.
 
 	@echo "--- ✔ Successfully built and pushed $$FINAL_IMAGE_TAG ---"
