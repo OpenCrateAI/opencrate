@@ -4,8 +4,12 @@ HOST_GIT_NAME = $(shell git config user.name)
 
 VERSION ?= $(shell cat VERSION | tr -d '\n')
 
-CACHE_IMAGE ?= braindotai/opencrate-build-cache:latest
-DOCKER_BUILD_ARGS ?= --cache-from type=registry,ref=$(CACHE_IMAGE),ignore-error=true --cache-to type=registry,ref=$(CACHE_IMAGE),mode=max
+# Separate cache images for CPU and CUDA runtimes
+CACHE_IMAGE_CPU ?= braindotai/opencrate-build-cache:cpu-latest
+CACHE_IMAGE_CUDA ?= braindotai/opencrate-build-cache:cuda-latest
+
+.SILENT:
+.ONESHELL:
 
 build-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
@@ -35,7 +39,7 @@ build-opencrate-all: build-generate
 
 
 build-clean-all:
-	echo "Cleaning container cache"; \
+	@echo "Cleaning container cache"; \
 	docker container prune -f; \
 	echo "Cleaning buildx cache"; \
 	docker buildx prune -f; \
@@ -52,8 +56,14 @@ gh-build-opencrate-all: build-generate
 			echo "-------- ● Building & Pushing: Python $$python_version, Runtime $$runtime --------"; \
 			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			echo "Building: $$FINAL_IMAGE_TAG from $$DOCKERFILE_PATH"; \
-			if docker buildx build --platform linux/amd64,linux/arm64 -f "$$DOCKERFILE_PATH" -t "$$FINAL_IMAGE_TAG" $(DOCKER_BUILD_ARGS) .; then \
+			if [ "$$runtime" = "cpu" ]; then \
+				CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
+			else \
+				CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
+			fi; \
+			echo "Building: $$FINAL_IMAGE_TAG from $$DOCKERFILE_PATH using cache: $$CACHE_IMAGE_VAR"; \
+			DOCKER_BUILD_ARGS="--push --progress=plain --cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max"; \
+			if docker buildx build --platform linux/amd64,linux/arm64 -f "$$DOCKERFILE_PATH" -t "$$FINAL_IMAGE_TAG" $$DOCKER_BUILD_ARGS .; then \
 				echo "-------- ✔ Image built and pushed: $$FINAL_IMAGE_TAG --------"; \
 			else \
 				echo "-------- ✗ Error: Failed to build and push $$FINAL_IMAGE_TAG --------"; \
@@ -62,6 +72,7 @@ gh-build-opencrate-all: build-generate
 		done; \
 	done; \
 	echo "\n======== ✔ All images have been built for Docker Registry for version $(VERSION) ========\n"
+
 
 gh-release-latest:
 	@echo "Tagging 'latest' for all images with version $(VERSION)..."

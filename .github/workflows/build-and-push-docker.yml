@@ -9,7 +9,8 @@ on:
     workflow_dispatch:
 
 env:
-    CACHE_IMAGE: braindotai/opencrate-build-cache:latest
+    CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
+    CACHE_IMAGE_CUDA: braindotai/opencrate-build-cache:cuda-latest
 
 jobs:
     build-and-push:
@@ -57,7 +58,8 @@ jobs:
             - name: Debug Environment
               run: |
                   echo "VERSION: ${{ steps.get_version.outputs.VERSION }}"
-                  echo "CACHE_IMAGE: ${{ env.CACHE_IMAGE }}"
+                  echo "CACHE_IMAGE_CPU: ${{ env.CACHE_IMAGE_CPU }}"
+                  echo "CACHE_IMAGE_CUDA: ${{ env.CACHE_IMAGE_CUDA }}"
                   echo "Current directory contents:"
                   ls -la
                   echo "Docker directory contents:"
@@ -73,7 +75,9 @@ jobs:
                   set -x
                   make gh-build-opencrate-all \
                       VERSION=${{ steps.get_version.outputs.VERSION }} \
-                      DOCKER_BUILD_ARGS="--push --progress=plain --cache-from type=registry,ref=${{ env.CACHE_IMAGE }},ignore-error=true --cache-to type=registry,ref=${{ env.CACHE_IMAGE }},mode=max"
+                      CACHE_IMAGE_CPU=${{ env.CACHE_IMAGE_CPU }} \
+                      CACHE_IMAGE_CUDA=${{ env.CACHE_IMAGE_CUDA }} \
+                      DOCKER_BUILD_ARGS="--push --progress=plain"
 
             - name: Tag and Push "latest" tag
               if: success() && github.ref_type == 'tag'
@@ -87,7 +91,7 @@ jobs:
               run: |
                   echo "Verifying images were pushed to registry..."
                   # List some of the expected images
-                  SUPPORTED_PYTHONS="3.10 3.11"
+                  SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"
                   for python_version in $SUPPORTED_PYTHONS; do
                       for runtime in cpu cuda; do
                           IMAGE_TAG="braindotai/opencrate-${runtime}-py${python_version}:${{ steps.get_version.outputs.VERSION }}"
