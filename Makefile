@@ -13,7 +13,7 @@ VERSION ?= $(shell cat VERSION | tr -d '\n')
 # It's called once by a setup job in the CI workflow.
 build-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12 3.13"; \
 	mkdir -p ./docker/dockerfiles; \
 	for python_version in $$SUPPORTED_PYTHONS; do \
 		for runtime in cpu cuda; do \
