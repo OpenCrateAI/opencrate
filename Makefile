@@ -4,13 +4,13 @@ HOST_GIT_NAME = $(shell git config user.name)
 
 VERSION ?= $(shell cat VERSION | tr -d '\n')
 
-# Separate cache images for CPU and CUDA runtimes
-CACHE_IMAGE_CPU ?= braindotai/opencrate-build-cache:cpu-latest
-CACHE_IMAGE_CUDA ?= braindotai/opencrate-build-cache:cuda-latest
+# Default cache image names, can be overridden by CI
 
 .SILENT:
 .ONESHELL:
 
+# This target generates all necessary Dockerfiles.
+# It's called once by a setup job in the CI workflow.
 build-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
 	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
@@ -23,57 +23,31 @@ build-generate:
 	@echo "\n======== ✔ All Dockerfiles generated successfully ========\n"
 
 
-build-opencrate:
-	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --log-level=DEBUG
+# This target builds and pushes a SINGLE image.
+# All parameters are passed from the CI matrix job.
+ci-build-one:
+	@set -e
+	@echo "--- Building: Runtime=$(RUNTIME), Python=$(PYTHON_VERSION), Version=$(VERSION) ---"
+
+	FINAL_IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"
+	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"
+
+	echo "Image Tag: $$FINAL_IMAGE_TAG"
+	echo "Dockerfile: $$DOCKERFILE_PATH"
+	echo "Remote Cache: $$CACHE_IMAGE_VAR"
+
+	docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		-f "$$DOCKERFILE_PATH" \
+		-t "$$FINAL_IMAGE_TAG" \
+		--push \
+		--progress=plain \
+		.
+
+	@echo "--- ✔ Successfully built and pushed $$FINAL_IMAGE_TAG ---"
 
 
-build-opencrate-all: build-generate
-	@echo "======== ● Building all OpenCrate images locally for all supported versions ========"
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
-		for runtime in cpu cuda; do \
-			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
-		done; \
-	done; \
-	echo "\n======== ✔ All local images built successfully! ========\n";
-
-
-build-clean-all:
-	@echo "Cleaning container cache"; \
-	docker container prune -f; \
-	echo "Cleaning buildx cache"; \
-	docker buildx prune -f; \
-	echo "Cleaning image cache"; \
-	docker image prune -f;
-
-
-gh-build-opencrate-all: build-generate
-	@echo "======== ● Building all OpenCrate images for Docker Registry for version $(VERSION) ========"
-	@set -e; \
-	SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
-		for runtime in cpu cuda; do \
-			echo "-------- ● Building & Pushing: Python $$python_version, Runtime $$runtime --------"; \
-			FINAL_IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
-			DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$$runtime-py$$python_version"; \
-			if [ "$$runtime" = "cpu" ]; then \
-				CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
-			else \
-				CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
-			fi; \
-			echo "Building: $$FINAL_IMAGE_TAG from $$DOCKERFILE_PATH using cache: $$CACHE_IMAGE_VAR"; \
-			DOCKER_BUILD_ARGS="--push --progress=plain --cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max"; \
-			if docker buildx build --platform linux/amd64,linux/arm64 -f "$$DOCKERFILE_PATH" -t "$$FINAL_IMAGE_TAG" $$DOCKER_BUILD_ARGS .; then \
-				echo "-------- ✔ Image built and pushed: $$FINAL_IMAGE_TAG --------"; \
-			else \
-				echo "-------- ✗ Error: Failed to build and push $$FINAL_IMAGE_TAG --------"; \
-				exit 1; \
-			fi; \
-		done; \
-	done; \
-	echo "\n======== ✔ All images have been built for Docker Registry for version $(VERSION) ========\n"
-
-
+# This target remains the same for tagging 'latest' after all builds succeed.
 gh-release-latest:
 	@echo "Tagging 'latest' for all images with version $(VERSION)..."
 	@set -e; \
@@ -87,6 +61,30 @@ gh-release-latest:
 		done; \
 	done; \
 	echo "✔ All images tagged as latest"
+
+
+build-local:
+	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --log-level=DEBUG
+
+
+build-local-all: build-generate
+	@echo "======== ● Building all OpenCrate images locally for all supported versions ========"
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
+		for runtime in cpu cuda; do \
+			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
+		done; \
+	done; \
+	echo "\n======== ✔ All local images built successfully! ========\n";
+
+
+build-local-clean:
+	@echo "Cleaning container cache"; \
+	docker container prune -f; \
+	echo "Cleaning buildx cache"; \
+	docker buildx prune -f; \
+	echo "Cleaning image cache"; \
+	docker image prune -f;
 
 
 start:
