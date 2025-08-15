@@ -74,5 +74,8 @@ COPY --from=python /root/.pyenv/ /root/.pyenv/
 
 RUN mkdir /home/opencrate/
 WORKDIR /home/opencrate/
+# installa ct for local github action testint
+RUN curl --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/nektos/act/master/install.sh | bash \
+    && mv bin/act /bin && rm -rf bin
 
 CMD ["zsh"]

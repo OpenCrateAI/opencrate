@@ -23,6 +23,30 @@ build-generate:
 	@echo "\n======== ✔ All Dockerfiles generated successfully ========\n"
 
 
+build-local:
+	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --log-level=DEBUG
+
+
+build-local-all:
+	@echo "======== ● Building all OpenCrate images locally for all supported versions ========"
+	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$SUPPORTED_PYTHONS; do \
+		for runtime in cpu cuda; do \
+			python3.10 docker/dockerfile.py --generate --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
+		done; \
+	done; \
+	echo "\n======== ✔ All local images built successfully! ========\n";
+
+
+build-local-clean:
+	@echo "Cleaning container cache"; \
+	docker container prune -f; \
+	echo "Cleaning buildx cache"; \
+	docker buildx prune -f; \
+	echo "Cleaning image cache"; \
+	docker image prune -f;
+
+
 # This target builds and pushes a SINGLE image.
 # All parameters are passed from the CI matrix job.
 ci-build-one:
@@ -63,30 +87,6 @@ gh-release-latest:
 	echo "✔ All images tagged as latest"
 
 
-build-local:
-	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --log-level=DEBUG
-
-
-build-local-all: build-generate
-	@echo "======== ● Building all OpenCrate images locally for all supported versions ========"
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
-		for runtime in cpu cuda; do \
-			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
-		done; \
-	done; \
-	echo "\n======== ✔ All local images built successfully! ========\n";
-
-
-build-local-clean:
-	@echo "Cleaning container cache"; \
-	docker container prune -f; \
-	echo "Cleaning buildx cache"; \
-	docker buildx prune -f; \
-	echo "Cleaning image cache"; \
-	docker image prune -f;
-
-
 start:
 	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
 	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
@@ -110,10 +110,8 @@ kill:
 
 
 install:
-	@$(check_python)
-	@echo "Using Python version: $${python_version}"
-	@python$${python_version} -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir
-	@python$${python_version} -m pip install -e .[dev] --root-user-action=ignore --no-cache-dir
+	@python3.10 -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir
+	@python3.10 -m pip install -e .[dev] --root-user-action=ignore --no-cache-dir
 	@PYTHON_VERSIONS="3.7 3.8 3.9 3.11 3.12 3.13"; \
 	echo "Installing Python versions: $$PYTHON_VERSIONS"; \
 	for version in $$PYTHON_VERSIONS; do \

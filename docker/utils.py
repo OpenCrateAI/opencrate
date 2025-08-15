@@ -2,7 +2,6 @@ import shlex
 import subprocess
 from collections import deque
 from contextlib import contextmanager
-from typing import Literal
 
 from rich.console import Console
 from rich.live import Live
@@ -22,7 +21,7 @@ def spinner(console: Console, message: str):
 
 def stream_shell_command_logs(
     logger, console: Console, command_str: str, log_level: str = "DEBUG"
-) -> Literal["Success"] | Literal["Failed"]:
+):
     """
     Executes a shell command and streams its output live to the console.
     This is used to run `docker buildx` and provide rich, real-time feedback.
