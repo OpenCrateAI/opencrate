@@ -6,7 +6,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from glob import glob
-from typing import Any, Callable, Dict, Generator, List, Optional, Type, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Type, Union
 
 import lovelyplots  # noqa: F401
 import matplotlib.pyplot as plt
@@ -420,12 +420,12 @@ class OpenCrate:
 
         return decorator
 
-    def _snapshot_reset(self, confirm) -> Any | None:
+    def _snapshot_reset(self, confirm) -> Optional[Any]:
         self.snapshot._name = self.script_name
         if self._original_snapshot_reset is not None:
             return self._original_snapshot_reset(confirm)
 
-    def _snapshot_setup(self, *args, **kwargs) -> Any | None:
+    def _snapshot_setup(self, *args, **kwargs) -> Optional[Any]:
         if "name" in kwargs:
             del kwargs["name"]
 
@@ -764,7 +764,7 @@ class OpenCrate:
             self.jobs_meta_kwargs[job_name]["start_epoch"] += 1
         # TODO: consider automating and standardizing some of such common variable names in ML projects
 
-    def batch_progress(self, dataloader, title="Batch") -> Generator[tuple[Any, Any, Any], Any, None]:
+    def batch_progress(self, dataloader, title="Batch") -> Generator[Tuple[Any, Any, Any], Any, None]:
         job_name = inspect.stack()[1].function
 
         assert self.meta_saved, "Meta variables not saved. Please call `save_meta()` in `__init__` method."
