@@ -237,10 +237,7 @@ def main():
         )
 
         build_command = (
-            f"docker buildx build --no-cache "
-            f"-f {dockerfile_path} "
-            f"-t {final_image_tag} "
-            f"--load {args.build_args} ."
+            f"docker buildx build -f {dockerfile_path} -t {final_image_tag} ."
         )
 
         logger.info(f"> Executing build command: {build_command}")

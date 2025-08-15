@@ -30,7 +30,7 @@ jobs:
               run: pip install rich loguru
 
             - name: Generate all Dockerfiles
-              run: make build-generate
+              run: make docker-generate
 
             - name: Upload Dockerfiles as artifact
               uses: actions/upload-artifact@v4
@@ -73,7 +73,7 @@ jobs:
 
             - name: Build and Push Single Image
               run: |
-                make ci-build-one \
+                make ci-build \
                   RUNTIME=${{ matrix.runtime }} \
                   PYTHON_VERSION=${{ matrix.python_version }} \
                   VERSION=${{ needs.generate-files.outputs.version }}
@@ -92,4 +92,4 @@ jobs:
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
             - name: Tag and Push "latest" tag
-              run: make gh-release-latest VERSION=${{ needs.generate-files.outputs.version }}
+              run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}

@@ -4,41 +4,39 @@ HOST_GIT_NAME = $(shell git config user.name)
 
 VERSION ?= $(shell cat VERSION | tr -d '\n')
 
-# Default cache image names, can be overridden by CI
-
 .SILENT:
 .ONESHELL:
 
-# This target generates all necessary Dockerfiles.
-# It's called once by a setup job in the CI workflow.
-build-generate:
+
+# This target generates Dockerfiles for all supported Python versions and runtimes.
+docker-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12 3.13"; \
+	@PYTHON_VERSIONS_TO_USE="$${PYTHON_VERSIONS:-3.7 3.8 3.9 3.10 3.11 3.12 3.13}"; \
+	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
 	mkdir -p ./docker/dockerfiles; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
-		for runtime in cpu cuda; do \
+	for python_version in $$PYTHON_VERSIONS_TO_USE; do \
+		for runtime in $$RUNTIMES_TO_USE; do \
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
 	done
 	@echo "\n======== ✔ All Dockerfiles generated successfully ========\n"
 
 
-build-local:
-	@python3.10 docker/dockerfile.py --generate --build --python=$${python:-3.10} --runtime=$${runtime:-cpu} --log-level=DEBUG
-
-
-build-local-all:
+# This target builds all supported OpenCrate images locally for all Python versions and runtimes.
+docker-build: docker-generate
 	@echo "======== ● Building all OpenCrate images locally for all supported versions ========"
-	@SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
-		for runtime in cpu cuda; do \
-			python3.10 docker/dockerfile.py --generate --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
+	@PYTHON_VERSIONS_TO_USE="$${PYTHON_VERSIONS:-3.7 3.8 3.9 3.10 3.11 3.12 3.13}"; \
+	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
+	for python_version in $$PYTHON_VERSIONS_TO_USE; do \
+		for runtime in $$RUNTIMES_TO_USE; do \
+			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
 		done; \
 	done; \
 	echo "\n======== ✔ All local images built successfully! ========\n";
 
 
-build-local-clean:
+# This target cleans up all Docker-related caches and unused images.
+docker-clean:
 	@echo "Cleaning container cache"; \
 	docker container prune -f; \
 	echo "Cleaning buildx cache"; \
@@ -47,9 +45,8 @@ build-local-clean:
 	docker image prune -f;
 
 
-# This target builds and pushes a SINGLE image.
-# All parameters are passed from the CI matrix job.
-ci-build-one:
+# This target is used in github actions to build a single image for CI/CD. Used in the matrix parallel builds.
+ci-build:
 	@set -e
 	@echo "--- Building: Runtime=$(RUNTIME), Python=$(PYTHON_VERSION), Version=$(VERSION) ---"
 
@@ -71,12 +68,12 @@ ci-build-one:
 	@echo "--- ✔ Successfully built and pushed $$FINAL_IMAGE_TAG ---"
 
 
-# This target remains the same for tagging 'latest' after all builds succeed.
-gh-release-latest:
+# This target pushes the images as the latest tag to the registry. Used in the CI/CD workflow if new git tag is created.
+ci-release:
 	@echo "Tagging 'latest' for all images with version $(VERSION)..."
 	@set -e; \
-	SUPPORTED_PYTHONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$SUPPORTED_PYTHONS; do \
+	PYTHON_VERSIONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$PYTHON_VERSIONS; do \
 		for runtime in cpu cuda; do \
 			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
@@ -110,8 +107,8 @@ kill:
 
 
 install:
-	@python3.10 -m pip install --upgrade pip --root-user-action=ignore --no-cache-dir
-	@python3.10 -m pip install -e .[dev] --root-user-action=ignore --no-cache-dir
+	@python3.10 -m pip install --upgrade pip --root-user-action=ignore
+	@python3.10 -m pip install -e ".[dev]" --root-user-action=ignore
 	@PYTHON_VERSIONS="3.7 3.8 3.9 3.11 3.12 3.13"; \
 	echo "Installing Python versions: $$PYTHON_VERSIONS"; \
 	for version in $$PYTHON_VERSIONS; do \
