@@ -157,21 +157,29 @@ ci-release:
 
 docker-test:
 	@echo "======== ● Testing OpenCrate in Docker for Python $(PYTHON_VERSION) and runtime $(RUNTIME) ========"
-	@set -e
-	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):v$(VERSION)"
-	LOG_FILE="tests/logs/test-py$(PYTHON_VERSION)-$(RUNTIME).log"
-	mkdir -p tests/logs
-
-	@echo "--- Running tests in Docker container from image: $$IMAGE_TAG ---"
-	@echo "--- Log file: $$LOG_FILE ---"
+	@set -e; \
+	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
+	LOG_FILE="tests/logs/test-py$(PYTHON_VERSION)-$(RUNTIME).log"; \
+	mkdir -p tests/logs; \
+	echo "--- Running tests in Docker container from image: $$IMAGE_TAG ---"; \
+	echo "--- Log file: $$LOG_FILE ---"; \
 	docker run --rm \
 		-v $(shell pwd)/tests:/home/opencrate/tests \
+		-v $(shell pwd)/src:/home/opencrate/src \
 		-v $(shell pwd)/Makefile:/home/opencrate/Makefile:ro \
 		-w /home/opencrate \
 		$$IMAGE_TAG \
-		sh -c 'pip install pytest pytest-cov && make test-pytest' > $$LOG_FILE 2>&1 || (cat $$LOG_FILE && exit 1)
-	
-	@echo "======== ✔ Test finished successfully. ========"
+		sh -c 'set -e && \
+			echo "Installing test dependencies..." && \
+			pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu && \
+			pip install --quiet pytest pytest-cov && \
+			echo "Running tests..." && \
+			make test-pytest' | tee $$LOG_FILE; \
+	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
+		echo "❌ Tests failed. Check log file: $$LOG_FILE"; \
+		exit 1; \
+	fi; \
+	echo "======== ✔ Tests completed successfully. Log saved to: $$LOG_FILE ========"
 
 
 help:

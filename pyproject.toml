@@ -48,16 +48,15 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = [
-    "tox",
+    "ruff",
     "mypy",
     "pytest",
-    "ruff",
     "pytest-cov",
+    "tox",
     "types-requests",
     "types-PyYAML",
     "types-docker",
     "torch",
-    "build",
     "mkdocs",
     "mkdocs-material",
     "mkdocstrings-python",
