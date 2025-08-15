@@ -205,7 +205,7 @@ def main():
     console = Console()
 
     try:
-        with open("VERSION", "r") as version_file:
+        with open("VERSION") as version_file:
             version = version_file.read().strip()
     except FileNotFoundError:
         console.print("[bold red]Error: VERSION file not found.[/bold red]")

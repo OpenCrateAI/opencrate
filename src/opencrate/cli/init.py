@@ -230,7 +230,7 @@ class DockerComposeDumper(yaml.Dumper):
 
 
 def remove_cuda_from_dockercompose(dockercompose_path: str):
-    with open(dockercompose_path, "r") as f:
+    with open(dockercompose_path) as f:
         compose_data = yaml.safe_load(f)
 
     for service_config in compose_data.get("services", {}).values():

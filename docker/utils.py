@@ -2,6 +2,7 @@ import shlex
 import subprocess
 from collections import deque
 from contextlib import contextmanager
+from typing import Deque
 
 from rich.console import Console
 from rich.live import Live
@@ -19,14 +20,12 @@ def spinner(console: Console, message: str):
             pass
 
 
-def stream_shell_command_logs(
-    logger, console: Console, command_str: str, log_level: str = "DEBUG"
-):
+def stream_shell_command_logs(logger, console: Console, command_str: str, log_level: str = "DEBUG"):
     """
     Executes a shell command and streams its output live to the console.
     This is used to run `docker buildx` and provide rich, real-time feedback.
     """
-    log_lines = deque(maxlen=15)
+    log_lines: Deque[Text] = deque(maxlen=15)
 
     def create_log_panel():
         # ======================================================================
@@ -56,24 +55,24 @@ def stream_shell_command_logs(
         )
 
         if log_level == "DEBUG":
-            with Live(
-                create_log_panel(), refresh_per_second=10, console=console
-            ) as live:
-                for line in process.stdout:
-                    clean_line = line.strip()
-                    if clean_line:
-                        logger.debug(clean_line)
+            with Live(create_log_panel(), refresh_per_second=10, console=console) as live:
+                if process.stdout is not None:
+                    for line in process.stdout:
+                        clean_line = line.strip()
+                        if clean_line:
+                            logger.debug(clean_line)
 
-                        line_text = Text()
-                        line_text.append("▶ ", style="dim blue")
-                        line_text.append(clean_line, style="dim")
+                            line_text = Text()
+                            line_text.append("▶ ", style="dim blue")
+                            line_text.append(clean_line, style="dim")
 
-                        log_lines.append(line_text)
+                            log_lines.append(line_text)
 
-                        live.update(create_log_panel())
+                            live.update(create_log_panel())
         else:
-            for line in process.stdout:
-                print(line.strip())
+            if process.stdout is not None:
+                for line in process.stdout:
+                    print(line.strip())
 
         return_code = process.wait()
         if return_code != 0:
