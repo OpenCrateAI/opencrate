@@ -56,7 +56,8 @@ def handle_replace(path: str, replace: bool) -> None:
     Example:
         >>> handle_replace("data.txt", replace=True)
         >>> handle_replace("data.txt", replace=False)
-        FileExistsError: Path already exists: data.txt. Pass `replace` as `True` if you want to replace the existing file or directory.
+        FileExistsError: Path already exists: data.txt.
+        Pass `replace` as `True` if you want to replace the existing file or directory.
     """
     if os.path.exists(path):
         if replace:
@@ -66,7 +67,8 @@ def handle_replace(path: str, replace: bool) -> None:
                 delete_file(path)
         else:
             raise FileExistsError(
-                f"\n\nPath already exists: {path}. Pass `replace` as `True` if you want to replace the existing file or directory.\n"
+                f"\nPath already exists: {path}.\
+                Pass `replace` as `True` if you want to replace the existing file or directory.\n"
             )
 
 
@@ -130,7 +132,7 @@ def read_json(file_path: str) -> Dict[str, Any]:
         {'key': 'value'}
     """
     ensure_file_exists(file_path)
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         return json.load(file)
 
 
@@ -250,7 +252,7 @@ def read_file(file_path: str) -> str:
         'Hello, world!'
     """
     ensure_file_exists(file_path)
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         return file.read()
 
 
@@ -507,7 +509,9 @@ def create_archive(output_filename: str, source_dir: str, format: str = "zip") -
     Args:
         output_filename (str): The name of the archive.
         source_dir (str): The path to the source directory.
-        format (str): The archive format. Defaults to 'zip'. Valid formats are: 'zip', 'tar', 'gztar', 'bztar', and 'xztar'. You can use 'gztar' or 'zip' for fast compression/decompression and 'xztar' for maximum compression.
+        format (str): The archive format. Defaults to 'zip'.
+        Valid formats are: 'zip', 'tar', 'gztar', 'bztar', and 'xztar'.
+        You can use 'gztar' or 'zip' for fast compression/decompression and 'xztar' for maximum compression.
 
     Example:
         >>> create_archive("archive", "my_folder", format="zip")
@@ -517,9 +521,7 @@ def create_archive(output_filename: str, source_dir: str, format: str = "zip") -
     # check if format is valid
     valid_formats = ["zip", "tar", "gztar", "bztar", "xztar"]
     if format not in valid_formats:
-        raise ValueError(
-            f"\n\nInvalid archive format: {format}. Valid formats are: 'zip', 'tar', 'gztar', 'bztar', and 'xztar'.\n"
-        )
+        raise ValueError(f"\n\nInvalid archive format: {format}. Valid formats are: 'zip', 'tar', 'gztar', 'bztar', and 'xztar'.\n")
     ensure_dir_exists(source_dir)
     handle_replace(output_filename, replace=True)
     shutil.make_archive(output_filename, format, source_dir)

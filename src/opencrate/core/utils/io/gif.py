@@ -12,7 +12,7 @@ def _to_gif(
     images: Sequence[Union[npt.NDArray[Any], Image.Image]],
     output_path: str,
     fps: int = 10,
-):
+) -> None:
     images_ = []
     for img in images:
         if isinstance(img, Image.Image):
@@ -23,9 +23,7 @@ def _to_gif(
 
         # Ensure img is numpy array at this point
         if not isinstance(img, np.ndarray):
-            raise TypeError(
-                f"Unsupported image type: {type(img)}. Expected numpy.ndarray or PIL.Image"
-            )
+            raise TypeError(f"Unsupported image type: {type(img)}. Expected numpy.ndarray or PIL.Image")
 
         # Normalize to [0, 1] range
         img_min, img_max = img.min(), img.max()
@@ -41,7 +39,7 @@ def _to_gif(
     imageio.mimsave(output_path, images_, fps=fps)
 
 
-def dir_to_gif(src_dir: str, output_path: str, fps: int = 10):
+def dir_to_gif(src_dir: str, output_path: str, fps: int = 10) -> None:
     """
     Converts all images in a directory to a GIF.
 
@@ -54,10 +52,7 @@ def dir_to_gif(src_dir: str, output_path: str, fps: int = 10):
 
     # Sort files to ensure correct sequence
     def natural_sort_key(s):
-        return [
-            int(text) if text.isdigit() else text.lower()
-            for text in re.split(r"(\d+)", str(s))
-        ]
+        return [int(text) if text.isdigit() else text.lower() for text in re.split(r"(\d+)", str(s))]
 
     for filename in sorted(os.listdir(src_dir), key=natural_sort_key):
         if filename.lower().endswith((".png", ".jpg", ".jpeg", ".bmp", ".tiff")):
@@ -66,17 +61,13 @@ def dir_to_gif(src_dir: str, output_path: str, fps: int = 10):
             images.append(img)
 
     if not images:
-        raise ValueError(
-            f"\n\nNo valid image files found in '{src_dir}' for creating the gif\n"
-        )
+        raise ValueError(f"\n\nNo valid image files found in '{src_dir}' for creating the gif\n")
 
     # Use _to_gif helper function
     _to_gif(images, output_path, fps)
 
 
-def images_to_gif(
-    images: List[Union[npt.NDArray[Any], Image.Image]], output_path: str, fps: int = 10
-):
+def images_to_gif(images: List[Union[npt.NDArray[Any], Image.Image]], output_path: str, fps: int = 10) -> None:
     """
     Converts a list of images to a GIF.
 
@@ -89,7 +80,7 @@ def images_to_gif(
     _to_gif(images, output_path, fps)
 
 
-def gif_to_images(path: str, transform=None):
+def gif_to_images(path: str, transform=None) -> List[Any]:
     images_ = []
     for frame in ImageSequence.Iterator(Image.open(path)):
         if transform:

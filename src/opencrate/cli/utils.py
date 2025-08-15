@@ -60,9 +60,7 @@ def stream_docker_logs(command, console: Console, is_build=False):
                         continue
 
                     if clean_line_str.startswith(PROGRESS_KEYWORDS):
-                        current_progress = Text(
-                            clean_line_str, style="dim", no_wrap=True
-                        )
+                        current_progress = Text(clean_line_str, style="dim", no_wrap=True)
                     else:
                         full_line_text.stylize("dim")
                         permanent_lines.append(full_line_text)
@@ -77,13 +75,9 @@ def stream_docker_logs(command, console: Console, is_build=False):
 
             except Exception as e:
                 error_message = str(e) if e else "Unknown build error."
-                console.print(
-                    f"\n[ERROR]: Build failed > {error_message}", style="bold red"
-                )
+                console.print(f"\n[ERROR]: Build failed > {error_message}", style="bold red")
                 error_message = str(e)
-                console.print(
-                    f"\n[ERROR]: Command failed > {error_message}", style="bold red"
-                )
+                console.print(f"\n[ERROR]: Command failed > {error_message}", style="bold red")
     else:  # This logic remains unchanged
         ansi_escape = re.compile(r"\x1B[@-_][0-?]*[ -/]*[@-~]")
         try:
@@ -98,9 +92,7 @@ def stream_docker_logs(command, console: Console, is_build=False):
                         console.print(clean_stderr, style="bold red")
         except Exception as e:
             error_message = str(e)
-            console.print(
-                f"\n[ERROR]: Command failed > {error_message}", style="bold red"
-            )
+            console.print(f"\n[ERROR]: Command failed > {error_message}", style="bold red")
 
 
 def handle_exceptions(console: Console) -> Callable[[Any], Any]:
@@ -173,7 +165,7 @@ def create_file(path: str, content):
 
 
 def replace_in_file(file_path, replacements: List[Tuple[str, str]]):
-    with open(file_path, "r") as file:
+    with open(file_path) as file:
         file_contents = file.read()
 
     for old_string, new_string in replacements:
@@ -184,7 +176,7 @@ def replace_in_file(file_path, replacements: List[Tuple[str, str]]):
 
 
 def write_template(filepath, settings):
-    with open(filepath, "r") as file:
+    with open(filepath) as file:
         template_content = file.read()
 
     template = Template(template_content)
@@ -200,9 +192,7 @@ def show_project_structure(console):
 
     # Add subdirectories and files
     assets = tree.add("📁 assets                [dark_cyan].........created folder")
-    assets_dataset = assets.add(
-        "📁 dataset           [dark_cyan].........created folder"
-    )
+    assets_dataset = assets.add("📁 dataset           [dark_cyan].........created folder")
     assets_dataset.add("📁 raw           [dark_cyan].........created folder")
     assets_dataset.add("📁 train         [dark_cyan].........created folder")
     assets_dataset.add("📁 val           [dark_cyan].........created folder")

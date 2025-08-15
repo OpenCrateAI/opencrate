@@ -1,0 +1,27 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.7
+    hooks:
+      - id: ruff
+        name: Ruff (lint, fix, and format)
+        args: [--fix, --show-fixes, --exit-non-zero-on-fix]
+        verbose: true
+
+  - repo: https://github.com/pre-commit/mirrors-mypy
+    rev: v1.10.0
+    hooks:
+      - id: mypy
+        name: Mypy (type checking)
+        verbose: true
+        additional_dependencies:
+          - types-requests
+          - types-PyYAML
+          - types-docker
+
+  - repo: https://github.com/asottile/pyupgrade
+    rev: v3.15.0
+    hooks:
+      - id: pyupgrade
+        name: Pyupgrade (modernize)
+        verbose: true
+        args: [--py37-plus]

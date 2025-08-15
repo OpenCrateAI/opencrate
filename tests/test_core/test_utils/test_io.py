@@ -1,6 +1,4 @@
 import json
-import os
-import shutil
 
 import pytest
 
@@ -34,353 +32,240 @@ from opencrate.core.utils import (
 
 
 class TestUtilsIO:
-    test_root_dir: str = "tests/assets"
+    def test_ensure_dir_exists(self, tmp_path):
+        existing_dir = tmp_path / "existing_dir"
+        existing_dir.mkdir()
 
-    def setup_ensure_dir_exists(self):
-        os.makedirs(f"{self.test_root_dir}/existing_dir", exist_ok=True)
+        ensure_dir_exists(str(existing_dir))
+        assert existing_dir.exists()
 
-    def teardown_ensure_dir_exists(self):
-        shutil.rmtree(f"{self.test_root_dir}/existing_dir", ignore_errors=True)
-
-    def test_ensure_dir_exists(self):
-        self.setup_ensure_dir_exists()
-        ensure_dir_exists(f"{self.test_root_dir}/existing_dir")
-        assert os.path.exists(f"{self.test_root_dir}/existing_dir")
-
+        non_existing_dir = tmp_path / "non_existing_dir"
         with pytest.raises(FileNotFoundError):
-            ensure_dir_exists(f"{self.test_root_dir}/non_existing_dir")
-        self.teardown_ensure_dir_exists()
+            ensure_dir_exists(str(non_existing_dir))
 
-    def test_ensure_dir_exists_not_found(self):
+    def test_ensure_dir_exists_not_found(self, tmp_path):
+        non_existing_dir = tmp_path / "non_existing_dir"
         with pytest.raises(FileNotFoundError):
-            ensure_dir_exists(f"{self.test_root_dir}/non_existing_dir")
+            ensure_dir_exists(str(non_existing_dir))
 
-    def setup_ensure_file_exists(self):
-        with open(f"{self.test_root_dir}/old_name.txt", "w") as f:
-            f.write("old content")
+    def test_ensure_file_exists(self, tmp_path):
+        test_file = tmp_path / "old_name.txt"
+        test_file.write_text("old content")
 
-    def teardown_ensure_file_exists(self):
-        if os.path.exists(f"{self.test_root_dir}/old_name.txt"):
-            os.remove(f"{self.test_root_dir}/old_name.txt")
+        ensure_file_exists(str(test_file))
+        assert test_file.exists()
 
-    def test_ensure_file_exists(self):
-        self.setup_ensure_file_exists()
-        ensure_file_exists(f"{self.test_root_dir}/old_name.txt")
-        assert os.path.exists(f"{self.test_root_dir}/old_name.txt")
-
+        non_existing_file = tmp_path / "non_existing_file.txt"
         with pytest.raises(FileNotFoundError):
-            ensure_file_exists(f"{self.test_root_dir}/non_existing_file.txt")
-        self.teardown_ensure_file_exists()
+            ensure_file_exists(str(non_existing_file))
 
-    def setup_handle_replace(self):
-        with open(f"{self.test_root_dir}/old_name.txt", "w") as f:
-            f.write("old content")
+    def test_handle_replace(self, tmp_path):
+        test_file = tmp_path / "old_name.txt"
+        test_file.write_text("old content")
 
-    def teardown_handle_replace(self):
-        if os.path.exists(f"{self.test_root_dir}/old_name.txt"):
-            os.remove(f"{self.test_root_dir}/old_name.txt")
+        handle_replace(str(test_file), replace=True)
+        assert not test_file.exists()
 
-    def test_handle_replace(self):
-        self.setup_handle_replace()
-        handle_replace(f"{self.test_root_dir}/old_name.txt", replace=True)
-        assert not os.path.exists(f"{self.test_root_dir}/old_name.txt")
-
-        with open(f"{self.test_root_dir}/old_name.txt", "w") as f:
-            f.write("old content")
+        test_file.write_text("old content")
 
         with pytest.raises(FileExistsError):
-            handle_replace(f"{self.test_root_dir}/old_name.txt", replace=False)
+            handle_replace(str(test_file), replace=False)
 
-        handle_replace(f"{self.test_root_dir}/non_existing_file.txt", replace=False)
-        self.teardown_handle_replace()
+        non_existing_file = tmp_path / "non_existing_file.txt"
+        handle_replace(str(non_existing_file), replace=False)
 
-    def test_handle_replace_directory(self):
-        os.makedirs(f"{self.test_root_dir}/dir_to_replace", exist_ok=True)
-        handle_replace(f"{self.test_root_dir}/dir_to_replace", replace=True)
-        assert not os.path.exists(f"{self.test_root_dir}/dir_to_replace")
+    def test_handle_replace_directory(self, tmp_path):
+        dir_to_replace = tmp_path / "dir_to_replace"
+        dir_to_replace.mkdir()
+        handle_replace(str(dir_to_replace), replace=True)
+        assert not dir_to_replace.exists()
 
-    def setup_create_dir(self):
-        os.makedirs(f"{self.test_root_dir}/existing_dir", exist_ok=True)
+    def test_create_dir(self, tmp_path):
+        existing_dir = tmp_path / "existing_dir"
+        existing_dir.mkdir()
 
-    def teardown_create_dir(self):
-        shutil.rmtree(f"{self.test_root_dir}/existing_dir", ignore_errors=True)
-        shutil.rmtree(f"{self.test_root_dir}/create_dir", ignore_errors=True)
-
-    def test_create_dir(self):
-        self.setup_create_dir()
-        create_dir(f"{self.test_root_dir}/create_dir", replace=True)
-        assert os.path.exists(f"{self.test_root_dir}/create_dir")
+        create_dir_path = tmp_path / "create_dir"
+        create_dir(str(create_dir_path), replace=True)
+        assert create_dir_path.exists()
 
         with pytest.raises(FileExistsError):
-            create_dir(f"{self.test_root_dir}/existing_dir", replace=False)
-        self.teardown_create_dir()
+            create_dir(str(existing_dir), replace=False)
 
-    def setup_delete_dir(self):
-        os.makedirs(f"{self.test_root_dir}/existing_dir", exist_ok=True)
+    def test_delete_dir(self, tmp_path):
+        existing_dir = tmp_path / "existing_dir"
+        existing_dir.mkdir()
 
-    def teardown_delete_dir(self):
-        shutil.rmtree(f"{self.test_root_dir}/existing_dir", ignore_errors=True)
+        delete_dir(str(existing_dir))
+        assert not existing_dir.exists()
 
-    def test_delete_dir(self):
-        self.setup_delete_dir()
-        delete_dir(f"{self.test_root_dir}/existing_dir")
-        assert not os.path.exists(f"{self.test_root_dir}/existing_dir")
-
+        non_existing_dir = tmp_path / "non_existing_dir"
         with pytest.raises(FileNotFoundError):
-            delete_dir(f"{self.test_root_dir}/non_existing_dir")
-        self.teardown_delete_dir()
+            delete_dir(str(non_existing_dir))
 
-    def setup_read_json(self):
-        with open(f"{self.test_root_dir}/data.json", "w") as f:
-            json.dump({"key": "value"}, f)
+    def test_read_json(self, tmp_path):
+        data_file = tmp_path / "data.json"
+        data_file.write_text(json.dumps({"key": "value"}))
 
-    def teardown_read_json(self):
-        if os.path.exists(f"{self.test_root_dir}/data.json"):
-            os.remove(f"{self.test_root_dir}/data.json")
-
-    def test_read_json(self):
-        self.setup_read_json()
-        data = read_json(f"{self.test_root_dir}/data.json")
+        data = read_json(str(data_file))
         assert data == {"key": "value"}
 
+        non_existing_file = tmp_path / "non_existing_file.json"
         with pytest.raises(FileNotFoundError):
-            read_json(f"{self.test_root_dir}/non_existing_file.json")
-        self.teardown_read_json()
+            read_json(str(non_existing_file))
 
-    def setup_write_json(self):
-        pass
+    def test_write_json(self, tmp_path):
+        data_file = tmp_path / "data.json"
+        write_json(str(data_file), {"key": "new_value"}, replace=True)
 
-    def teardown_write_json(self):
-        if os.path.exists(f"{self.test_root_dir}/data.json"):
-            os.remove(f"{self.test_root_dir}/data.json")
-
-    def test_write_json(self):
-        self.setup_write_json()
-        write_json(
-            f"{self.test_root_dir}/data.json", {"key": "new_value"}, replace=True
-        )
-        with open(f"{self.test_root_dir}/data.json", "r") as f:
-            data = json.load(f)
+        data = json.loads(data_file.read_text())
         assert data == {"key": "new_value"}
-        self.teardown_write_json()
 
-    def setup_list_files_in_dir(self):
-        os.makedirs(f"{self.test_root_dir}/source_dir", exist_ok=True)
-        os.makedirs(f"{self.test_root_dir}/source_dir/sub_dir", exist_ok=True)
-        with open(f"{self.test_root_dir}/source_dir/file.txt", "w") as f:
-            f.write("content")
-        with open(f"{self.test_root_dir}/source_dir/sub_dir/file.txt", "w") as f:
-            f.write("content")
+    def test_list_files_in_dir(self, tmp_path):
+        source_dir = tmp_path / "source_dir"
+        source_dir.mkdir()
+        sub_dir = source_dir / "sub_dir"
+        sub_dir.mkdir()
 
-    def teardown_list_files_in_dir(self):
-        shutil.rmtree(f"{self.test_root_dir}/source_dir", ignore_errors=True)
+        (source_dir / "file.txt").write_text("content")
+        (sub_dir / "file.txt").write_text("content")
 
-    def test_list_files_in_dir(self):
-        self.setup_list_files_in_dir()
-        files = list_files_in_dir(f"{self.test_root_dir}/source_dir")
+        files = list_files_in_dir(str(source_dir))
         assert files == [
-            f"{self.test_root_dir}/source_dir/file.txt",
-            f"{self.test_root_dir}/source_dir/sub_dir/file.txt",
+            str(source_dir / "file.txt"),
+            str(sub_dir / "file.txt"),
         ]
 
+        non_existing_dir = tmp_path / "non_existing_dir"
         with pytest.raises(FileNotFoundError):
-            list_files_in_dir(f"{self.test_root_dir}/non_existing_dir")
-        self.teardown_list_files_in_dir()
+            list_files_in_dir(str(non_existing_dir))
 
-    def setup_list_files_in_dir_with_extension(self):
-        os.makedirs(f"{self.test_root_dir}/source_dir", exist_ok=True)
-        with open(f"{self.test_root_dir}/source_dir/file.txt", "w") as f:
-            f.write("content")
+    def test_list_files_in_dir_with_extension(self, tmp_path):
+        source_dir = tmp_path / "source_dir"
+        source_dir.mkdir()
+        (source_dir / "file.txt").write_text("content")
 
-    def teardown_list_files_in_dir_with_extension(self):
-        shutil.rmtree(f"{self.test_root_dir}/source_dir", ignore_errors=True)
+        files = list_files_in_dir(str(source_dir), extension="txt")
+        assert files == [str(source_dir / "file.txt")]
 
-    def test_list_files_in_dir_with_extension(self):
-        self.setup_list_files_in_dir_with_extension()
-        files = list_files_in_dir(f"{self.test_root_dir}/source_dir", extension="txt")
-        assert files == [f"{self.test_root_dir}/source_dir/file.txt"]
-        self.teardown_list_files_in_dir_with_extension()
+    def test_copy_dir(self, tmp_path):
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dst_dir = tmp_path / "dst"
 
-    def setup_copy_dir(self):
-        os.makedirs(f"{self.test_root_dir}/src", exist_ok=True)
+        copy_dir(str(src_dir), str(dst_dir), replace=True)
+        assert dst_dir.exists()
 
-    def teardown_copy_dir(self):
-        shutil.rmtree(f"{self.test_root_dir}/src", ignore_errors=True)
-        shutil.rmtree(f"{self.test_root_dir}/dst", ignore_errors=True)
-
-    def test_copy_dir(self):
-        self.setup_copy_dir()
-        copy_dir(f"{self.test_root_dir}/src", f"{self.test_root_dir}/dst", replace=True)
-        assert os.path.exists(f"{self.test_root_dir}/dst")
-
+        non_existing_src = tmp_path / "non_existing_src"
         with pytest.raises(FileNotFoundError):
-            copy_dir(
-                f"{self.test_root_dir}/non_existing_src", f"{self.test_root_dir}/dst"
-            )
-        self.teardown_copy_dir()
+            copy_dir(str(non_existing_src), str(dst_dir))
 
-    def setup_move_dir(self):
-        os.makedirs(f"{self.test_root_dir}/src", exist_ok=True)
+    def test_move_dir(self, tmp_path):
+        src_dir = tmp_path / "src"
+        src_dir.mkdir()
+        dst_dir = tmp_path / "dst"
 
-    def teardown_move_dir(self):
-        shutil.rmtree(f"{self.test_root_dir}/src", ignore_errors=True)
-        shutil.rmtree(f"{self.test_root_dir}/dst", ignore_errors=True)
+        move_dir(str(src_dir), str(dst_dir), replace=True)
+        assert dst_dir.exists()
+        assert not src_dir.exists()
 
-    def test_move_dir(self):
-        self.setup_move_dir()
-        move_dir(f"{self.test_root_dir}/src", f"{self.test_root_dir}/dst", replace=True)
-        assert os.path.exists(f"{self.test_root_dir}/dst")
-        assert not os.path.exists(f"{self.test_root_dir}/src")
-
+        non_existing_src = tmp_path / "non_existing_src"
         with pytest.raises(FileNotFoundError):
-            move_dir(
-                f"{self.test_root_dir}/non_existing_src", f"{self.test_root_dir}/dst"
-            )
-        self.teardown_move_dir()
+            move_dir(str(non_existing_src), str(dst_dir))
 
-    def setup_read_file(self):
-        with open(f"{self.test_root_dir}/file.txt", "w") as f:
-            f.write("content")
+    def test_read_file(self, tmp_path):
+        test_file = tmp_path / "file.txt"
+        test_file.write_text("content")
 
-    def teardown_read_file(self):
-        if os.path.exists(f"{self.test_root_dir}/file.txt"):
-            os.remove(f"{self.test_root_dir}/file.txt")
-
-    def test_read_file(self):
-        self.setup_read_file()
-        content = read_file(f"{self.test_root_dir}/file.txt")
+        content = read_file(str(test_file))
         assert content == "content"
 
+        non_existing_file = tmp_path / "non_existing_file.txt"
         with pytest.raises(FileNotFoundError):
-            read_file(f"{self.test_root_dir}/non_existing_file.txt")
-        self.teardown_read_file()
+            read_file(str(non_existing_file))
 
-    def setup_write_file(self):
-        pass
+    def test_write_file(self, tmp_path):
+        test_file = tmp_path / "file.txt"
+        write_file(str(test_file), "new content", replace=True)
 
-    def teardown_write_file(self):
-        if os.path.exists(f"{self.test_root_dir}/file.txt"):
-            os.remove(f"{self.test_root_dir}/file.txt")
-
-    def test_write_file(self):
-        self.setup_write_file()
-        write_file(f"{self.test_root_dir}/file.txt", "new content", replace=True)
-        with open(f"{self.test_root_dir}/file.txt", "r") as f:
-            content = f.read()
+        content = test_file.read_text()
         assert content == "new content"
-        self.teardown_write_file()
 
-    def setup_file_exists(self):
-        with open(f"{self.test_root_dir}/file.txt", "w") as f:
-            f.write("content")
+    def test_file_exists(self, tmp_path):
+        test_file = tmp_path / "file.txt"
+        test_file.write_text("content")
 
-    def teardown_file_exists(self):
-        if os.path.exists(f"{self.test_root_dir}/file.txt"):
-            os.remove(f"{self.test_root_dir}/file.txt")
+        assert file_exists(str(test_file))
 
-    def test_file_exists(self):
-        self.setup_file_exists()
-        assert file_exists(f"{self.test_root_dir}/file.txt")
-        assert not file_exists(f"{self.test_root_dir}/non_existing_file.txt")
-        self.teardown_file_exists()
+        non_existing_file = tmp_path / "non_existing_file.txt"
+        assert not file_exists(str(non_existing_file))
 
-    def setup_dir_exists(self):
-        os.makedirs(f"{self.test_root_dir}/existing_dir", exist_ok=True)
+    def test_dir_exists(self, tmp_path):
+        existing_dir = tmp_path / "existing_dir"
+        existing_dir.mkdir()
 
-    def teardown_dir_exists(self):
-        shutil.rmtree(f"{self.test_root_dir}/existing_dir", ignore_errors=True)
+        assert dir_exists(str(existing_dir))
 
-    def test_dir_exists(self):
-        self.setup_dir_exists()
-        assert dir_exists(f"{self.test_root_dir}/existing_dir")
-        assert not dir_exists(f"{self.test_root_dir}/non_existing_dir")
-        self.teardown_dir_exists()
+        non_existing_dir = tmp_path / "non_existing_dir"
+        assert not dir_exists(str(non_existing_dir))
 
-    def setup_get_file_size(self):
-        with open(f"{self.test_root_dir}/file.txt", "w") as f:
-            f.write("content")
+    def test_get_file_size(self, tmp_path):
+        test_file = tmp_path / "file.txt"
+        test_file.write_text("content")
 
-    def teardown_get_file_size(self):
-        if os.path.exists(f"{self.test_root_dir}/file.txt"):
-            os.remove(f"{self.test_root_dir}/file.txt")
+        size = get_file_size(str(test_file))
+        assert size == test_file.stat().st_size
 
-    def test_get_file_size(self):
-        self.setup_get_file_size()
-        size = get_file_size(f"{self.test_root_dir}/file.txt")
-        assert size == os.path.getsize(f"{self.test_root_dir}/file.txt")
-
+        non_existing_file = tmp_path / "non_existing_file.txt"
         with pytest.raises(FileNotFoundError):
-            get_file_size(f"{self.test_root_dir}/non_existing_file.txt")
-        self.teardown_get_file_size()
+            get_file_size(str(non_existing_file))
 
-    def setup_get_dir_size(self):
-        os.makedirs(f"{self.test_root_dir}/source_dir", exist_ok=True)
-        with open(f"{self.test_root_dir}/source_dir/file.txt", "w") as f:
-            f.write("content")
+    def test_get_dir_size(self, tmp_path):
+        source_dir = tmp_path / "source_dir"
+        source_dir.mkdir()
+        test_file = source_dir / "file.txt"
+        test_file.write_text("content")
 
-    def teardown_get_dir_size(self):
-        shutil.rmtree(f"{self.test_root_dir}/source_dir", ignore_errors=True)
+        size = get_dir_size(str(source_dir))
+        assert size == test_file.stat().st_size
 
-    def test_get_dir_size(self):
-        self.setup_get_dir_size()
-        size = get_dir_size(f"{self.test_root_dir}/source_dir")
-        assert size == os.path.getsize(f"{self.test_root_dir}/source_dir/file.txt")
-
+        non_existing_dir = tmp_path / "non_existing_dir"
         with pytest.raises(FileNotFoundError):
-            get_dir_size(f"{self.test_root_dir}/non_existing_dir")
-        self.teardown_get_dir_size()
+            get_dir_size(str(non_existing_dir))
 
-    def setup_list_dir(self):
-        os.makedirs(f"{self.test_root_dir}/source_dir", exist_ok=True)
+    def test_list_dir(self, tmp_path):
+        source_dir = tmp_path / "source_dir"
+        source_dir.mkdir()
 
-    def teardown_list_dir(self):
-        shutil.rmtree(f"{self.test_root_dir}/source_dir", ignore_errors=True)
-
-    def test_list_dir(self):
-        self.setup_list_dir()
-        items = list_dir(f"{self.test_root_dir}/source_dir")
+        items = list_dir(str(source_dir))
         assert items == []
 
+        non_existing_dir = tmp_path / "non_existing_dir"
         with pytest.raises(FileNotFoundError):
-            list_dir(f"{self.test_root_dir}/non_existing_dir")
-        self.teardown_list_dir()
+            list_dir(str(non_existing_dir))
 
-    def setup_delete_file(self):
-        with open(f"{self.test_root_dir}/file.txt", "w") as f:
-            f.write("content")
+    def test_delete_file(self, tmp_path):
+        test_file = tmp_path / "file.txt"
+        test_file.write_text("content")
 
-    def test_delete_file(self):
-        self.setup_delete_file()
-        delete_file(f"{self.test_root_dir}/file.txt")
-        assert not os.path.exists(f"{self.test_root_dir}/file.txt")
+        delete_file(str(test_file))
+        assert not test_file.exists()
 
+        non_existing_file = tmp_path / "non_existing_file.txt"
         with pytest.raises(FileNotFoundError):
-            delete_file(f"{self.test_root_dir}/non_existing_file.txt")
+            delete_file(str(non_existing_file))
 
-    def setup_rename(self):
-        with open(f"{self.test_root_dir}/old_name.txt", "w") as f:
-            f.write("old content")
+    def test_rename(self, tmp_path):
+        old_file = tmp_path / "old_name.txt"
+        old_file.write_text("old content")
+        new_file = tmp_path / "new_name.txt"
 
-    def teardown_rename(self):
-        if os.path.exists(f"{self.test_root_dir}/new_name.txt"):
-            os.remove(f"{self.test_root_dir}/new_name.txt")
+        rename(str(old_file), str(new_file), replace=True)
+        assert new_file.exists()
+        assert not old_file.exists()
 
-    def test_rename(self):
-        self.setup_rename()
-        rename(
-            f"{self.test_root_dir}/old_name.txt",
-            f"{self.test_root_dir}/new_name.txt",
-            replace=True,
-        )
-        assert os.path.exists(f"{self.test_root_dir}/new_name.txt")
-        assert not os.path.exists(f"{self.test_root_dir}/old_name.txt")
-
+        non_existing_file = tmp_path / "non_existing_file.txt"
         with pytest.raises(FileNotFoundError):
-            rename(
-                f"{self.test_root_dir}/non_existing_file.txt",
-                f"{self.test_root_dir}/new_name.txt",
-            )
-        self.teardown_rename()
+            rename(str(non_existing_file), str(new_file))
 
     def test_get_file_name(self):
         assert get_file_name("path/to/file.txt") == "file.txt"
@@ -391,55 +276,48 @@ class TestUtilsIO:
     def test_get_parent_dir(self):
         assert get_parent_dir("path/to/file.txt") == "path/to"
 
-    def test_download_file(self):
+    def test_download_file(self, tmp_path):
+        archive_file = tmp_path / "archive.zip"
         download_file(
             "https://www.learningcontainer.com/download/sample-zip-files/?wpdmdl=1637&refresh=67ac3bd61a3771739340758",
-            f"{self.test_root_dir}/archive.zip",
+            str(archive_file),
             replace=True,
         )
-        assert os.path.exists(f"{self.test_root_dir}/archive.zip")
+        assert archive_file.exists()
 
-    def setup_create_archive(self):
-        os.makedirs(f"{self.test_root_dir}/source_dir", exist_ok=True)
+    def test_create_archive(self, tmp_path):
+        source_dir = tmp_path / "source_dir"
+        source_dir.mkdir()
+        archive_path = tmp_path / "create_archive"
 
-    def teardown_create_archive(self):
-        shutil.rmtree(f"{self.test_root_dir}/source_dir", ignore_errors=True)
-        if os.path.exists(f"{self.test_root_dir}/create_archive.zip"):
-            os.remove(f"{self.test_root_dir}/create_archive.zip")
+        create_archive(str(archive_path), str(source_dir), format="zip")
+        assert (tmp_path / "create_archive.zip").exists()
 
-    def test_create_archive(self):
-        self.setup_create_archive()
-        create_archive(
-            f"{self.test_root_dir}/create_archive",
-            f"{self.test_root_dir}/source_dir",
-            format="zip",
-        )
-        assert os.path.exists(f"{self.test_root_dir}/create_archive.zip")
-        self.teardown_create_archive()
+    def test_create_archive_invalid_format(self, tmp_path):
+        source_dir = tmp_path / "source_dir"
+        source_dir.mkdir()
+        archive_path = tmp_path / "create_archive"
 
-    def test_create_archive_invalid_format(self):
         with pytest.raises(ValueError):
-            create_archive(
-                f"{self.test_root_dir}/create_archive",
-                f"{self.test_root_dir}/source_dir",
-                format="invalid_format",
-            )
+            create_archive(str(archive_path), str(source_dir), format="invalid_format")
 
-    def teardown_extract_archive(self):
-        shutil.rmtree(f"{self.test_root_dir}/dest_dir", ignore_errors=True)
-        if os.path.exists(f"{self.test_root_dir}/archive.zip"):
-            os.remove(f"{self.test_root_dir}/archive.zip")
+    def test_extract_archive(self, tmp_path):
+        # This test assumes the archive.zip was created by test_download_file
+        archive_file = tmp_path / "archive.zip"
+        dest_dir = tmp_path / "dest_dir"
 
-    def test_extract_archive(self):
-        extract_archive(
-            f"{self.test_root_dir}/archive.zip", f"{self.test_root_dir}/dest_dir"
-        )
-        assert os.path.exists(f"{self.test_root_dir}/dest_dir")
-        self.teardown_extract_archive()
+        # Create a simple zip file for testing
+        import zipfile
 
-    def test_extract_archive_invalid_file(self):
+        with zipfile.ZipFile(str(archive_file), "w") as zf:
+            zf.writestr("test.txt", "test content")
+
+        extract_archive(str(archive_file), str(dest_dir))
+        assert dest_dir.exists()
+
+    def test_extract_archive_invalid_file(self, tmp_path):
+        non_existing_archive = tmp_path / "non_existing_archive.zip"
+        dest_dir = tmp_path / "dest_dir"
+
         with pytest.raises(FileNotFoundError):
-            extract_archive(
-                f"{self.test_root_dir}/non_existing_archive.zip",
-                f"{self.test_root_dir}/dest_dir",
-            )
+            extract_archive(str(non_existing_archive), str(dest_dir))

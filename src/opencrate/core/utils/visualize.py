@@ -35,9 +35,7 @@ def _prepare_cmap_alpha(
         for i, a in enumerate(alpha[:count]):
             if a is not None:
                 if not isinstance(a, (int, float)) or not (0.0 <= a <= 1.0):
-                    raise ValueError(
-                        f"alpha[{i}] must be between 0 and 1 or None, got {a}"
-                    )
+                    raise ValueError(f"alpha[{i}] must be between 0 and 1 or None, got {a}")
                 alpha_list.append(float(a))
             else:
                 alpha_list.append(None)
@@ -169,17 +167,13 @@ def image_stack(
     # Check that all columns have the same length
     column_lengths = [len(col) for col in stack_lists]
     if len(set(column_lengths)) > 1:
-        raise ValueError(
-            f"All columns must have the same length, got lengths: {column_lengths}"
-        )
+        raise ValueError(f"All columns must have the same length, got lengths: {column_lengths}")
 
     if titles is not None:
         if not isinstance(titles, list):
             raise TypeError(f"titles must be a list or None, got {type(titles)}")
         if len(stack_lists) != len(titles):
-            raise ValueError(
-                f"Number of titles ({len(titles)}) must match number of columns ({len(stack_lists)})"
-            )
+            raise ValueError(f"Number of titles ({len(titles)}) must match number of columns ({len(stack_lists)})")
 
     num_rows = len(stack_lists[0])
     num_cols = len(stack_lists)
@@ -210,7 +204,7 @@ def image_stack(
 
 
 def image_grid(
-    grid_list: Union[List[Union[Image.Image, npt.NDArray[Any]]], npt.NDArray[Any]],  # type: ignore
+    grid_list: Union[List[Union[Image.Image, npt.NDArray[Any]]], npt.NDArray[Any]],
     shape: Tuple[int, int] = (3, 3),
     figsize: int = 10,
     bgr2rgb: bool = False,
@@ -246,18 +240,12 @@ def image_grid(
 
     # Handle numpy array input (batch of images)
     if isinstance(grid_list, np.ndarray):
-        if len(grid_list.shape) == 4:  # type: ignore # Batch of images
-            grid_list = [
-                grid_list[i] for i in range(min(len(grid_list), shape[0] * shape[1]))
-            ]
+        if len(grid_list.shape) == 4:
+            grid_list = [grid_list[i] for i in range(min(len(grid_list), shape[0] * shape[1]))]
         else:
-            raise ValueError(
-                f"Expected 4D array for batch input, got {len(grid_list.shape)}D"
-            )  # type: ignore
+            raise ValueError(f"Expected 4D array for batch input, got {len(grid_list.shape)}D")
     elif not isinstance(grid_list, list):
-        raise TypeError(
-            f"grid_list must be a list or numpy array, got {type(grid_list)}"
-        )
+        raise TypeError(f"grid_list must be a list or numpy array, got {type(grid_list)}")
 
     if not grid_list:
         raise ValueError("grid_list cannot be empty")
@@ -295,8 +283,8 @@ def image_grid(
 
 
 def labeled_images(
-    image_batch: Union[List[Union[Image.Image, npt.NDArray[Any]]], npt.NDArray[Any]],  # type: ignore
-    label_batch: Union[List, npt.NDArray[Any]],  # type: ignore
+    image_batch: Union[List[Union[Image.Image, npt.NDArray[Any]]], npt.NDArray[Any]],
+    label_batch: Union[List[str], npt.NDArray[Any]],
     shape: Tuple[int, int],
     label_names: Optional[List[str]] = None,
     figsize: int = 10,
@@ -344,22 +332,16 @@ def labeled_images(
         if not image_batch:
             raise ValueError("image_batch cannot be empty")
     else:
-        raise TypeError(
-            f"image_batch must be a list or numpy array, got {type(image_batch)}"
-        )
+        raise TypeError(f"image_batch must be a list or numpy array, got {type(image_batch)}")
 
     if isinstance(label_batch, np.ndarray):
         label_batch = label_batch.tolist()
     elif not isinstance(label_batch, list):
-        raise TypeError(
-            f"label_batch must be a list or numpy array, got {type(label_batch)}"
-        )
+        raise TypeError(f"label_batch must be a list or numpy array, got {type(label_batch)}")
 
     # Check lengths before limiting
     if len(image_batch) != len(label_batch):
-        raise ValueError(
-            f"Number of images ({len(image_batch)}) must match number of labels ({len(label_batch)})"
-        )
+        raise ValueError(f"Number of images ({len(image_batch)}) must match number of labels ({len(label_batch)})")
 
     # Limit to grid size
     max_images = shape[0] * shape[1]
@@ -368,9 +350,7 @@ def labeled_images(
 
     if label_names is not None:
         if not isinstance(label_names, list):
-            raise TypeError(
-                f"label_names must be a list or None, got {type(label_names)}"
-            )
+            raise TypeError(f"label_names must be a list or None, got {type(label_names)}")
 
     fig = plt.figure(figsize=(figsize, figsize))
     grid = ImageGrid(fig, 111, nrows_ncols=shape, axes_pad=0.05)
@@ -392,9 +372,7 @@ def labeled_images(
             else:
                 label_idx = int(label)
                 if label_idx < 0 or label_idx >= len(label_names):
-                    raise IndexError(
-                        f"Label index {label_idx} out of range for label_names of length {len(label_names)}"
-                    )
+                    raise IndexError(f"Label index {label_idx} out of range for label_names of length {len(label_names)}")
                 label_text = str(label_names[label_idx])
         except (ValueError, TypeError) as e:
             raise ValueError(f"Invalid label at index {i}: {label}") from e

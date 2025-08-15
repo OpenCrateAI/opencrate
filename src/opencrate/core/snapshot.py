@@ -17,7 +17,7 @@ from PIL import Image
 _has_torch = True
 
 try:
-    import torch  # type: ignore
+    import torch
 except ImportError:
     _has_torch = False
 
@@ -26,7 +26,7 @@ class Snapshot:
     def __init__(self):
         self.version: Union[str, int, None] = None
         self.start: Union[str, int, None] = None
-        self.tag: str = ""
+        self.tag: Optional[str] = None
         self.logger = logger
         self.snapshot_name: str = ""
         self._setup_not_done = True
@@ -59,14 +59,10 @@ class Snapshot:
         Returns:
             None
         """
-        assert os.path.isdir(self._config_dir), (
-            "\n\nNot an OpenCrate project directory.\n"
-        )
+        assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
 
-        if not isinstance(log_level, str):  # type: ignore
-            raise ValueError(
-                f"\n\n`log_level` must be a string, but received {type(log_level)}"
-            )
+        if not isinstance(log_level, str):
+            raise ValueError(f"\n\n`log_level` must be a string, but received {type(log_level)}")
         log_level = log_level.upper()
         if log_level not in [
             "DEBUG",
@@ -76,27 +72,17 @@ class Snapshot:
             "CRITICAL",
             "SUCCESS",
         ]:
-            raise ValueError(
-                "\n\n`log_level` must be one of ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'SUCCESS']"
-            )
-        if not isinstance(log_time, bool):  # type: ignore
-            raise ValueError(
-                f"\n\n`log_time` must be a boolean, but received {type(log_time)}"
-            )
-        if tag is not None and not isinstance(tag, str):  # type: ignore
-            raise ValueError(
-                f"\n\n`tag` must be a string or None, but received {type(tag)}"
-            )
+            raise ValueError("\n\n`log_level` must be one of ['DEBUG', 'INFO', 'WARNING', 'ERROR', 'CRITICAL', 'SUCCESS']")
+        if not isinstance(log_time, bool):
+            raise ValueError(f"\n\n`log_time` must be a boolean, but received {type(log_time)}")
+        if tag is not None and not isinstance(tag, str):
+            raise ValueError(f"\n\n`tag` must be a string or None, but received {type(tag)}")
         try:
             start = int(start)
         except:  # noqa: E722
             pass
-        if not isinstance(start, (int, str)) or (  # type: ignore
-            isinstance(start, str) and start not in ["new", "last", "dev"]
-        ):
-            raise ValueError(
-                f"\n\n`start` must be an int, 'new', 'last' or 'dev', but received {type(start)}"
-            )
+        if not isinstance(start, (int, str)) or (isinstance(start, str) and start not in ["new", "last", "dev"]):
+            raise ValueError(f"\n\n`start` must be an int, 'new', 'last' or 'dev', but received {type(start)}")
 
         self.start = start
         self.tag = tag if tag else ""
@@ -135,9 +121,7 @@ class Snapshot:
         self.log_path = os.path.join(self.dir_path, f"{self.snapshot_name}.log")
 
         if start != "new":
-            self.history_log_path = self.log_path.replace(
-                f"{self.snapshot_name}.log", f"{self.snapshot_name}.history.log"
-            )
+            self.history_log_path = self.log_path.replace(f"{self.snapshot_name}.log", f"{self.snapshot_name}.history.log")
 
             if os.path.isfile(self.log_path):
                 if not os.path.isfile(self.history_log_path):
@@ -167,9 +151,7 @@ class Snapshot:
 
         self._setup_not_done = False
 
-        self.debug(
-            f"Snapshot setup done for script '{self.snapshot_name}' with version '{self.version_name}'"
-        )
+        self.debug(f"Snapshot setup done for script '{self.snapshot_name}' with version '{self.version_name}'")
 
     def list_tags(self, return_tags: Optional[bool] = False) -> Optional[List[str]]:
         """
@@ -184,10 +166,8 @@ class Snapshot:
         Returns:
             Optional[List[str]]: List of tags available in the snapshots.
         """
-        if not isinstance(return_tags, bool):  # type: ignore
-            raise ValueError(
-                f"\n\n`return_tags` must be a boolean, but received `{return_tags}` of type `{type(return_tags).__name__}`"
-            )
+        if not isinstance(return_tags, bool):
+            raise ValueError(f"\n\n`return_tags` must be a boolean, but received `{return_tags}` of type `{type(return_tags).__name__}`")
 
         path = os.path.join("snapshots", self.snapshot_name)
         if not os.path.isdir(path):
@@ -255,9 +235,7 @@ class Snapshot:
         ckpt_path = os.path.join(path, name)
 
         if name.endswith(".pth") or name.endswith(".pt"):
-            assert _has_torch, (
-                "\n\nPyTorch is not installed. Please install PyTorch to save a checkpoint.\n\n"
-            )
+            assert _has_torch, "\n\nPyTorch is not installed. Please install PyTorch to save a checkpoint.\n\n"
             torch.save(checkpoint, ckpt_path)
         elif name.endswith(".json"):
             if isinstance(checkpoint, dict):
@@ -275,9 +253,7 @@ class Snapshot:
         elif name.endswith(".csv"):
             if pd and isinstance(checkpoint, pd.DataFrame):
                 checkpoint.to_csv(ckpt_path, index=False)
-            elif isinstance(checkpoint, (list, tuple)) and all(
-                isinstance(row, (list, tuple)) for row in checkpoint
-            ):
+            elif isinstance(checkpoint, (list, tuple)) and all(isinstance(row, (list, tuple)) for row in checkpoint):
                 with open(ckpt_path, "w", newline="") as f:
                     writer = csv.writer(f)
                     writer.writerows(checkpoint)
@@ -287,25 +263,17 @@ class Snapshot:
             if isinstance(checkpoint, np.ndarray):
                 np.save(ckpt_path, checkpoint)
             else:
-                raise ValueError(
-                    f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npy file. Only numpy arrays are supported.\n"
-                )
+                raise ValueError(f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npy file. Only numpy arrays are supported.\n")
         elif name.endswith(".npz"):
             if isinstance(checkpoint, dict):
                 for value in checkpoint.values():
                     if not isinstance(value, np.ndarray):
-                        raise ValueError(
-                            f"\n\nUnsupported checkpoint type {type(value)} for .npz file. Only dictionaries with numpy arrays are supported but got.\n"
-                        )
+                        raise ValueError(f"\n\nUnsupported checkpoint type {type(value)} for .npz file. Only dictionaries with numpy arrays are supported but got.\n")
                 np.savez(ckpt_path, **checkpoint)
             else:
-                raise ValueError(
-                    f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npz file. Only dictionaries are supported.\n"
-                )
+                raise ValueError(f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npz file. Only dictionaries are supported.\n")
         else:
-            assert custom_saver is not None, (
-                "\n\nUnsupported file extension. Please provide a valid file extension or a custom saver function - custom_saver(checkpoint, name).\n"
-            )
+            assert custom_saver is not None, "\n\nUnsupported file extension. Please provide a valid file extension or a custom saver function - custom_saver(checkpoint, name).\n"
             custom_saver(checkpoint, ckpt_path)
 
     def json(self, data: Union[Dict[Any, Any], List[Any]], name: str) -> None:
@@ -335,9 +303,7 @@ class Snapshot:
             with open(os.path.join(path, name), "w") as f:
                 json.dump(data, f, indent=4)
         else:
-            raise ValueError(
-                f"\n\nUnsupported data type {type(data)}. Only dictionaries and lists are supported.\n"
-            )
+            raise ValueError(f"\n\nUnsupported data type {type(data)}. Only dictionaries and lists are supported.\n")
 
     def csv(self, df: pd.DataFrame, name: str) -> None:
         """
@@ -401,15 +367,9 @@ class Snapshot:
                 elif image.shape[2] == 3:  # (H, W, 3)
                     pass  # Keep as is
                 else:
-                    raise ValueError(
-                        f"\n\nUnsupported image shape {image.shape}. "
-                        f"Supported formats: (H, W), (H, W, 1), (H, W, 3), (1, H, W), (3, H, W)\n"
-                    )
+                    raise ValueError(f"\n\nUnsupported image shape {image.shape}. Supported formats: (H, W), (H, W, 1), (H, W, 3), (1, H, W), (3, H, W)\n")
             else:
-                raise ValueError(
-                    f"\n\nUnsupported image dimensions {image.ndim}. "
-                    f"Only 2D and 3D arrays are supported.\n"
-                )
+                raise ValueError(f"\n\nUnsupported image dimensions {image.ndim}. Only 2D and 3D arrays are supported.\n")
 
             # Normalize to [0, 255]
             np_image = image.astype("float32")
@@ -424,23 +384,16 @@ class Snapshot:
         elif isinstance(image, Image.Image):
             image.save(os.path.join(path, name))
         else:
-            raise ValueError(
-                f"\n\nUnsupported image type {type(image)}. Only numpy arrays, PIL images, and matplotlib figures are supported.\n"
-            )
+            raise ValueError(f"\n\nUnsupported image type {type(image)}. Only numpy arrays, PIL images, and matplotlib figures are supported.\n")
 
     def reset(self, confirm: bool = False) -> None:
-        assert os.path.isdir(self._config_dir), (
-            "\n\nNot an OpenCrate project directory.\n"
-        )
+        assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
 
         if not self.snapshot_name:
             self.snapshot_name = self._snapshot_name()
 
         if not confirm:
-            raise ValueError(
-                f"\n\nPlease confirm to reset the versioning, add `confirm=True` to the reset method. "
-                f"Doing this will delete all `{self.snapshot_name}` snapshots.\n"
-            )
+            raise ValueError(f"\n\nPlease confirm to reset the versioning, add `confirm=True` to the reset method. Doing this will delete all `{self.snapshot_name}` snapshots.\n")
 
         path = os.path.join("snapshots", self.snapshot_name)
         if os.path.isdir(path):
@@ -517,16 +470,14 @@ class Snapshot:
 
         snapshot_name = os.path.basename(sys.argv[0]).split(".")[0]
         if snapshot_name == "ipykernel_launcher":
-            raise ValueError(
-                "\n\nSnapshot name cannot be determined for jupyter notebook, argument `name` must be passed in the `snapshot.setup` method.\n"
-            )
+            raise ValueError("\n\nSnapshot name cannot be determined for jupyter notebook, argument `name` must be passed in the `snapshot.setup` method.\n")
         return snapshot_name
 
     def _read_config(self):
         if os.path.isdir(self._config_dir):
             config_path = os.path.join(self._config_dir, "config.json")
 
-        with open(config_path, "r") as f:
+        with open(config_path) as f:
             return json.load(f)
 
     def _write_config(self, config: Dict[Any, Any]):
@@ -543,22 +494,16 @@ class Snapshot:
 
             config = self._read_config()
 
-            if (
-                "snapshot_version" not in config
-                or self.snapshot_name not in config["snapshot_version"]
-            ):
+            if "snapshot_version" not in config or self.snapshot_name not in config["snapshot_version"]:
                 if self.start is not None and self.start != "new":
-                    raise ValueError(
-                        f"\n\nNo snapshots are created for `{self.snapshot_name}`, cannot set `start` to {self.start}.\n"
-                    )
+                    raise ValueError(f"\n\nNo snapshots are created for `{self.snapshot_name}`, cannot set `start` to {self.start}.\n")
                 # config["snapshot_version"] = {self.snapshot_name: 0} # check if this line is even being used
             else:
                 available_version = config["snapshot_version"][self.snapshot_name]
 
                 if self.version > available_version:
                     raise ValueError(
-                        f"\n\nSnapshot of version 'v{self.version}' does not exist, cannot set `start` to {self.version}. "
-                        f"Available versions are upto 'v{available_version}'.\n"
+                        f"\n\nSnapshot of version 'v{self.version}' does not exist, cannot set `start` to {self.version}. Available versions are upto 'v{available_version}'.\n"
                     )
 
                 return
@@ -586,9 +531,7 @@ class Snapshot:
 
         # return os.path.join("snapshots", self.snapshot_name, str(version_name), snapshot_type)
 
-        return os.path.join(
-            "snapshots", self.snapshot_name, self.version_name, snapshot_type
-        )
+        return os.path.join("snapshots", self.snapshot_name, self.version_name, snapshot_type)
 
     def _log_asset(self, item: Any, name: str, snapshot_type: str) -> None:
         self._get_version()
@@ -626,23 +569,17 @@ class _PATH:
             else:
                 asset_type_plural = snapshot_type + "s"
 
-            asset_dir = os.path.join(
-                "snapshots", self.snapshot_name, str(version), asset_type_plural
-            )
+            asset_dir = os.path.join("snapshots", self.snapshot_name, str(version), asset_type_plural)
 
             if name is None:
                 return asset_dir
 
             if check_exists:
-                assert os.path.isdir(asset_dir), (
-                    f"\n\nNo '{snapshot_type}' snapshot type found for version '{version}'.\n"
-                )
+                assert os.path.isdir(asset_dir), f"\n\nNo '{snapshot_type}' snapshot type found for version '{version}'.\n"
 
             asset_path = os.path.join(asset_dir, name)
             if check_exists:
-                assert os.path.exists(asset_path), (
-                    f"\n\nNo snapshot '{name}' found in '{snapshot_type}' for version '{version}'.\n"
-                )
+                assert os.path.exists(asset_path), f"\n\nNo snapshot '{name}' found in '{snapshot_type}' for version '{version}'.\n"
 
             return asset_path
 

@@ -24,9 +24,7 @@ class ConfigSetting(BaseSettings):
     # docker_base_image: str = "nvidia/cuda:12.4.1-cudnn-runtime-ubuntu22.04"
     # docker_base_image_cpu: str = "ubuntu:22.04"
 
-    def write_template_settings(
-        self, config: Dict[str, str], template_item_paths: List[str]
-    ):
+    def write_template_settings(self, config: Dict[str, str], template_item_paths: List[str]):
         config_path = os.path.join(config["project_dir"], ".opencrate", "config.json")
         with open(config_path, "w") as json_file:
             json_file.write(self.model_dump_json(indent=4))

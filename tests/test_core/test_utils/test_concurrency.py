@@ -1,8 +1,4 @@
-from opencrate.core.utils.concurrency import (
-    parallelize_with_processes,
-    parallelize_with_threads,
-    parallize_with_batch_processes,
-)
+from opencrate.core.utils.concurrency import parallelize_with_processes, parallelize_with_threads, parallize_with_batch_processes
 
 
 def _cube(value):

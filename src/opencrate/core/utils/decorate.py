@@ -61,9 +61,7 @@ def timeit(record: bool = False) -> Callable[[Any], Any]:
 
         def summarize():
             if not record:
-                raise Exception(
-                    "Summarize is not enabled, set `record` argument to `True` to enable summary."
-                )
+                raise Exception("Summarize is not enabled, set `record` argument to `True` to enable summary.")
             acc = np.array(times)
             mean_time = acc.mean()
             median_time = float(np.median(acc))
@@ -113,9 +111,7 @@ def memoize(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return wrapper
 
 
-def retry(
-    max_retries: int = 3, delay: float = 2.0, exceptions=None
-) -> Callable[[Any], Any]:
+def retry(max_retries: int = 3, delay: float = 2.0, exceptions=None) -> Callable[[Any], Any]:
     """
     Decorator to retry a function call a specified number of times on failure.
 
@@ -150,23 +146,17 @@ def retry(
             for try_idx in range(max_retries):
                 try:
                     if try_idx > 0:
-                        print(
-                            f"Retrying {func.__name__}()... ({try_idx}/{max_retries})"
-                        )
+                        print(f"Retrying {func.__name__}()... ({try_idx}/{max_retries})")
                     return func(*args, **kwargs)
                 except Exception as e:
                     if exceptions is not None and not isinstance(
                         e,
-                        tuple(exceptions)
-                        if isinstance(exceptions, (list, tuple))
-                        else (exceptions,),
+                        tuple(exceptions) if isinstance(exceptions, (list, tuple)) else (exceptions,),
                     ):
                         raise
                     last_exception = e
                     time.sleep(delay)
-            raise Exception(
-                f"{func.__name__}() failed after {max_retries} retries:\n{last_exception}"
-            )
+            raise Exception(f"{func.__name__}() failed after {max_retries} retries:\n{last_exception}")
 
         return wrapper
 
@@ -207,9 +197,7 @@ def rate_limit(calls: int, period: float) -> Callable[[Any], Any]:
             call_history[:] = [t for t in call_history if now - t < period]
             if len(call_history) >= calls:
                 wait_time = max(period - (now - call_history[0]), period)
-                raise Exception(
-                    f"{func.__name__}() rate limit exceeded. Try again in {wait_time:.2f} seconds"
-                )
+                raise Exception(f"{func.__name__}() rate limit exceeded. Try again in {wait_time:.2f} seconds")
             call_history.append(now)
             return func(*args, **kwargs)
 

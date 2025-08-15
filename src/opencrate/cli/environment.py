@@ -5,10 +5,10 @@ import json
 import os
 import sys
 import traceback
-from typing import Any, Optional
+from typing import Any, Callable, Dict, Optional, Type, Union
 
 import docker
-from docker import errors
+from docker.errors import APIError, ImageNotFound, NotFound
 from rich.console import Console
 
 from ..core.opencrate import OpenCrate
@@ -21,20 +21,20 @@ class OpenCrateConfig:
     Manages the OpenCrate configuration file.
     """
 
-    def __init__(self, config_path: str = ".opencrate/config.json"):
+    def __init__(self, config_path: str = ".opencrate/config.json") -> None:
         self._config_path = config_path
-        self._config: dict[str, Any] = {}
+        self._config: Dict[str, Any] = {}
 
-    def read(self, reload: bool = False):
+    def read(self, reload: bool = False) -> None:
         """
         Read the configuration file.
         """
         if os.path.exists(self._config_path):
             if reload or len(self._config) == 0:
-                with open(self._config_path, "r") as config_file:
+                with open(self._config_path) as config_file:
                     self._config = json.load(config_file)
 
-    def write(self):
+    def write(self) -> None:
         """
         Write the configuration to the file.
         """
@@ -48,7 +48,7 @@ class OpenCrateConfig:
         self.read()
         return self._config.get(key, default)
 
-    def set(self, key: str, value: Any):
+    def set(self, key: str, value: Any) -> None:
         """
         Set a configuration value.
         """
@@ -68,47 +68,32 @@ class OpenCrateCLI:
         self.console = Console()
         self.config = OpenCrateConfig()
         self.docker_client = docker.from_env()
+
         self._helpers = {
-            "build_image": lambda: self.console.print(
-                "[dim]└─ Use [bold yellow]$ oc build[/bold yellow] to build the image[/dim]"
-            ),
-            "start_container": lambda: self.console.print(
-                "[dim]└─ Use [bold yellow]$ oc start[/bold yellow] to start the container[/dim]"
-            ),
-            "enter_container": lambda: self.console.print(
-                "[dim]└─ Use [bold yellow]$ oc enter[/bold yellow] to enter the container[/dim]"
-            ),
-            "switch_branch": lambda: self.console.print(
-                "[dim]└─ Use [bold yellow]$ oc branch --switch --name='<branch_name>'[/bold yellow] to switch to a different branch[/dim]"
-            ),
+            "build_image": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc build[/bold yellow] to build the image[/dim]"),
+            "start_container": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc start[/bold yellow] to start the container[/dim]"),
+            "enter_container": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc enter[/bold yellow] to enter the container[/dim]"),
+            "switch_branch": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc branch --switch --name='<branch_name>'[/bold yellow] to switch to a different branch[/dim]"),
             "commit_runtime": lambda: self.console.print(
                 "[dim]└─ Use [bold yellow]$ oc commit '<your message>'[/bold yellow] to commit latest container changes to the image[/dim]"
             ),
-            "show_runtime": lambda: self.console.print(
-                "[dim]└─ Use [bold yellow]$ oc runtime --show[/bold yellow] to view the image commits[/dim]"
-            ),
+            "show_runtime": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc runtime --show[/bold yellow] to view the image commits[/dim]"),
             "switch_runtime": lambda: self.console.print(
                 "[dim]└─ Use [bold yellow]$ oc runtime --switch --name='<runtime_name>'[/bold yellow] to switch to a different runtime[/dim]"
             ),
-            "delete_runtime": lambda: self.console.print(
-                "[dim]└─ Use [bold yellow]$ oc runtime --delete --name='<runtime_name>'[/bold yellow] to delete a runtime[/dim]"
-            ),
+            "delete_runtime": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc runtime --delete --name='<runtime_name>'[/bold yellow] to delete a runtime[/dim]"),
         }
         self._setup_environment()
 
-    def _setup_environment(self):
+    def _setup_environment(self) -> None:
         """
         Set up the environment for the CLI.
         """
 
-        os.environ["HOST_GIT_NAME"] = str(
-            utils.run_command(command="git config --get user.name") or ""
-        )
-        os.environ["HOST_GIT_EMAIL"] = str(
-            utils.run_command(command="git config --get user.email") or ""
-        )
+        os.environ["HOST_GIT_NAME"] = str(utils.run_command(command="git config --get user.name") or "")
+        os.environ["HOST_GIT_EMAIL"] = str(utils.run_command(command="git config --get user.email") or "")
 
-    def get_help(self, help_type: str):
+    def get_help(self, help_type: str) -> Callable[[], None]:
         """
         Returns a dictionary of helper functions.
         """
@@ -120,19 +105,15 @@ cli = OpenCrateCLI()
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def build():
+def build() -> None:
     """
     Build the OpenCrate baseline image.
     """
 
     # cli.console.print(f"\n░▒▓█ [bold]Building[/bold] > {cli.config.get('title')}\n")
-    with utils.spinner(
-        cli.console, f"Building {cli.config.get('version')} runtime ..."
-    ):
+    with utils.spinner(cli.console, f"Building {cli.config.get('version')} runtime ..."):
         utils.stream_docker_logs(
-            command=cli.docker_client.api.build(
-                path=".", tag=cli.config.get("docker_image"), rm=True, decode=True
-            ),
+            command=cli.docker_client.api.build(path=".", tag=cli.config.get("docker_image"), rm=True, decode=True),
             console=cli.console,
             is_build=True,
         )
@@ -140,7 +121,7 @@ def build():
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def start():
+def start() -> None:
     """
     Start the OpenCrate container.
     """
@@ -149,15 +130,13 @@ def start():
     with utils.spinner(cli.console, f"Starting {cli.config.get('version')} ..."):
         try:
             cli.docker_client.images.get(cli.config.get("docker_image"))
-        except errors.ImageNotFound:
+        except ImageNotFound:
             cli.console.print("× Docker image not found, skipping...")
             cli.get_help("build_image")()
             return
 
         try:
-            container = cli.docker_client.containers.get(
-                cli.config.get("docker_container")
-            )
+            container = cli.docker_client.containers.get(cli.config.get("docker_container"))
             if container.status == "running":
                 cli.console.print("✔ Container is already running")
                 cli.get_help("enter_container")()
@@ -167,20 +146,18 @@ def start():
                 cli.console.print("✔ Successfully restarted container")
                 cli.get_help("enter_container")()
                 return
-        except errors.NotFound:
+        except NotFound:
             pass
 
         branch_name = cli.config.get("version")
-        utils.run_command(
-            f"docker compose --project-name={cli.config.get('name')} up oc_{cli.config.get('name')}_{branch_name} -d"
-        )
+        utils.run_command(f"docker compose --project-name={cli.config.get('name')} up oc_{cli.config.get('name')}_{branch_name} -d")
         cli.console.print("✔ Created and started new container")
         cli.get_help("enter_container")()
 
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def stop(down: bool = False, all: bool = False):
+def stop(down: bool = False, all: bool = False) -> None:
     """
     Stop the OpenCrate container.
     """
@@ -189,28 +166,20 @@ def stop(down: bool = False, all: bool = False):
     #     cli.console.print(f"\n░▒▓█ [bold]Stopping[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(
         cli.console,
-        f"Stopping {cli.config.get('version')} runtime ..."
-        if not down
-        else f"Stopping and removing {cli.config.get('version')} runtime ...",
+        f"Stopping {cli.config.get('version')} runtime ..." if not down else f"Stopping and removing {cli.config.get('version')} runtime ...",
     ):
         try:
-            container = cli.docker_client.containers.get(
-                cli.config.get("docker_container")
-            )
+            container = cli.docker_client.containers.get(cli.config.get("docker_container"))
             if container.status == "exited":
                 if not down:
-                    cli.console.print(
-                        f"✔ {cli.config.get('version')} runtime is already stopped"
-                    )
+                    cli.console.print(f"✔ {cli.config.get('version')} runtime is already stopped")
                     cli.get_help("start_container")()
                 else:
                     container.remove()
                 return
             elif container.status == "running":
                 if not all:
-                    service_name = (
-                        f"oc_{cli.config.get('name')}_{cli.config.get('version')}"
-                    )
+                    service_name = f"oc_{cli.config.get('name')}_{cli.config.get('version')}"
                     utils.run_command(
                         f"docker compose --project-name={cli.config.get('name')} {'stop' if not down else 'down'} {service_name}",
                     )
@@ -220,7 +189,7 @@ def stop(down: bool = False, all: bool = False):
                     )
                 cli.console.print(f"✔ Stopped {cli.config.get('version')} runtime")
                 cli.get_help("start_container")()
-        except errors.NotFound:
+        except NotFound:
             cli.console.print(
                 f"× Runtime {cli.config.get('version')} not found, skipping...",
             )
@@ -230,22 +199,16 @@ def stop(down: bool = False, all: bool = False):
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def enter():
+def enter() -> None:
     """
     Enter the OpenCrate container.
     """
 
-    with utils.spinner(
-        cli.console, f"Entering {cli.config.get('version')} runtime ..."
-    ):
+    with utils.spinner(cli.console, f"Entering {cli.config.get('version')} runtime ..."):
         try:
-            container = cli.docker_client.containers.get(
-                cli.config.get("docker_container")
-            )
+            container = cli.docker_client.containers.get(cli.config.get("docker_container"))
             if container.status == "running":
-                cli.console.print(
-                    f"✔ Entering container {cli.config.get('docker_container')}"
-                )
+                cli.console.print(f"✔ Entering container {cli.config.get('docker_container')}")
                 os.execvp(
                     "docker",
                     [
@@ -259,7 +222,7 @@ def enter():
             else:
                 cli.console.print("[ERROR]: Container is not running")
                 cli.get_help("start_container")()
-        except errors.NotFound:
+        except NotFound:
             cli.console.print("× Container not found, skipping...")
             cli.get_help("start_container")()
 
@@ -274,7 +237,7 @@ def runtime(
     delete: bool = False,
     name: Optional[str] = None,
     reset: bool = False,
-):
+) -> None:
     """
     Manage the OpenCrate runtime environment.
 
@@ -296,9 +259,7 @@ def runtime(
         with utils.spinner(cli.console, "Processing & loading runtimes commits ..."):
             # Get all images for current branch
             current_branch = cli.config.get("version").split("-v")[0]
-            img_prefix = (
-                f"{cli.config.get('docker_image').split(':')[0]}:{current_branch}"
-            )
+            img_prefix = f"{cli.config.get('docker_image').split(':')[0]}:{current_branch}"
 
             # Find matching images
             matching_images = []
@@ -345,24 +306,14 @@ def runtime(
                         version = f"* {version}"
                     if human_commit:
                         comment = human_commit.get("Comment", "No commit message")
-                        commit_hash = human_commit.get("Id", "").replace("sha256:", "")[
-                            :12
-                        ]
+                        commit_hash = human_commit.get("Id", "").replace("sha256:", "")[:12]
                         size_mb = human_commit.get("Size", 0) / (1024**2)
-                        created = datetime.datetime.fromtimestamp(
-                            human_commit.get("Created", 0)
-                        )
+                        created = datetime.datetime.fromtimestamp(human_commit.get("Created", 0))
                         date_str = created.strftime("%d-%m-%Y %H:%M:%S")
-                        logs.append(
-                            f"[bold]{version}: {comment}[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]"
-                        )
+                        logs.append(f"[bold]{version}: {comment}[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]")
                     else:
                         # No human commit found, use image info
-                        commit_hash = (
-                            image.id.replace("sha256:", "")[:12]
-                            if image.id
-                            else "unknown"
-                        )
+                        commit_hash = image.id.replace("sha256:", "")[:12] if image.id else "unknown"
                         size_mb = image.attrs.get("Size", 0) / (1024**2)
                         created_str = image.attrs.get("Created", "1970-01-01T00:00:00Z")
 
@@ -378,14 +329,10 @@ def runtime(
 
                         created = datetime.datetime.fromisoformat(created_str)
                         date_str = created.strftime("%d-%m-%Y %H:%M:%S")
-                        logs.append(
-                            f"[bold]{version}:[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]"
-                        )
+                        logs.append(f"[bold]{version}:[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]")
 
-                except errors.ImageNotFound:
-                    logs.append(
-                        f"[bold]{image_name}[/bold] -> [red]Image not found[/red]"
-                    )
+                except ImageNotFound:
+                    logs.append(f"[bold]{image_name}[/bold] -> [red]Image not found[/red]")
 
             # Display results
             if logs:
@@ -399,9 +346,7 @@ def runtime(
     elif commit:
         # Commit functionality (previously commit command)
         if not message:
-            cli.console.print(
-                "[ERROR]: --message is required when using --commit", style="bold red"
-            )
+            cli.console.print("[ERROR]: --message is required when using --commit", style="bold red")
             return
 
         # cli.console.print(
@@ -410,10 +355,8 @@ def runtime(
 
         with utils.spinner(cli.console, "Commiting runtime changes ..."):
             try:
-                container = cli.docker_client.containers.get(
-                    cli.config.get("docker_container")
-                )
-            except errors.NotFound:
+                container = cli.docker_client.containers.get(cli.config.get("docker_container"))
+            except NotFound:
                 cli.console.print("[ERROR]: Container not found")
                 cli.get_help("start_container")()
                 return
@@ -423,9 +366,7 @@ def runtime(
             version_match = current_image.split("-v")[-1]
 
             new_version = f"{current_version.split('-v')[0]}-v{int(version_match) + 1}"
-            new_docker_image = current_image.replace(
-                f"-v{version_match}", f"-v{int(version_match) + 1}"
-            )
+            new_docker_image = current_image.replace(f"-v{version_match}", f"-v{int(version_match) + 1}")
             container.commit(
                 repository=new_docker_image,
                 author=os.environ["HOST_GIT_NAME"],
@@ -447,7 +388,7 @@ def runtime(
                 )
 
             # Update Dockerfile FROM statement
-            with open("Dockerfile", "r") as file:
+            with open("Dockerfile") as file:
                 dockerfile_content = file.read()
 
             dockerfile_line = next(
@@ -459,9 +400,7 @@ def runtime(
                 cli.config.read(reload=True)
                 utils.replace_in_file(
                     file_path="Dockerfile",
-                    replacements=[
-                        (dockerfile_line, f"FROM {cli.config.get('docker_image')}")
-                    ],
+                    replacements=[(dockerfile_line, f"FROM {cli.config.get('docker_image')}")],
                 )
 
         with utils.spinner(cli.console, "Committing changes to git ..."):
@@ -469,23 +408,17 @@ def runtime(
             utils.run_command(
                 "git add docker-compose.yml .devcontainer/devcontainer.json .opencrate/config.json Dockerfile",
             )
-            utils.run_command(
-                f'git commit -m "updated base image to {cli.config.get("version")} - {message}"'
-            )
+            utils.run_command(f'git commit -m "updated base image to {cli.config.get("version")} - {message}"')
 
         start()
 
-        cli.console.print(
-            f"✔ Successfully commited environment changes to {cli.config.get('docker_image')}"
-        )
+        cli.console.print(f"✔ Successfully commited environment changes to {cli.config.get('docker_image')}")
         cli.docker_client.images.prune()
 
     elif switch:
         # Switch functionality (previously switch command)
         if not name:
-            cli.console.print(
-                "[ERROR]: --name is required when using --switch", style="bold red"
-            )
+            cli.console.print("[ERROR]: --name is required when using --switch", style="bold red")
             return
 
         if name.split("-v")[0] != cli.config.get("version").split("-v")[0]:
@@ -500,7 +433,7 @@ def runtime(
         image_name = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
         try:
             cli.docker_client.images.get(image_name)
-        except errors.ImageNotFound:
+        except ImageNotFound:
             cli.console.print(
                 f"[ERROR]: No runtime '{image_name}' not found",
                 style="bold red",
@@ -538,9 +471,7 @@ def runtime(
                 cli.get_help("show_runtime")()
                 return
 
-            utils.run_command(
-                f"git checkout {commit_id_tag} -- Dockerfile docker-compose.yml .devcontainer/devcontainer.json .opencrate/config.json"
-            )
+            utils.run_command(f"git checkout {commit_id_tag} -- Dockerfile docker-compose.yml .devcontainer/devcontainer.json .opencrate/config.json")
 
             cli.config.read(reload=True)
             # build()
@@ -548,17 +479,13 @@ def runtime(
         start()
         cli.docker_client.images.prune()
 
-        cli.console.print(
-            f"✔ Successfully restored {cli.config.get('version')} runtime"
-        )
+        cli.console.print(f"✔ Successfully restored {cli.config.get('version')} runtime")
     elif delete:
         # cli.console.print(f"\n░▒▓█ [bold]Deleting runtime[/bold] > {name}\n")
 
         # Delete functionality (previously delete command)
         if not name:
-            cli.console.print(
-                "[ERROR]: --name is required when using --delete", style="bold red"
-            )
+            cli.console.print("[ERROR]: --name is required when using --delete", style="bold red")
             cli.get_help("delete_runtime")()
             return
 
@@ -586,17 +513,15 @@ def runtime(
                 container = cli.docker_client.containers.get(container_name)
                 container.remove()
                 cli.console.print(f"✔ Deleted container {container_name}")
-            except errors.NotFound:
-                cli.console.print(
-                    f"× Container {container_name} not found, skipping..."
-                )
+            except NotFound:
+                cli.console.print(f"× Container {container_name} not found, skipping...")
 
             # Delete the docker image
             try:
                 image_name = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
                 cli.docker_client.images.remove(image_name, force=True)
                 cli.console.print(f"✔ Deleted docker image {image_name}")
-            except errors.ImageNotFound:
+            except ImageNotFound:
                 cli.console.print(f"× Image {image_name} not found, skipping...")
 
         with utils.spinner(cli.console, "Cleaning up git history ..."):
@@ -628,18 +553,16 @@ def runtime(
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def kill(confirm: bool = False):
+def kill(confirm: bool = False) -> None:
     """
     Kill the OpenCrate environment.
     """
     # cli.console.print(f"\n░▒▓█ [bold]Killing[/bold] > {cli.config.get('title')}\n")
 
     try:
-        with utils.spinner(
-            cli.console, f"Killing {cli.config.get('version')} runtime ..."
-        ):
+        with utils.spinner(cli.console, f"Killing {cli.config.get('version')} runtime ..."):
             # check if "FROM opencrate" is in Dockerfile
-            with open("Dockerfile", "r") as file:
+            with open("Dockerfile") as file:
                 dockerfile_content = file.read()
             # get the full line that contains "FROM opencrate"
             has_commited_base_image = False
@@ -650,23 +573,22 @@ def kill(confirm: bool = False):
 
         if has_commited_base_image and not confirm:
             cli.console.print(
-                f"[ERROR]: Your current {cli.config.get('version')} branch has commited docker image which is being referred in the Dockerfile: [bold]{dockerfile_line}[/]\nKilling this image will break your branch and you will not be able to build it again.\nIf you still want to kill the image, then use `--confirm` flag.",
+                f"[ERROR]: Your current {cli.config.get('version')} branch has commited docker image which is being referred in the Dockerfile: [bold]{dockerfile_line}[/]\
+                    nKilling this image will break your branch and you will not be able to build it again.\nIf you still want to kill the image, then use `--confirm` flag.",
                 style="bold red",
             )
             return
 
         stop(down=True, all=True)
 
-        with utils.spinner(
-            cli.console, f"Removing {cli.config.get('version')} runtime image ..."
-        ):
+        with utils.spinner(cli.console, f"Removing {cli.config.get('version')} runtime image ..."):
             cli.docker_client.images.remove(cli.config.get("docker_image"), force=True)
             cli.docker_client.images.prune()
 
         cli.console.print(f"✔ Removed {cli.config.get('version')} image")
         if not has_commited_base_image:
             cli.get_help("build_image")()
-    except errors.ImageNotFound:
+    except ImageNotFound:
         cli.console.print(
             f"× {cli.config.get('version')} runtime image not found, skipping...",
             style="bold red",
@@ -683,7 +605,7 @@ def branch(
     create: bool = False,
     delete: bool = False,
     switch: bool = False,
-):
+) -> None:
     """
     Create a new branch for the OpenCrate environment.
 
@@ -699,13 +621,9 @@ def branch(
     if show:
         # Validate that conflicting options are not used together
         num_actions = sum([create, delete, switch])
-        assert num_actions <= 1, (
-            "\n\nYou cannot use --create, --delete, and --switch together. Please specify only one action.\n"
-        )
+        assert num_actions <= 1, "\n\nYou cannot use --create, --delete, and --switch together. Please specify only one action.\n"
 
-        assert name is None, (
-            "\n\nFor showing branches, using --name option is not allowed.\n"
-        )
+        assert name is None, "\n\nFor showing branches, using --name option is not allowed.\n"
 
         # cli.console.print("\n░▒▓█ [bold]Showing branches[/bold]")
         git_branches = utils.run_command("git branch").strip().split("\n")
@@ -730,9 +648,7 @@ def branch(
                     runtime_images.append(image_name)
 
             # Sort runtime images by version (v0, v1, v2, etc.)
-            runtime_images.sort(
-                key=lambda x: int(x.split("-v")[-1]) if "-v" in x else 0
-            )
+            runtime_images.sort(key=lambda x: int(x.split("-v")[-1]) if "-v" in x else 0)
 
             # Display branch info
             branch_indicator = "* " if is_current else ""
@@ -742,19 +658,13 @@ def branch(
 
             if runtime_images:
                 for runtime_idx, runtime_image in enumerate(runtime_images):
-                    runtime_prefix = (
-                        "   └─" if idx == (len(git_branches) - 1) else "│  └─"
-                    )
+                    runtime_prefix = "   └─" if idx == (len(git_branches) - 1) else "│  └─"
                     if runtime_idx < len(runtime_images) - 1:
-                        runtime_prefix = (
-                            "   ├─" if idx == (len(git_branches) - 1) else "│  ├─"
-                        )
+                        runtime_prefix = "   ├─" if idx == (len(git_branches) - 1) else "│  ├─"
                     cli.console.print(f"{runtime_prefix} {runtime_image}")
 
     elif create:
-        assert name, (
-            "\n\nYou must provide a branch name to create. Use --name option.\n"
-        )
+        assert name, "\n\nYou must provide a branch name to create. Use --name option.\n"
 
         stop()
 
@@ -795,9 +705,7 @@ def branch(
             cli.config.set("docker_container", new_docker_container)
             cli.config.write()
 
-        with utils.spinner(
-            cli.console, f"Committing changes to git for {name} branch ..."
-        ):
+        with utils.spinner(cli.console, f"Committing changes to git for {name} branch ..."):
             utils.run_command("git add .", ignore_error=True)
             utils.run_command(
                 f"git commit -m 'opencrate new branch {name}'",
@@ -824,22 +732,14 @@ def branch(
             build()
         start()
     elif delete:
-        assert name, (
-            "\n\nYou must provide a branch name to delete. Use --name option.\n"
-        )
-        assert not create, (
-            "\n\nYou cannot delete a branch while creating a new one. Remove --create option.\n"
-        )
+        assert name, "\n\nYou must provide a branch name to delete. Use --name option.\n"
+        assert not create, "\n\nYou cannot delete a branch while creating a new one. Remove --create option.\n"
 
         # cli.console.print(f"\n░▒▓█ [bold]Deleting branch[/bold]: {name}\n")
 
         with utils.spinner(cli.console, f"Checking {name} branch status ..."):
-            current_branch = utils.run_command(
-                "git rev-parse --abbrev-ref HEAD"
-            ).strip()
-            branch_exists = utils.run_command(
-                f"git branch --list {name}", ignore_error=True
-            ).strip()
+            current_branch = utils.run_command("git rev-parse --abbrev-ref HEAD").strip()
+            branch_exists = utils.run_command(f"git branch --list {name}", ignore_error=True).strip()
             if not branch_exists:
                 cli.console.print(
                     f"[ERROR]: Branch '{name}' does not exist. You can create one using [bold]`$ oc branch --create --name={name}`[/] command.",
@@ -880,15 +780,13 @@ def branch(
                         # Try to delete without force first
                         cli.docker_client.images.remove(image_name, force=False)
                         cli.console.print(f"✔ Deleted image {image_name}")
-                    except errors.APIError:
+                    except APIError:
                         # If deletion fails, untag the image instead
-                        cli.docker_client.api.remove_image(
-                            image_name, force=False, noprune=False
-                        )
+                        cli.docker_client.api.remove_image(image_name, force=False, noprune=False)
                         cli.console.print(f"✔ Untagged image {image_name}")
 
                 cli.docker_client.images.prune()
-            except errors.ImageNotFound:
+            except ImageNotFound:
                 cli.console.print(
                     f"× Image {image_name} not found, skipping...",
                     style="bold red",
@@ -899,12 +797,8 @@ def branch(
             cli.console.print(f"✔ Deleted git branch {name}")
     elif switch:
         with utils.spinner(cli.console, f"Checking {name} branch availability ..."):
-            branch_exists = utils.run_command(
-                f"git branch --list {name}", ignore_error=True
-            ).strip()
-            current_branch = utils.run_command(
-                "git rev-parse --abbrev-ref HEAD", ignore_error=True
-            ).strip()
+            branch_exists = utils.run_command(f"git branch --list {name}", ignore_error=True).strip()
+            current_branch = utils.run_command("git rev-parse --abbrev-ref HEAD", ignore_error=True).strip()
 
         if branch_exists:
             if current_branch == name:
@@ -913,17 +807,12 @@ def branch(
                 )
                 return
 
-            with utils.spinner(
-                cli.console, "Checking for uncommitted changes current branch..."
-            ):
+            with utils.spinner(cli.console, "Checking for uncommitted changes current branch..."):
                 # Check for uncommitted changes before switching
-                git_status = utils.run_command(
-                    "git status --porcelain", ignore_error=True
-                )
+                git_status = utils.run_command("git status --porcelain", ignore_error=True)
                 if git_status.strip():
                     cli.console.print(
-                        "[ERROR]: You have uncommitted changes in the current branch.\n"
-                        "Please commit your changes or stash them before switching branches\n",
+                        "[ERROR]: You have uncommitted changes in the current branch.\nPlease commit your changes or stash them before switching branches\n",
                         style="bold red",
                     )
                     return
@@ -952,7 +841,7 @@ def branch(
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def clone(git_url: str):
+def clone(git_url: str) -> None:
     """
     Clone an OpenCrate project from a git repository.
 
@@ -967,9 +856,7 @@ def clone(git_url: str):
         # Clone the repository
         with utils.spinner(cli.console, f"Cloning {repo_name}..."):
             utils.run_command(f"git clone {git_url}")
-        cli.console.print(
-            f"✔ Successfully cloned into [bold cyan]{repo_name}[/bold cyan]!"
-        )
+        cli.console.print(f"✔ Successfully cloned into [bold cyan]{repo_name}[/bold cyan]!")
 
         # Change into the new project directory
         os.chdir(repo_name)
@@ -994,7 +881,7 @@ def clone(git_url: str):
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def status():
+def status() -> None:
     """
     Display the status of the OpenCrate environment.
     """
@@ -1009,10 +896,8 @@ def status():
         cli.console.print(f"- Image name:\t{', '.join(image.tags)}")
         cli.console.print(f"- Image Size:\t{image.attrs['Size'] / (1024**2):.2f} MB")
         cli.console.print(f"- Image ID:\t{image.id}")
-    except errors.ImageNotFound:
-        cli.console.print(
-            f"- Image {cli.config.get('docker_image')} [bold red]not found[/bold red]"
-        )
+    except ImageNotFound:
+        cli.console.print(f"- Image {cli.config.get('docker_image')} [bold red]not found[/bold red]")
         cli.get_help("build_image")()
     except Exception as e:
         cli.console.print(f"[ERROR] > Extracting image info: {e}", style="bold red")
@@ -1022,27 +907,17 @@ def status():
         cli.console.print(f"- Container Name:\t{container.name}")
         cli.console.print(f"- Container Status:\t{container.status}")
         cli.console.print(f"- Container ID:\t{container.id}")
-    except errors.NotFound:
-        cli.console.print(
-            f"- Container {cli.config.get('docker_container')} [bold red]not found[/bold red]"
-        )
+    except NotFound:
+        cli.console.print(f"- Container {cli.config.get('docker_container')} [bold red]not found[/bold red]")
         cli.get_help("start_container")()
     except Exception as e:
         cli.console.print(f"[ERROR] > Extracting container info: {e}", style="bold red")
 
     try:
-        git_remote_url = utils.run_command(
-            "git ls-remote --get-url origin", ignore_error=True
-        )
-        git_last_commit_date = utils.run_command(
-            "git log -1 --format=%cd", ignore_error=True
-        )
-        git_pull_requests_count = utils.run_command(
-            "git log --merges --oneline | wc -l", ignore_error=True
-        )
-        cli.console.print(
-            f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}"
-        )
+        git_remote_url = utils.run_command("git ls-remote --get-url origin", ignore_error=True)
+        git_last_commit_date = utils.run_command("git log -1 --format=%cd", ignore_error=True)
+        git_pull_requests_count = utils.run_command("git log --merges --oneline | wc -l", ignore_error=True)
+        cli.console.print(f"- Git Remote URL:\t{None if git_remote_url == 'origin' else git_remote_url}")
         cli.console.print(f"- Last Commit Date:\t{git_last_commit_date}")
         cli.console.print(f"- Pull Requests Count:\t{git_pull_requests_count}")
     except Exception as e:
@@ -1052,7 +927,7 @@ def status():
 @app.command()
 @utils.handle_exceptions(cli.console)
 def launch(
-    workflow: str,
+    workflow: Union[str, Type[OpenCrate]],
     job: Optional[str] = None,
     start: str = "new",
     tag: Optional[str] = None,
@@ -1083,20 +958,6 @@ def launch(
         - KeyboardInterrupt: If the script execution is interrupted
     """
 
-    # if use_version != "new":
-    #     assert (
-    #         use_config == "default"
-    #     ), f"\n\nCannot set --use-config to custom when --use-version is set to {use_version}, they are mutually exclusive. If you want to use custom config, then you must set --use-config=custom, and not set --use-version which will consider --use-version=new and create a new version. And if you want to use the config from version {use_version}, then you must not set the --use-cli.config.\n"
-    # is_exited = False
-    # try:
-    #     container = cli.docker_client.containers.get(cli.config.get("docker_container"))
-    #     if container.status == "exited":
-    #         is_exited = True
-    #         container.start()
-    # except docker.errors.NotFound:  # type: ignore
-    #     start()
-    #     container = cli.docker_client.containers.get(cli.config.get("docker_container"))
-
     # Check if the script exists
     import opencrate as oc
 
@@ -1104,14 +965,10 @@ def launch(
         script, class_name = workflow.split(".")
         local_script_path = f"{script}.py"
         if not os.path.isfile(local_script_path):
-            cli.console.print(
-                f"\n[ERROR]: Script {script}.py not found.\n", style="bold red"
-            )
+            cli.console.print(f"\n[ERROR]: Script {script}.py not found.\n", style="bold red")
             exit(1)
 
-    cli.console.print(
-        f"\n░▒▓█ [bold]Launching[/bold] > {workflow if isinstance(workflow, str) else workflow.__name__}"
-    )
+    cli.console.print(f"\n░▒▓█ [bold]Launching[/bold] > {workflow.__name__ if inspect.isclass(workflow) and issubclass(workflow, OpenCrate) else workflow}\n")
 
     use_config = config
 
@@ -1135,9 +992,7 @@ def launch(
 
                 # Import the module
                 module_name = os.path.basename(script).replace(".py", "")
-                spec = importlib.util.spec_from_file_location(
-                    module_name, local_script_path
-                )
+                spec = importlib.util.spec_from_file_location(module_name, local_script_path)
                 if spec is None:
                     raise ImportError(f"Cannot import module {module_name}")
                 module = importlib.util.module_from_spec(spec)
@@ -1148,14 +1003,10 @@ def launch(
 
                 # Find classes in the module that inherit from OpenCrate
                 for name, inherited_class in inspect.getmembers(module):
-                    if (
-                        inspect.isclass(inherited_class)
-                        and issubclass(inherited_class, OpenCrate)
-                        and inherited_class != OpenCrate
-                    ):
+                    if inspect.isclass(inherited_class) and issubclass(inherited_class, OpenCrate) and inherited_class != OpenCrate:
                         crate_classes.append(inherited_class)
             else:
-                crate_classes.append(workflow)  # type: ignore
+                crate_classes.append(workflow)
 
         with utils.spinner(cli.console, "Validating workflow classes ..."):
             if len(crate_classes) == 0:
@@ -1169,14 +1020,10 @@ def launch(
         with utils.spinner(cli.console, "Initializing workflow instance ..."):
             if isinstance(workflow, str):
                 available_classes = [cls.__name__ for cls in crate_classes]
-                assert class_name in available_classes, (
-                    f"\n\nNo '{class_name}' workflow found in '{script}.py'. Available workflows: {available_classes}."
-                )
-                crate_class = list(
-                    filter(lambda x: x.__name__ == class_name, crate_classes)
-                )[0]
+                assert class_name in available_classes, f"\n\nNo '{class_name}' workflow found in '{script}.py'. Available workflows: {available_classes}."
+                crate_class = list(filter(lambda x: x.__name__ == class_name, crate_classes))[0]
             else:
-                crate_class = workflow  # type: ignore
+                crate_class = workflow
 
             crate_class.use_config = use_config
             crate_class.start = start
@@ -1188,9 +1035,7 @@ def launch(
             crate_instance = crate_class()
 
             if job:
-                assert hasattr(crate_instance, job), (
-                    f"\n\n{crate_class.__name__} has no job named '{job}'. Available jobs are: {crate_instance.available_jobs}\n"
-                )
+                assert hasattr(crate_instance, job), f"\n\n{crate_class.__name__} has no job named '{job}'. Available jobs are: {crate_instance.available_jobs}\n"
                 getattr(crate_instance, job)()
             else:
                 return crate_instance
@@ -1214,7 +1059,7 @@ def launch(
 
 @app.command()
 @utils.handle_exceptions(cli.console)
-def snapshot(name: str, reset: bool = False, show: bool = False):
+def snapshot(name: str, reset: bool = False, show: bool = False) -> None:
     """
     Create a snapshot of the OpenCrate environment.
     """

@@ -52,9 +52,7 @@ def parallelize_with_threads(
 
     results: List[Any] = []
     with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(func, *args) for args in _make_args_list_iterable(args_list)
-        ]
+        futures = [executor.submit(func, *args) for args in _make_args_list_iterable(args_list)]
 
         num_tasks = len(futures)
 
@@ -62,9 +60,7 @@ def parallelize_with_threads(
             for idx, future in enumerate(futures):
                 results.append(future.result())
         else:
-            for idx, future, prog_bar in progress(
-                as_completed(futures), title, "Task", total_count=num_tasks
-            ):
+            for idx, future, prog_bar in progress(as_completed(futures), title, "Task", total_count=num_tasks):
                 results.append(future.result())
 
     return results
@@ -102,9 +98,7 @@ def parallelize_with_processes(
 
     results: List[Any] = []
     with ProcessPoolExecutor(max_workers=max_workers) as executor:
-        futures = [
-            executor.submit(func, *args) for args in _make_args_list_iterable(args_list)
-        ]
+        futures = [executor.submit(func, *args) for args in _make_args_list_iterable(args_list)]
 
         num_tasks = len(futures)
 
@@ -112,9 +106,7 @@ def parallelize_with_processes(
             for future in futures:
                 results.append(future.result())
         else:
-            for idx, future, prog_bar in progress(
-                as_completed(futures), title, "Task", total_count=num_tasks
-            ):
+            for idx, future, prog_bar in progress(as_completed(futures), title, "Task", total_count=num_tasks):
                 results.append(future.result())
 
     return results
@@ -154,9 +146,7 @@ def parallize_with_batch_processes(
     with Pool(batch_size) as pool:
         # Use the progress function to track processed items
         progress_title = title if title else "Batch processing"
-        for idx, result, prog_bar in progress(
-            pool.imap(func, data), progress_title, "Item", total_count=len(data)
-        ):
+        for idx, result, prog_bar in progress(pool.imap(func, data), progress_title, "Item", total_count=len(data)):
             results.append(result)
 
     return results

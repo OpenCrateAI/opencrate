@@ -60,9 +60,7 @@ class Configuration:
         # New pattern: Capture arg_name (Group 1), arg_type (Group 2),
         # arg_description (Group 3, non-greedy, up to '[' or end of line),
         # and validation_bracket (Group 4, content inside rules []).
-        pattern = re.compile(
-            r"^\s*(\w+)\s*\(([\w\.]+)\):\s*([^\n]*?)(?:\[([^\]]+)\])?\s*$", re.MULTILINE
-        )
+        pattern = re.compile(r"^\s*(\w+)\s*\(([\w\.]+)\):\s*([^\n]*?)(?:\[([^\]]+)\])?\s*$", re.MULTILINE)
         matches = pattern.findall(docstring)
 
         for arg_name, arg_type, arg_description_raw, validation_bracket_raw in matches:
@@ -106,9 +104,7 @@ class Configuration:
 
         return validation_info
 
-    def _perform_validation(
-        self, validation_rules, arg_name, arg_value, param_type, all_args
-    ):
+    def _perform_validation(self, validation_rules, arg_name, arg_value, param_type, all_args):
         for rule in validation_rules:
             rule = rule.strip()
 
@@ -125,29 +121,21 @@ class Configuration:
                     raise ValueError("\n\nLambda must take at least one parameter.\n")
                 missing = [p for p in params[1:] if p not in all_args]
                 if missing:
-                    raise ValueError(
-                        f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with missing parameter(s): `{'`, `'.join(missing)}`.\n"
-                    )
+                    raise ValueError(f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with missing parameter(s): `{'`, `'.join(missing)}`.\n")
                 additional_params_values = [all_args[p] for p in params[1:]]
                 args = [arg_value] + additional_params_values
                 try:
                     lambda_validation_result = compiled(*args)
                 except NameError as e:
-                    raise NameError(
-                        f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with missing parameter: {e}.\n"
-                    )
+                    raise NameError(f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with missing parameter: {e}.\n")
                 if not lambda_validation_result:
-                    additional_params_names_with_values = ", ".join(
-                        [f"`{p}`: {all_args[p]}" for p in params[1:]]
-                    )
+                    additional_params_names_with_values = ", ".join([f"`{p}`: {all_args[p]}" for p in params[1:]])
                     if len(additional_params_names_with_values):
                         raise ValueError(
                             f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with value `{arg_value}` and {additional_params_names_with_values}.\n"
                         )
                     else:
-                        raise ValueError(
-                            f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with value `{arg_value}`.\n"
-                        )
+                        raise ValueError(f"\n\nValidation `{rule.split(':')[-1].strip()}` failed for `{arg_name}` with value `{arg_value}`.\n")
 
             elif rule.startswith((">", "<", ">=", "<=")):
                 match = re.match(r"([>=<]+)\s*([\d.]+)", rule)
@@ -156,50 +144,30 @@ class Configuration:
                 operator_part, threshold_str = match.groups()
                 try:
                     if param_type:
-                        threshold = (
-                            param_type(float(threshold_str))
-                            if param_type is int
-                            else param_type(threshold_str)
-                        )
+                        threshold = param_type(float(threshold_str)) if param_type is int else param_type(threshold_str)
                     else:
                         threshold = float(threshold_str)
                 except (ValueError, TypeError):
-                    raise ValueError(
-                        f"\n\nInvalid threshold value '{threshold_str}' for type {param_type if param_type else 'numeric'}.\n"
-                    )
+                    raise ValueError(f"\n\nInvalid threshold value '{threshold_str}' for type {param_type if param_type else 'numeric'}.\n")
                 if not isinstance(arg_value, (int, float)):
-                    raise TypeError(
-                        f"\n\n`{arg_name}` must be `int` or `float` for comparison, but got `{type(arg_value)}`.\n"
-                    )
+                    raise TypeError(f"\n\n`{arg_name}` must be `int` or `float` for comparison, but got `{type(arg_value)}`.\n")
                 if operator_part == ">=" and arg_value < threshold:
-                    raise ValueError(
-                        f"\n\n`{arg_name}` must be >= {threshold}, but got `{arg_value}`.\n"
-                    )
+                    raise ValueError(f"\n\n`{arg_name}` must be >= {threshold}, but got `{arg_value}`.\n")
                 elif operator_part == "<=" and arg_value > threshold:
-                    raise ValueError(
-                        f"\n\n`{arg_name}` must be <= {threshold}, but got `{arg_value}`.\n"
-                    )
+                    raise ValueError(f"\n\n`{arg_name}` must be <= {threshold}, but got `{arg_value}`.\n")
                 elif operator_part == ">" and arg_value <= threshold:
-                    raise ValueError(
-                        f"\n\n`{arg_name}` must be > {threshold}, but got `{arg_value}`.\n"
-                    )
+                    raise ValueError(f"\n\n`{arg_name}` must be > {threshold}, but got `{arg_value}`.\n")
                 elif operator_part == "<" and arg_value >= threshold:
-                    raise ValueError(
-                        f"\n\n`{arg_name}` must be < {threshold}, but got `{arg_value}`.\n"
-                    )
+                    raise ValueError(f"\n\n`{arg_name}` must be < {threshold}, but got `{arg_value}`.\n")
 
             elif rule.startswith('"') and rule.endswith('"'):
                 allowed = [v.strip().strip('"') for v in validation_rules]
                 if str(arg_value) not in allowed:
-                    raise ValueError(
-                        f"\n\n`{arg_name}` must be one of {allowed}, but got `{arg_value}`.\n"
-                    )
+                    raise ValueError(f"\n\n`{arg_name}` must be one of {allowed}, but got `{arg_value}`.\n")
                 break
 
             else:
-                raise ValueError(
-                    f"\n\nUnsupported validation rule: {rule} for `{arg_name}`.\n"
-                )
+                raise ValueError(f"\n\nUnsupported validation rule: {rule} for `{arg_name}`.\n")
 
     def _resolve_type(self, type_str):
         """
@@ -242,9 +210,7 @@ class Configuration:
                 else:
                     effective_type = None
 
-                self._perform_validation(
-                    rules, arg_name, arg_value, effective_type, bound_args
-                )
+                self._perform_validation(rules, arg_name, arg_value, effective_type, bound_args)
 
     def _get_func_meta(self, func):
         func_name = func.__name__
@@ -277,13 +243,13 @@ class Configuration:
 
                     # Convert file_path to be relative to the current working directory.
                     # Only do this if it's not the special 'jupyter_notebook' path.
-                    if "tmp/" in file_path:  # type: ignore
+                    if "tmp/" in file_path:  # pyright: ignore
                         file_path = "jupyter_notebook"
                     else:
                         try:
                             # Get the path relative to the current working directory.
                             # This assumes os.getcwd() is the project's root.
-                            file_path = os.path.relpath(file_path, os.getcwd())  # type: ignore
+                            file_path = os.path.relpath(file_path, os.getcwd())  # pyright: ignore
                         except ValueError:
                             # If the path cannot be made relative (e.g., on a different drive or
                             # outside the current working directory's scope),
@@ -308,29 +274,21 @@ class Configuration:
                                 stripped = line.strip()
 
                                 # Check if this is a section header (Args, Arguments, Parameters, etc.)
-                                if stripped.lower().startswith(
-                                    ("args:", "arguments:", "parameters:", "param:")
-                                ):
+                                if stripped.lower().startswith(("args:", "arguments:", "parameters:", "param:")):
                                     skip_section = True
                                     current_section = "args"
                                     continue
-                                elif stripped.lower().startswith(
-                                    ("returns:", "return:")
-                                ):
+                                elif stripped.lower().startswith(("returns:", "return:")):
                                     skip_section = False
                                     current_section = "returns"
                                     formatted_lines.append(line)
                                     continue
-                                elif stripped.lower().startswith(
-                                    ("raises:", "raise:", "exceptions:", "exception:")
-                                ):
+                                elif stripped.lower().startswith(("raises:", "raise:", "exceptions:", "exception:")):
                                     skip_section = False
                                     current_section = "raises"
                                     formatted_lines.append(line)
                                     continue
-                                elif stripped.lower().startswith(
-                                    ("note:", "notes:", "example:", "examples:")
-                                ):
+                                elif stripped.lower().startswith(("note:", "notes:", "example:", "examples:")):
                                     skip_section = False
                                     current_section = "other"
                                     formatted_lines.append(line)
@@ -341,11 +299,7 @@ class Configuration:
                                     # Empty line - keep it if not in args section
                                     if not skip_section:
                                         formatted_lines.append(line)
-                                elif (
-                                    stripped
-                                    and not line.startswith(" ")
-                                    and not line.startswith("\t")
-                                ):
+                                elif stripped and not line.startswith(" ") and not line.startswith("\t"):
                                     # New paragraph/section starting at column 0
                                     if current_section == "args" and not any(
                                         stripped.lower().startswith(s)
@@ -394,10 +348,7 @@ class Configuration:
                         }
                     elif not self.opencrate_init_done:
                         config_kwargs = self._config[func_name]["config"]
-                        kwargs = {
-                            param_name: config_kwargs[param_name]["value"]
-                            for param_name in config_kwargs
-                        }
+                        kwargs = {param_name: config_kwargs[param_name]["value"] for param_name in config_kwargs}
                     sig = inspect.signature(func)
                     bound_args = sig.bind(*args, **kwargs)
                     bound_args.apply_defaults()
@@ -419,9 +370,7 @@ class Configuration:
                         func_type = param.annotation
                         doc_info = validation_info.get(arg_name, {})
                         doc_type_str = doc_info.get("type")
-                        param_doc_description = doc_info.get(
-                            "description", ""
-                        )  # Get the extracted description
+                        param_doc_description = doc_info.get("description", "")  # Get the extracted description
 
                         effective_type = None  # Initialize effective_type
 
@@ -430,52 +379,34 @@ class Configuration:
                             effective_type = func_type
                             # If docstring also has a type, ensure it matches
                             if doc_type_str:
-                                doc_type_resolved = self.default_type_mapping.get(
-                                    doc_type_str.lower()
-                                ) or self._resolve_type(doc_type_str)
+                                doc_type_resolved = self.default_type_mapping.get(doc_type_str.lower()) or self._resolve_type(doc_type_str)
                                 if doc_type_resolved != func_type:
-                                    raise AssertionError(
-                                        f"\n\nType mismatch for `{arg_name}`: Annotation `{func_type}` vs Docstring `{doc_type_str}`.\n"
-                                    )
+                                    raise AssertionError(f"\n\nType mismatch for `{arg_name}`: Annotation `{func_type}` vs Docstring `{doc_type_str}`.\n")
                         # If no function annotation, try to use docstring type
                         elif doc_type_str:
-                            effective_type = self.default_type_mapping.get(
-                                doc_type_str.lower()
-                            ) or self._resolve_type(doc_type_str)
+                            effective_type = self.default_type_mapping.get(doc_type_str.lower()) or self._resolve_type(doc_type_str)
                         else:
                             # If neither annotation nor docstring provides type, log a warning.
                             # effective_type remains None.
-                            print(
-                                f"Warning: No type information found for `{arg_name}` in function annotation or docstring."
-                            )
+                            print(f"Warning: No type information found for `{arg_name}` in function annotation or docstring.")
 
                         arg_value = bound_args.arguments[arg_name]
                         if effective_type and not isinstance(arg_value, effective_type):
-                            raise TypeError(
-                                f"\n\n`{arg_name}` must be `{effective_type}`, but got `{arg_value}` of type `{type(arg_value)}`.\n"
-                            )
+                            raise TypeError(f"\n\n`{arg_name}` must be `{effective_type}`, but got `{arg_value}` of type `{type(arg_value)}`.\n")
 
                         if update_config:
                             param_config = {}
-                            if (
-                                param_doc_description
-                            ):  # Only add 'doc' if description is not empty
+                            if param_doc_description:  # Only add 'doc' if description is not empty
                                 param_config["doc"] = param_doc_description
                             param_config["value"] = arg_value
                             if effective_type:
                                 param_config["type"] = effective_type
-                            param_config["rules"] = doc_info.get(
-                                "rules", []
-                            )  # Pass rules as a list
+                            param_config["rules"] = doc_info.get("rules", [])  # Pass rules as a list
                             self._config[func_name]["config"][arg_name] = param_config
 
-                    self._validate_arguments(
-                        validation_info, bound_args.arguments, sig.parameters
-                    )
+                    self._validate_arguments(validation_info, bound_args.arguments, sig.parameters)
 
-                    self.config_eval_on = (
-                        time.perf_counter() - self.config_eval_start
-                    ) < self.config_eval_timeout
+                    self.config_eval_on = (time.perf_counter() - self.config_eval_start) < self.config_eval_timeout
                 return func(*args, **kwargs)
 
             return wrapper
@@ -532,21 +463,13 @@ class Configuration:
                     add_nodes(branch, subtree[key])
             elif isinstance(subtree, list):
                 for config_name, line_num, config_data in subtree:
-                    config_branch = rich_tree.add(
-                        f"[bold]{config_name}[/bold] (line: {line_num})"
-                    )
+                    config_branch = rich_tree.add(f"[bold]{config_name}[/bold] (line: {line_num})")
                     if config_data:
                         for param, param_details in config_data.items():
                             ptype = param_details.get("type", None)
                             pvalue = param_details.get("value", None)
-                            type_name = (
-                                ptype.__name__
-                                if hasattr(ptype, "__name__")
-                                else str(ptype)
-                            )
-                            config_branch.add(
-                                f"[bold]{param}[/bold] ({type_name}) = {pvalue}"
-                            )
+                            type_name = ptype.__name__ if hasattr(ptype, "__name__") else str(ptype)
+                            config_branch.add(f"[bold]{param}[/bold] ({type_name}) = {pvalue}")
 
         # Create the root tree and populate it with the file tree
         root = Tree(f"{prefix_title}")
@@ -599,9 +522,7 @@ class Configuration:
                     sort_keys=False,
                     indent=4,
                 )
-                self.snapshot.debug(
-                    f"Updated configuration in: 'config/{filename}.yml'"
-                )
+                self.snapshot.debug(f"Updated configuration in: 'config/{filename}.yml'")
 
         snapshot_config_path = self.snapshot._get_version_path("")
         if not os.path.isdir(snapshot_config_path):
@@ -616,9 +537,7 @@ class Configuration:
                 sort_keys=False,
                 indent=4,
             )
-            self.snapshot.debug(
-                f"Saved configuration to the snapshot version: '{snapshot_config_path}{filename}.yml'"
-            )
+            self.snapshot.debug(f"Saved configuration to the snapshot version: '{snapshot_config_path}{filename}.yml'")
 
     def read(self, filename, load_from_use_version=False):
         """
@@ -627,11 +546,11 @@ class Configuration:
         """
 
         if load_from_use_version:
-            with open(f"{self.snapshot.dir_path}/{filename}.yml", "r") as f:
+            with open(f"{self.snapshot.dir_path}/{filename}.yml") as f:
                 config_yaml = yaml.safe_load(f)
         else:
             os.makedirs("config", exist_ok=True)
-            with open(f"config/{filename}.yml", "r") as f:
+            with open(f"config/{filename}.yml") as f:
                 config_yaml = yaml.safe_load(f)
 
         self._config = {}
@@ -643,16 +562,10 @@ class Configuration:
                 param_copy = param_details.copy()
                 type_str = param_copy.get("type")
                 if type_str:
-                    param_copy["type"] = self.default_type_mapping.get(
-                        type_str, type_str
-                    )
+                    param_copy["type"] = self.default_type_mapping.get(type_str, type_str)
                 self._config[comp_name]["config"][param] = param_copy
 
         if load_from_use_version:
-            self.snapshot.debug(
-                f"Loaded configuration from the snapshot version: {self.snapshot.version_name}"
-            )
+            self.snapshot.debug(f"Loaded configuration from the snapshot version: {self.snapshot.version_name}")
         else:
-            self.snapshot.debug(
-                f"Loaded configuration from custom configuration file: 'config/{filename}.yml'"
-            )
+            self.snapshot.debug(f"Loaded configuration from custom configuration file: 'config/{filename}.yml'")

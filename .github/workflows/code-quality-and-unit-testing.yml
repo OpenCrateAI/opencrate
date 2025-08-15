@@ -1,4 +1,4 @@
-name: Build and Push Docker
+name: Code Quality and Testing
 
 on:
     push:

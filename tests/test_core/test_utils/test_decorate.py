@@ -13,7 +13,7 @@ class TestUtilsDecorate:
 
         slow_function()
         slow_function()
-        slow_function.summarize()  # type: ignore
+        slow_function.summarize()
         captured = capsys.readouterr()
         assert "slow_function() executed in" in captured.out
         assert "Total executions  : 2" in captured.out
@@ -26,10 +26,8 @@ class TestUtilsDecorate:
             time.sleep(1)
 
         slow_function()
-        with pytest.raises(
-            Exception, match=r"Summarize is not enabled, set `record` argument to `True` to enable summary."
-        ):
-            slow_function.summarize()  # type: ignore
+        with pytest.raises(Exception, match=r"Summarize is not enabled, set `record` argument to `True` to enable summary."):
+            slow_function.summarize()
 
     def test_memoize(self, capsys):
         call_count = 0

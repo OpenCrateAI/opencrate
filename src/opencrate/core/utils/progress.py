@@ -73,11 +73,7 @@ class OpenCrateProgress:
 
         display: Dict[str, Union[float, int, str]] = {}
         for metric_name, metric_value in metrics.items():
-            metric_value = (
-                np.mean(metric_value)
-                if isinstance(metric_value, (list, tuple, np.ndarray))
-                else metric_value
-            )
+            metric_value = np.mean(metric_value) if isinstance(metric_value, (list, tuple, np.ndarray)) else metric_value
             self.metrics.setdefault(metric_name, []).append(float(metric_value))
             if len(self.metrics[metric_name]) % self.plot_samples == 0:
                 recent = self.metrics[metric_name][-self.plot_samples :]
@@ -139,10 +135,8 @@ class OpenCrateProgress:
                     vals = (
                         np.clip(
                             data,
-                            np.percentile(data, 5)
-                            - 1.5 * np.subtract(*np.percentile(data, [95, 5])),
-                            np.percentile(data, 95)
-                            + 1.5 * np.subtract(*np.percentile(data, [95, 5])),
+                            np.percentile(data, 5) - 1.5 * np.subtract(*np.percentile(data, [95, 5])),
+                            np.percentile(data, 95) + 1.5 * np.subtract(*np.percentile(data, [95, 5])),
                         )
                         if len(data) > 5
                         else data
@@ -216,15 +210,14 @@ def progress(
             total = len(iterator)
         else:
             raise ValueError(
-                "Iterator must have `__len__` method that returns if length of your iterator. Please define this method, or provide `total_count` parameter."
+                "Iterator must have `__len__` method that returns if length of your iterator.\
+                Please define this method, or provide `total_count` parameter."
             )
 
     # Initialize progress bar with proper title and starting position
     desc = f"{title} " if title else ""
     initial_desc = f"{desc}{step}({step_start}/{total})"
-    progress_bar = OpenCrateProgress(
-        total=total, title=initial_desc, step_start=step_start
-    )
+    progress_bar = OpenCrateProgress(total=total, title=initial_desc, step_start=step_start)
     current_idx = step_start
 
     try:
@@ -251,20 +244,14 @@ def progress(
 
         # Log final summary
         if progress_bar.pbar is not None:
-            elapsed_str = str(
-                timedelta(seconds=int(progress_bar.pbar.format_dict["elapsed"]))
-            )
+            elapsed_str = str(timedelta(seconds=int(progress_bar.pbar.format_dict["elapsed"])))
         else:
             elapsed_str = "N/A"
-        metrics_text = ", ".join(
-            f"{k}: {v:.4f}" for k, v in progress_bar.metrics_column.items()
-        )
+        metrics_text = ", ".join(f"{k}: {v:.4f}" for k, v in progress_bar.metrics_column.items())
 
         # Calculate actual percentage based on current progress
         percentage = (current_idx / total) * 100 if total > 0 else 0
-        summary = (
-            f"{desc}{step}({current_idx}/{total}): {percentage:.2f}%, {elapsed_str}"
-        )
+        summary = f"{desc}{step}({current_idx}/{total}): {percentage:.2f}%, {elapsed_str}"
         if metrics_text:
             summary += f", {metrics_text}"
 

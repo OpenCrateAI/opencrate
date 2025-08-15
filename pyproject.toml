@@ -10,12 +10,10 @@ authors = [
 ]
 version = "0.1.0"
 license = {text = "MIT"}
-requires-python = ">=3.5"
+requires-python = ">=3.7"
 classifiers = [
     "Programming Language :: Python :: 3",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.5",
-    "Programming Language :: Python :: 3.6",
     "Programming Language :: Python :: 3.7",
     "Programming Language :: Python :: 3.8",
     "Programming Language :: Python :: 3.9",
@@ -56,10 +54,10 @@ dev = [
     "ruff",
     "pytest-cov",
     "types-requests",
-    "torch",
-    "docker",
-    "build",
     "types-PyYAML",
+    "types-docker",
+    "torch",
+    "build",
     "mkdocs",
     "mkdocs-material",
     "mkdocstrings-python",
@@ -77,8 +75,37 @@ license-files = ["LICENCE"]
 where = ["src"]
 include = ["opencrate", "opencrate.*"]
 
+[tool.ruff]
+src = ["src"]
+line-length = 180
+
+extend-exclude = [
+    ".git",
+    ".mypy_cache",
+    ".ruff_cache",
+    ".tox",
+    ".venv",
+    "__pycache__",
+    "docs/_build",
+]
+
+[tool.ruff.lint]
+select = [
+    "W",  # pycodestyle warnings
+    "F",  # pyflakes
+    "I",  # isort
+    "C4",  # flake8-comprehensions
+    "E",  # pycodestyle errors
+]
+
+[tool.ruff.format]
+quote-style = "double"
+skip-magic-trailing-comma = false
+
 [tool.mypy]
 exclude = ".git, __pycache__, build, dist, .mypy_cache, .tox, .venv"
+disable_error_code = ["unreachable"]
+files = ["src", "tests"]
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
@@ -86,11 +113,13 @@ check_untyped_defs = true
 disallow_any_generics = true
 disallow_untyped_calls = false
 disallow_untyped_defs = false
-no_implicit_optional = true
+no_implicit_optional = false
 show_error_codes = true
 strict_equality = true
 warn_redundant_casts = true
 warn_unreachable = true
+warn_no_return = false
+warn_unused_ignores = true
 no_implicit_reexport = false
 
 [tool.pytest.ini_options]
