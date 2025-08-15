@@ -237,7 +237,7 @@ def main():
         )
 
         build_command = (
-            f"docker buildx build --platform linux/amd64 "
+            f"docker buildx build --no-cache "
             f"-f {dockerfile_path} "
             f"-t {final_image_tag} "
             f"--load {args.build_args} ."
