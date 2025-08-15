@@ -20,9 +20,7 @@ DATATYPES = ["Image", "Text", "Video", "Audio", "Tabular"]
 PYTHON_VERSIONS = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
 TEMPLATE_DIR = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/template"
-GIT_BASH_SCRIPT = (
-    Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
-)
+GIT_BASH_SCRIPT = Path(__file__).resolve().parent.parent.parent / "opencrate/cli/bash/git_init.sh"
 
 CUSTOM_STYLE = Style(
     [
@@ -58,9 +56,7 @@ def _validate_project_name(name: str):
     if len(name) == 0:
         return "Please enter Project Name, can't be empty."
     else:
-        project_dir = (
-            name.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
-        )
+        project_dir = name.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
         if os.path.exists(project_dir):
             return f"Project {project_dir} already exists in current directory, please choose another name."
 
@@ -76,9 +72,7 @@ def prompt_project_details():
             style=CUSTOM_STYLE,
         ).ask()
     )
-    project_name = (
-        project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
-    )
+    project_name = project_title.lower().replace(" - ", " ").replace("-", " ").replace(" ", "_")
 
     # if not safe_prompt(
     #     lambda: questionary.confirm(
@@ -123,9 +117,7 @@ def prompt_project_details():
                 for data_type in DATATYPES
             ],
             qmark="",
-            validate=lambda x: True
-            if len(x) > 0
-            else "Please select at least one datatype",
+            validate=lambda x: True if len(x) > 0 else "Please select at least one datatype",
             style=CUSTOM_STYLE,
         ).ask(),
     )
@@ -145,9 +137,7 @@ def prompt_project_details():
                         for data_type in DATATYPES
                     ],
                     qmark="",
-                    validate=lambda x: True
-                    if len(x) > 0
-                    else "Please select at least one datatype",
+                    validate=lambda x: True if len(x) > 0 else "Please select at least one datatype",
                     style=CUSTOM_STYLE,
                 ).ask(),
             )
@@ -155,10 +145,7 @@ def prompt_project_details():
     project_python_version = safe_prompt(
         lambda: questionary.select(
             "● Select your python environment version:",
-            choices=[
-                {"name": f"{version}", "value": f"{version}"}
-                for version in PYTHON_VERSIONS
-            ],
+            choices=[{"name": f"{version}", "value": f"{version}"} for version in PYTHON_VERSIONS],
             qmark="",
             default={"name": "3.10", "value": "3.10"},
             style=CUSTOM_STYLE,
@@ -240,9 +227,7 @@ def remove_cuda_from_dockercompose(dockercompose_path: str):
         del service_config["deploy"]
 
     with open(dockercompose_path, "w") as f:
-        yaml.dump(
-            compose_data, f, Dumper=DockerComposeDumper, sort_keys=False, indent=4
-        )
+        yaml.dump(compose_data, f, Dumper=DockerComposeDumper, sort_keys=False, indent=4)
 
 
 def create_project_structure(config):
@@ -289,9 +274,7 @@ def create_project_structure(config):
         )
 
         if config["project_runtime"] == "cpu":
-            remove_cuda_from_dockercompose(
-                os.path.join(config["project_dir"], "docker-compose.yml")
-            )
+            remove_cuda_from_dockercompose(os.path.join(config["project_dir"], "docker-compose.yml"))
 
 
 def setup_git_repository(project_dir, git_remote_url):

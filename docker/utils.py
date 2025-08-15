@@ -28,12 +28,7 @@ def stream_shell_command_logs(logger, console: Console, command_str: str, log_le
     log_lines: Deque[Text] = deque(maxlen=15)
 
     def create_log_panel():
-        # ======================================================================
-        # THE FIX IS HERE: Use Text.join() instead of str.join()
-        # ======================================================================
-        # This correctly joins an iterable of Text objects with a newline Text object.
         log_text = Text("\n").join(log_lines)
-        # ======================================================================
 
         return Panel(
             log_text,

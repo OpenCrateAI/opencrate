@@ -8,6 +8,77 @@ VERSION ?= $(shell cat VERSION | tr -d '\n')
 .ONESHELL:
 
 
+start:
+	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
+	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
+	@docker compose up opencrate_dev -d
+
+
+enter:
+	@docker exec -it opencrate_dev zsh
+
+
+stop:
+	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
+	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
+	@docker compose stop
+
+
+kill:
+	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
+	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
+	@docker compose down
+
+
+install-dev-package:
+	@python3.10 -m pip install --upgrade pip --root-user-action=ignore
+	@python3.10 -m pip install -e ".[dev]" --root-user-action=ignore
+
+
+install-dev-versions:
+	@PYTHON_VERSIONS="3.7 3.8 3.9 3.11 3.12 3.13"; \
+	echo "Installing Python versions: $$PYTHON_VERSIONS"; \
+	for version in $$PYTHON_VERSIONS; do \
+		if ! pyenv versions --bare | grep -q "^$$version\\."; then \
+			pyenv install $$version; \
+		fi; \
+	done; \
+	pyenv local $$PYTHON_VERSIONS
+	echo "\nDone installing the package with development environment and dependencies"
+
+
+install: install-dev-package install-dev-versions
+
+
+mkdocs:
+	mkdocs serve -a 0.0.0.0:8000
+
+
+test-ruff:
+	@ruff check src tests --exclude tests/pipelines
+
+
+test-mypy:
+	@mypy src tests --exclude tests/pipelines
+
+
+test-pytest:
+	@PYTHONPATH=src pytest
+
+
+test: test-ruff test-mypy test-pytest
+
+
+test-tox:
+	@tox
+
+
+test-clean:
+	@rm -rf .mypy_cache .pytest_cache .ruff_cache .tox .coverage
+
+
+
+
 # This target generates Dockerfiles for all supported Python versions and runtimes.
 docker-generate:
 	@echo "======== ● Generating all Dockerfiles ========"
@@ -84,73 +155,23 @@ ci-release:
 	echo "✔ All images tagged as latest"
 
 
-start:
-	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
-	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
-	@docker compose up opencrate_dev -d
+docker-test:
+	@echo "======== ● Testing OpenCrate in Docker for Python $(PYTHON_VERSION) and runtime $(RUNTIME) ========"
+	@set -e
+	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):v$(VERSION)"
+	LOG_FILE="tests/logs/test-py$(PYTHON_VERSION)-$(RUNTIME).log"
+	mkdir -p tests/logs
 
-
-enter:
-	@docker exec -it opencrate_dev zsh
-
-
-stop:
-	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
-	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
-	@docker compose stop
-
-
-kill:
-	@export HOST_GIT_EMAIL=$(HOST_GIT_EMAIL)
-	@export HOST_GIT_NAME=$(HOST_GIT_NAME)
-	@docker compose down
-
-
-install-dev-package:
-	@python3.10 -m pip install --upgrade pip --root-user-action=ignore
-	@python3.10 -m pip install -e ".[dev]" --root-user-action=ignore
-
-
-install-dev-versions:
-	@PYTHON_VERSIONS="3.7 3.8 3.9 3.11 3.12 3.13"; \
-	echo "Installing Python versions: $$PYTHON_VERSIONS"; \
-	for version in $$PYTHON_VERSIONS; do \
-		if ! pyenv versions --bare | grep -q "^$$version\\."; then \
-			pyenv install $$version; \
-		fi; \
-	done; \
-	pyenv local $$PYTHON_VERSIONS
-	echo "\nDone installing the package with development environment and dependencies"
-
-
-install: install-dev-package install-dev-versions
-
-
-mkdocs:
-	mkdocs serve -a 0.0.0.0:8000
-
-
-test-ruff:
-	@ruff check src tests --exclude tests/pipelines
-
-
-test-mypy:
-	@mypy src tests --exclude tests/pipelines
-
-
-test-pytest:
-	@PYTHONPATH=src pytest
-
-
-test: test-ruff test-mypy test-pytest
-
-
-test-tox:
-	@tox
-
-
-test-clean:
-	@rm -rf .mypy_cache .pytest_cache .ruff_cache .tox .coverage
+	@echo "--- Running tests in Docker container from image: $$IMAGE_TAG ---"
+	@echo "--- Log file: $$LOG_FILE ---"
+	docker run --rm \
+		-v $(shell pwd)/tests:/home/opencrate/tests \
+		-v $(shell pwd)/Makefile:/home/opencrate/Makefile:ro \
+		-w /home/opencrate \
+		$$IMAGE_TAG \
+		sh -c 'pip install pytest pytest-cov && make test-pytest' > $$LOG_FILE 2>&1 || (cat $$LOG_FILE && exit 1)
+	
+	@echo "======== ✔ Test finished successfully. ========"
 
 
 help:
@@ -174,6 +195,8 @@ help:
 	@echo "  docker-build      Build all Docker images locally based on the generated files."
 	@echo "                    Example: make docker-build RUNTIMES=cpu"
 	@echo "  docker-clean      Clean up Docker build cache, dangling images, and containers."
+	@echo "  docker-test       Run tox tests inside a Docker container for a specific Python version and runtime."
+	@echo "                    Example: make docker-test PYTHON_VERSION=3.9 RUNTIME=cpu"
 	@echo ""
 	@echo "-----------------------------------------"
 	@echo "Testing and Linting"
