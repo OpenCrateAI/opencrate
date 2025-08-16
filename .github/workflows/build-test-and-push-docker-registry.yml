@@ -1,0 +1,130 @@
+name: Build, Test, and Push Docker Registry
+
+on:
+    # Trigger on new version tags
+    push:
+        tags:
+            - 'v*.*.*'
+    
+    # Add a scheduled trigger to run every Sunday at 3 AM UTC
+    schedule:
+        - cron: '0 3 * * 0'
+
+    # Add a manual trigger with a rebuild option
+    workflow_dispatch:
+        inputs:
+            REBUILD_BASE:
+                description: 'Force a pull of new base layers and refresh the cache?'
+                required: true
+                type: boolean
+                default: false
+
+env:
+    CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
+    CACHE_IMAGE_CUDA: braindotai/opencrate-build-cache:cuda-latest
+	
+jobs:
+    generate-files:
+        name: Generate Dockerfiles
+        runs-on: ubuntu-latest
+        outputs:
+            # CORRECTED LOGIC: Use the ref_name for push/dispatch, but 'main' for scheduled runs.
+            version: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name || 'main' }}
+            # Set the rebuild flag to true if triggered by schedule, a new tag, or the manual checkbox.
+            rebuild_flag: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event.inputs.REBUILD_BASE }}
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            # This step is slightly redundant but harmless. The output above is what's used.
+            - name: Get the version from the Git ref
+              id: get_version
+              run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
+            
+            - name: Set up Python
+              uses: actions/setup-python@v5
+              with:
+                  python-version: '3.10'
+
+            - name: Install Python dependencies
+              run: pip install rich loguru
+
+            - name: Generate all Dockerfiles
+              run: make docker-generate
+
+            - name: Upload Dockerfiles as artifact
+              uses: actions/upload-artifact@v4
+              with:
+                  name: dockerfiles
+                  path: ./docker/dockerfiles
+
+    build-and-test:
+        name: Build & Test ${{ matrix.runtime }}-py${{ matrix.python_version }}
+        runs-on: ubuntu-latest
+        needs: generate-files
+        strategy:
+            fail-fast: false
+            matrix:
+                runtime: [cpu, cuda]
+                python_version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+
+        steps:
+            - name: Checkout repository
+              uses: actions/checkout@v4
+
+            - name: Download Dockerfiles artifact
+              uses: actions/download-artifact@v4
+              with:
+                  name: dockerfiles
+                  path: ./docker/dockerfiles
+
+            - name: Set up QEMU
+              uses: docker/setup-qemu-action@v3
+
+            - name: Set up Docker Buildx
+              uses: docker/setup-buildx-action@v3
+
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+            - name: Build Image
+              run: |
+                  make ci-build-test \
+                    RUNTIME=${{ matrix.runtime }} \
+                    PYTHON_VERSION=${{ matrix.python_version }} \
+                    VERSION=${{ needs.generate-files.outputs.version }} \
+                    REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+
+            - name: Test Image
+              run: |
+                  make docker-test \
+                    RUNTIME=${{ matrix.runtime }} \
+                    PYTHON_VERSION=${{ matrix.python_version }} \
+                    VERSION=${{ needs.generate-files.outputs.version }}
+
+            - name: Build Multi-Platform Image
+              run: |
+                  make ci-push \
+                    RUNTIME=${{ matrix.runtime }} \
+                    PYTHON_VERSION=${{ matrix.python_version }} \
+                    VERSION=${{ needs.generate-files.outputs.version }} \
+                    REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+          
+    release-latest:
+        name: Tag "latest"
+        runs-on: ubuntu-latest
+        needs: [generate-files, build-and-test]
+        # Only tag latest on successful tag pushes, not on scheduled runs
+        if: success() && github.event_name == 'push' && github.ref_type == 'tag'
+        steps:
+            - name: Login to Docker Hub
+              uses: docker/login-action@v3
+              with:
+                  username: ${{ secrets.DOCKERHUB_USERNAME }}
+                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+                  
+            - name: Tag and Push "latest" tag
+              run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}

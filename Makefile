@@ -117,27 +117,57 @@ docker-clean:
 	docker image prune -f;
 
 
-# This target is used in github actions to build a single image for CI/CD. Used in the matrix parallel builds.
-ci-build:
-	@set -e
-	@echo "--- Building: Runtime=$(RUNTIME), Python=$(PYTHON_VERSION), Version=$(VERSION) ---"
+ci-build-test:
+	@echo "======== ● Building local image for testing: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ========"
 
-	FINAL_IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"
-	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"
+	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
+	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
+	PULL_FLAG=""; \
+	if [ "$(REBUILD_FLAG)" = "true" ]; then \
+		echo "!!! ========== REBUILDING BASE LAYERS: Forcing pull of new base images ========== !!!"; \
+		PULL_FLAG="--pull"; \
+	fi; \
+	if [ "$(RUNTIME)" = "cpu" ]; then \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
+	else \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
+	fi; \
+	docker buildx build \
+		--platform linux/amd64 \
+		-f "$$DOCKERFILE_PATH" \
+		-t "$$IMAGE_TAG" \
+		--load \
+		$$PULL_FLAG \
+		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
+		.
 
-	echo "Image Tag: $$FINAL_IMAGE_TAG"
-	echo "Dockerfile: $$DOCKERFILE_PATH"
-	echo "Remote Cache: $$CACHE_IMAGE_VAR"
+	@echo "\n======== ✔ Successfully built and tested $$IMAGE_TAG ========\n"
 
+
+ci-push:
+	@echo "========== ● Building and pushing multi-platform image: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) =========="
+	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
+	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
+	CACHE_TO_FLAG=""; \
+	if [ "$(REBUILD_FLAG)" = "true" ]; then \
+		echo "!!! ========== PUSHING REFRESHED CACHE to registry ========== !!!"; \
+		CACHE_TO_FLAG="--cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max"; \
+	fi; \
+	if [ "$(RUNTIME)" = "cpu" ]; then \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
+	else \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
+	fi; \
 	docker buildx build \
 		--platform linux/amd64,linux/arm64 \
 		-f "$$DOCKERFILE_PATH" \
-		-t "$$FINAL_IMAGE_TAG" \
+		-t "$$IMAGE_TAG" \
 		--push \
-		--progress=plain \
+		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
+		$$CACHE_TO_FLAG \
 		.
-
-	@echo "--- ✔ Successfully built and pushed $$FINAL_IMAGE_TAG ---"
+	
+	@echo "\n======== ✔ Successfully built and pushed $$IMAGE_TAG ========\n"
 
 
 # This target pushes the images as the latest tag to the registry. Used in the CI/CD workflow if new git tag is created.
