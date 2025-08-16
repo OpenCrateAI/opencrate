@@ -15,9 +15,9 @@ on:
         inputs:
             REBUILD_BASE:
                 description: 'Force a pull of new base layers and refresh the cache?'
-                required: false
+                required: true
                 type: boolean
-                default: true
+                default: false
 
 env:
     CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
