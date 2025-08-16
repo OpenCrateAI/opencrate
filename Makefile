@@ -171,8 +171,8 @@ docker-test:
 		$$IMAGE_TAG \
 		sh -c 'set -e && \
 			echo "Installing test dependencies..." && \
-			pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu && \
-			pip install --quiet pytest pytest-cov && \
+			pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
+			pip install --quiet pytest pytest-cov --root-user-action=ignore && \
 			echo "Running tests..." && \
 			make test-pytest' | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \

@@ -122,5 +122,6 @@ warn_unused_ignores = true
 no_implicit_reexport = false
 
 [tool.pytest.ini_options]
+filterwarnings = ["ignore::DeprecationWarning"]
 addopts = "--verbose --cov=opencrate --cov-report=term-missing --color=yes -vv"
 testpaths = ["tests"]
