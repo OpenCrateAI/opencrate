@@ -1,3 +1,4 @@
+SHELL := /bin/bash
 PYTHON_VERSION ?= 3.10
 HOST_GIT_EMAIL = $(shell git config user.email)
 HOST_GIT_NAME = $(shell git config user.name)
