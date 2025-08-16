@@ -213,7 +213,7 @@ def main():
         console.print(f"[green]-------- ✔ Dockerfile generated at {dockerfile_path} --------[/green]")
 
     if args.build:
-        final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:v{version}"
+        final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:{version}"
 
         logger.info(f"-------- ● Building image for {args.runtime}-py{args.python} --------")
         console.print(f"\n[yellow]-------- ● Building image for {args.runtime}-py{args.python} --------[/]")

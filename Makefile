@@ -121,7 +121,7 @@ docker-clean:
 docker-test:
 	@set -e; \
 	echo -e "\n======== ● Testing OpenCrate in Docker for Python $(PYTHON_VERSION) and runtime $(RUNTIME) ========\n"
-	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):v$(VERSION)"; \
+	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
 	LOG_FILE="tests/logs/test-py$(PYTHON_VERSION)-$(RUNTIME).log"; \
 	mkdir -p tests/logs; \
 	echo "--- Running tests in Docker container from image: $$IMAGE_TAG ---"; \
