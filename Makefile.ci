@@ -6,40 +6,7 @@ PYTHON_VERSION ?= 3.10
 
 
 # This target builds and tests a single Docker image for CI/CD workflows.
-build-test:
-	@echo "\n========== ● Building local image for testing: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ==========\n"
-	@if [ "$(RUNTIME)" = "cpu" ]; then \
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
-	else \
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
-	fi; \
-	\
-	@PULL_FLAG=""; \
-	if [ "$(REBUILD_FLAG)" = "true" ]; then \
-		echo "!!!!!!!!!! REBUILDING BASE LAYERS: Forcing pull of new base images !!!!!!!!!!"; \
-		PULL_FLAG="--pull"; \
-	fi; \
-	\
-	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
-	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
-	if docker buildx build \
-		--platform linux/amd64 \
-		-f "$$DOCKERFILE_PATH" \
-		-t "$$IMAGE_TAG" \
-		--load \
-		$$PULL_FLAG \
-		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
-		.; then \
-		echo "========== ✔ Local image built successfully: $$IMAGE_TAG =========="; \
-	else \
-		echo "!!!!!!!!!! ❌ FAILED to build local image: $$IMAGE_TAG !!!!!!!!!!"; \
-		exit 1; \
-	fi
-
-
-# This target builds and pushes a multi-platform Docker image to the registry.
-build-push:
-	@echo "\n========== ● Building and pushing multi-platform image: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ==========\n"
+build:
 	if [ "$(RUNTIME)" = "cpu" ]; then
 		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)";
 	else
@@ -85,7 +52,6 @@ build-push:
 		echo "!!!!!!!!!! ❌ FAILED during MODE=$(MODE) for image $$IMAGE_TAG !!!!!!!!!!!!";
 		exit 1;
 	fi
-
 
 
 # This target pushes the images as the latest tag to the registry. Used in the CI/CD workflow if new git tag is created.

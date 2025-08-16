@@ -15,9 +15,9 @@ on:
         inputs:
             REBUILD_BASE:
                 description: 'Force a pull of new base layers and refresh the cache?'
-                required: true
+                required: false
                 type: boolean
-                default: false
+                default: true
 
 env:
     CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
@@ -28,15 +28,12 @@ jobs:
         name: Generate Dockerfiles
         runs-on: ubuntu-latest
         outputs:
-            # CORRECTED LOGIC: Use the ref_name for push/dispatch, but 'main' for scheduled runs.
             version: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name || 'main' }}
-            # Set the rebuild flag to true if triggered by schedule, a new tag, or the manual checkbox.
             rebuild_flag: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event.inputs.REBUILD_BASE }}
         steps:
             - name: Checkout repository
               uses: actions/checkout@v4
 
-            # This step is slightly redundant but harmless. The output above is what's used.
             - name: Get the version from the Git ref
               id: get_version
               run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
@@ -65,7 +62,7 @@ jobs:
         strategy:
             fail-fast: false
             matrix:
-                runtime: [cpu, cuda]
+                runtime: [cpu]
                 python_version: ['3.13']
 
         steps:
@@ -90,24 +87,24 @@ jobs:
                   username: ${{ secrets.DOCKERHUB_USERNAME }}
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            - name: Build Image
+            - name: Build local image for testing
               run: |
-                  make ci-build-test \
+                  make ci-build MODE=test \
                     RUNTIME=${{ matrix.runtime }} \
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }} \
                     REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
 
-            - name: Test Image
+            - name: Test local image
               run: |
                   make docker-test \
                     RUNTIME=${{ matrix.runtime }} \
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }}
 
-            - name: Build Multi-Platform Image
+            - name: Build and push multi-platform image on success
               run: |
-                  make ci-build-push \
+                  make ci-build MODE=push \
                     RUNTIME=${{ matrix.runtime }} \
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }} \
@@ -127,4 +124,4 @@ jobs:
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
                   
             - name: Tag and Push "latest" tag
-              run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}
+              run: make -f Makefile.deploy ci-release VERSION=${{ needs.generate-files.outputs.version }}
