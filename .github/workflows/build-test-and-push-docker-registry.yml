@@ -22,7 +22,7 @@ on:
 env:
     CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
     CACHE_IMAGE_CUDA: braindotai/opencrate-build-cache:cuda-latest
-	
+
 jobs:
     generate-files:
         name: Generate Dockerfiles
