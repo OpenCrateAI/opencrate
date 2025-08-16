@@ -45,7 +45,7 @@ install-dev-versions:
 		fi; \
 	done; \
 	pyenv local $$PYTHON_VERSIONS
-	echo "\nDone installing the package with development environment and dependencies"
+	echo -e "\nDone installing the package with development environment and dependencies"
 
 
 install: install-dev-package install-dev-versions
@@ -78,11 +78,10 @@ test-clean:
 	@rm -rf .mypy_cache .pytest_cache .ruff_cache .tox .coverage
 
 
-
-
 # This target generates Dockerfiles for all supported Python versions and runtimes.
 docker-generate:
-	@echo "======== ● Generating all Dockerfiles ========"
+	@set -e; \
+	echo -e "\n======== ● Generating all Dockerfiles ========\n"
 	@PYTHON_VERSIONS_TO_USE="$${PYTHON_VERSIONS:-3.7 3.8 3.9 3.10 3.11 3.12 3.13}"; \
 	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
 	mkdir -p ./docker/dockerfiles; \
@@ -91,12 +90,13 @@ docker-generate:
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
 	done
-	@echo "\n======== ✔ All Dockerfiles generated successfully ========\n"
+	echo -e "\n======== ✔ All Dockerfiles generated successfully ========\n"
 
 
 # This target builds all supported OpenCrate images locally for all Python versions and runtimes.
 docker-build: docker-generate
-	@echo "======== ● Building all OpenCrate images locally for all supported versions ========"
+	@set -e; \
+	echo -e "\n======== ● Building all OpenCrate images locally for all supported versions ========\n"
 	@PYTHON_VERSIONS_TO_USE="$${PYTHON_VERSIONS:-3.7 3.8 3.9 3.10 3.11 3.12 3.13}"; \
 	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
 	for python_version in $$PYTHON_VERSIONS_TO_USE; do \
@@ -104,7 +104,7 @@ docker-build: docker-generate
 			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
 		done; \
 	done; \
-	echo "\n======== ✔ All local images built successfully! ========\n";
+	echo -e "\n======== ✔ All local images built successfully! ========\n";
 
 
 # This target cleans up all Docker-related caches and unused images.
@@ -117,79 +117,11 @@ docker-clean:
 	docker image prune -f;
 
 
-ci-build-test:
-	@echo "======== ● Building local image for testing: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ========"
-
-	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
-	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
-	PULL_FLAG=""; \
-	if [ "$(REBUILD_FLAG)" = "true" ]; then \
-		echo "!!! ========== REBUILDING BASE LAYERS: Forcing pull of new base images ========== !!!"; \
-		PULL_FLAG="--pull"; \
-	fi; \
-	if [ "$(RUNTIME)" = "cpu" ]; then \
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
-	else \
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
-	fi; \
-	docker buildx build \
-		--platform linux/amd64 \
-		-f "$$DOCKERFILE_PATH" \
-		-t "$$IMAGE_TAG" \
-		--load \
-		$$PULL_FLAG \
-		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
-		.
-
-	@echo "\n======== ✔ Successfully built and tested $$IMAGE_TAG ========\n"
-
-
-ci-push:
-	@echo "========== ● Building and pushing multi-platform image: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) =========="
-	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
-	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
-	CACHE_TO_FLAG=""; \
-	if [ "$(REBUILD_FLAG)" = "true" ]; then \
-		echo "!!! ========== PUSHING REFRESHED CACHE to registry ========== !!!"; \
-		CACHE_TO_FLAG="--cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max"; \
-	fi; \
-	if [ "$(RUNTIME)" = "cpu" ]; then \
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
-	else \
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
-	fi; \
-	docker buildx build \
-		--platform linux/amd64,linux/arm64 \
-		-f "$$DOCKERFILE_PATH" \
-		-t "$$IMAGE_TAG" \
-		--push \
-		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
-		$$CACHE_TO_FLAG \
-		.
-	
-	@echo "\n======== ✔ Successfully built and pushed $$IMAGE_TAG ========\n"
-
-
-# This target pushes the images as the latest tag to the registry. Used in the CI/CD workflow if new git tag is created.
-ci-release:
-	@echo "Tagging 'latest' for all images with version $(VERSION)..."
-	@set -e; \
-	PYTHON_VERSIONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$PYTHON_VERSIONS; do \
-		for runtime in cpu cuda; do \
-			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
-			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
-			echo "Tagging $$IMAGE_TAG as $$LATEST_TAG"; \
-			docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
-		done; \
-	done; \
-	echo "✔ All images tagged as latest"
-
-
+# This target runs tests inside a Docker container for a specific Python version and runtime.
 docker-test:
-	@echo "======== ● Testing OpenCrate in Docker for Python $(PYTHON_VERSION) and runtime $(RUNTIME) ========"
 	@set -e; \
-	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
+	echo -e "\n======== ● Testing OpenCrate in Docker for Python $(PYTHON_VERSION) and runtime $(RUNTIME) ========\n"
+	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):v$(VERSION)"; \
 	LOG_FILE="tests/logs/test-py$(PYTHON_VERSION)-$(RUNTIME).log"; \
 	mkdir -p tests/logs; \
 	echo "--- Running tests in Docker container from image: $$IMAGE_TAG ---"; \
@@ -198,76 +130,164 @@ docker-test:
 		-v $(shell pwd)/tests:/home/opencrate/tests \
 		-v $(shell pwd)/src:/home/opencrate/src \
 		-v $(shell pwd)/Makefile:/home/opencrate/Makefile:ro \
+		-v $(shell pwd)/Makefile.ci:/home/opencrate/Makefile.ci:ro \
 		-w /home/opencrate \
 		$$IMAGE_TAG \
 		sh -c 'set -e && \
-			echo "Installing test dependencies..." && \
+			echo "--- Installing test dependencies ---" && \
 			pip install --quiet torch --index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
 			pip install --quiet pytest pytest-cov --root-user-action=ignore && \
-			echo "Running tests..." && \
+			echo "\nRunning tests..." && \
 			make test-pytest' | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
-		echo "❌ Tests failed. Check log file: $$LOG_FILE"; \
+		echo "!!!!!!!!!! ❌ Tests failed. Check log file: $$LOG_FILE" !!!!!!!!!!; \
 		exit 1; \
 	fi; \
-	echo "======== ✔ Tests completed successfully. Log saved to: $$LOG_FILE ========"
+	echo -e "\n======== ✔ Tests completed successfully. Log saved to: $$LOG_FILE ========\n"
 
 
 help:
-	@echo "OpenCrate Project Makefile"
 	@echo ""
-	@echo "Usage: make [target] [ARG=value]"
+	@echo "===================================================================="
+	@echo "                  OpenCrate Development Makefile" 
+	@echo "===================================================================="
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "Local Development Environment"
-	@echo "-----------------------------------------"
-	@echo "  start             Start the development Docker container in detached mode."
-	@echo "  enter             Get a shell inside the running development container."
-	@echo "  stop              Stop the development container."
-	@echo "  kill              Stop and remove the development container and its resources."
+	@echo "Usage: make [target] [VARIABLE=value]"
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "Docker Image Management"
-	@echo "-----------------------------------------"
-	@echo "  docker-generate   Generate all Dockerfiles for supported Python versions and runtimes."
-	@echo "                    Example: make docker-generate PYTHON_VERSIONS=\"3.10 3.11\""
-	@echo "  docker-build      Build all Docker images locally based on the generated files."
-	@echo "                    Example: make docker-build RUNTIMES=cpu"
-	@echo "  docker-clean      Clean up Docker build cache, dangling images, and containers."
-	@echo "  docker-test       Run tox tests inside a Docker container for a specific Python version and runtime."
-	@echo "                    Example: make docker-test PYTHON_VERSION=3.9 RUNTIME=cpu"
+	@echo "Available Variables:"
+	@echo "  PYTHON_VERSION    Python version to use (default: $(PYTHON_VERSION))"
+	@echo "  RUNTIME           Runtime type: cpu or cuda"
+	@echo "  VERSION           Project version (default: $(VERSION))"
+	@echo "  REBUILD_FLAG      Force rebuild of base layers: true/false"
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "Testing and Linting"
-	@echo "-----------------------------------------"
-	@echo "  test              Run all primary tests (ruff, mypy, pytest) for the current environment."
-	@echo "  test-ruff         Run ruff linter."
-	@echo "  test-mypy         Run mypy for static type checking."
-	@echo "  test-pytest       Run unit tests with pytest."
-	@echo "  test-tox          Run tests against all supported Python versions using tox."
-	@echo "  test-clean        Remove cache files generated by testing tools."
+	@echo "===================================================================="
+	@echo "                    Development Environment"
+	@echo "===================================================================="
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "Installation & Setup"
-	@echo "-----------------------------------------"
-	@echo "  install           Install the project in editable mode and required Python versions."
-	@echo "  install-dev-package Install the project package in editable mode with dev dependencies."
-	@echo "  install-dev-versions Install multiple Python versions using pyenv."
+	@echo "  start           Start the development Docker container in detached mode"
+	@echo "                  Uses docker-compose to launch the opencrate_dev service"
+	@echo "                  Example: make start"
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "CI/CD (For GitHub Actions)"
-	@echo "-----------------------------------------"
-	@echo "  ci-build          Build and push a single Docker image. (Internal use for CI)"
-	@echo "                    Requires RUNTIME, PYTHON_VERSION, and VERSION variables."
-	@echo "  ci-release        Tag versioned images as 'latest'. (Internal use for CI)"
+	@echo "  enter           Open an interactive shell inside the running container"
+	@echo "                  Provides zsh shell access to the development environment"
+	@echo "                  Example: make enter"
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "Documentation"
-	@echo "-----------------------------------------"
-	@echo "  mkdocs            Serve the project documentation locally on http://0.0.0.0:8000."
+	@echo "  stop            Stop the running development container gracefully"
+	@echo "                  Preserves container state for later restart"
+	@echo "                  Example: make stop"
 	@echo ""
-	@echo "-----------------------------------------"
-	@echo "Miscellaneous"
-	@echo "-----------------------------------------"
-	@echo "  help              Show this help message."
+	@echo "  kill            Stop and completely remove the development container"
+	@echo "                  Destroys all container state and volumes"
+	@echo "                  Example: make kill"
 	@echo ""
+	@echo "===================================================================="
+	@echo "                    Package Installation & Setup"
+	@echo "===================================================================="
+	@echo ""
+	@echo "  install         Complete development setup: install package + Python versions"
+	@echo "                  Combines install-dev-package and install-dev-versions"
+	@echo "                  Example: make install"
+	@echo ""
+	@echo "  install-dev-package"
+	@echo "                  Install the OpenCrate package in editable mode with dev dependencies"
+	@echo "                  Uses pip to install the current project in development mode"
+	@echo "                  Example: make install-dev-package"
+	@echo ""
+	@echo "  install-dev-versions"
+	@echo "                  Install multiple Python versions (3.7-3.13) using pyenv"
+	@echo "                  Sets up multi-version testing environment"
+	@echo "                  Example: make install-dev-versions"
+	@echo ""
+	@echo "===================================================================="
+	@echo "                    Testing & Code Quality"
+	@echo "===================================================================="
+	@echo ""
+	@echo "  test            Run complete test suite: ruff + mypy + pytest"
+	@echo "                  Comprehensive testing for the current environment"
+	@echo "                  Example: make test"
+	@echo ""
+	@echo "  test-ruff       Run ruff linter for code style and quality checks"
+	@echo "                  Excludes tests/pipelines directory"
+	@echo "                  Example: make test-ruff"
+	@echo ""
+	@echo "  test-mypy       Run mypy for static type checking"
+	@echo "                  Validates type annotations and catches type errors"
+	@echo "                  Example: make test-mypy"
+	@echo ""
+	@echo "  test-pytest     Run unit tests with pytest"
+	@echo "                  Sets PYTHONPATH=src for proper imports"
+	@echo "                  Example: make test-pytest"
+	@echo ""
+	@echo "  test-tox        Run tests across all supported Python versions using tox"
+	@echo "                  Multi-environment testing for compatibility"
+	@echo "                  Example: make test-tox"
+	@echo ""
+	@echo "  test-clean      Remove all testing cache files and artifacts"
+	@echo "                  Cleans .mypy_cache, .pytest_cache, .ruff_cache, .tox, .coverage"
+	@echo "                  Example: make test-clean"
+	@echo ""
+	@echo "===================================================================="
+	@echo "                    Docker Image Management"
+	@echo "===================================================================="
+	@echo ""
+	@echo "  docker-generate Generate Dockerfiles for all supported Python versions and runtimes"
+	@echo "                  Creates dockerfiles in ./docker/dockerfiles/ directory"
+	@echo "                  Example: make docker-generate"
+	@echo "                  Example: make docker-generate PYTHON_VERSIONS=\"3.10 3.11\" RUNTIMES=\"cpu\""
+	@echo ""
+	@echo "  docker-build    Build all Docker images locally for all supported configurations"
+	@echo "                  Builds images for all Python versions (3.7-3.13) and runtimes (cpu/cuda)"
+	@echo "                  Example: make docker-build"
+	@echo "                  Example: make docker-build PYTHON_VERSIONS=\"3.11\" RUNTIMES=\"cpu\""
+	@echo ""
+	@echo "  docker-test     Run tests inside a Docker container for specific configuration"
+	@echo "                  Tests a specific Python version and runtime combination"
+	@echo "                  Example: make docker-test PYTHON_VERSION=3.11 RUNTIME=cpu"
+	@echo "                  Example: make docker-test PYTHON_VERSION=3.9 RUNTIME=cuda"
+	@echo ""
+	@echo "  docker-clean    Clean up Docker build cache, containers, and unused images"
+	@echo "                  Removes dangling containers, build cache, and unused images"
+	@echo "                  Example: make docker-clean"
+	@echo ""
+	@echo "===================================================================="
+	@echo "                    Documentation & Utilities"
+	@echo "===================================================================="
+	@echo ""
+	@echo "  mkdocs          Serve project documentation locally using MkDocs"
+	@echo "                  Accessible at http://0.0.0.0:8000"
+	@echo "                  Example: make mkdocs"
+	@echo ""
+	@echo "  help            Display this comprehensive help message"
+	@echo "                  Shows all available targets with descriptions and examples"
+	@echo "                  Example: make help"
+	@echo ""
+	@echo "===================================================================="
+	@echo "                    Common Usage Patterns"
+	@echo "===================================================================="
+	@echo ""
+	@echo "  Development Setup:"
+	@echo "    make start                       # Start development container"
+	@echo "    make enter                       # Enter container for development"
+	@echo "    make install                     # Install entire project requirements for development"
+	@echo ""
+	@echo "  Local Testing:"
+	@echo "    make test                        # Run all tests locally"
+	@echo "    make test-tox                    # Test across Python versions"
+	@echo "    make docker-test PYTHON_VERSION=3.11 RUNTIME=cpu  # Test in container"
+	@echo ""
+	@echo "  Docker Operations:"
+	@echo "    make docker-build                # Build all images"
+	@echo "    make docker-clean               # Clean up Docker resources"
+	@echo ""
+	@echo "  CI/CD (GitHub Actions):"
+	@echo "    make ci-build-test RUNTIME=cpu PYTHON_VERSION=3.11 VERSION=main"
+	@echo "    make ci-push RUNTIME=cpu PYTHON_VERSION=3.11 VERSION=main REBUILD_FLAG=true"
+	@echo "    make ci-release VERSION=1.0.0"
+	@echo ""
+	@echo ""
+
+
+
+# importing targets from external source
+ci-%:
+	@make -f Makefile.ci $*

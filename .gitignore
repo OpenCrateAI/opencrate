@@ -1,3 +1,4 @@
+.artifacts
 .secrets
 *logs*
 .history

@@ -1,0 +1,85 @@
+SHELL := /bin/bash
+PYTHON_VERSION ?= 3.10
+
+.SILENT:
+.ONESHELL:
+
+
+# This target builds and tests a single Docker image for CI/CD workflows.
+build-test:
+	@echo "\n========== ● Building local image for testing: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ==========\n"
+	@if [ "$(RUNTIME)" = "cpu" ]; then \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
+	else \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
+	fi; \
+	\
+	@PULL_FLAG=""; \
+	if [ "$(REBUILD_FLAG)" = "true" ]; then \
+		echo "!!!!!!!!!! REBUILDING BASE LAYERS: Forcing pull of new base images !!!!!!!!!!"; \
+		PULL_FLAG="--pull"; \
+	fi; \
+	\
+	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
+	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
+	if docker buildx build \
+		--platform linux/amd64 \
+		-f "$$DOCKERFILE_PATH" \
+		-t "$$IMAGE_TAG" \
+		--load \
+		$$PULL_FLAG \
+		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
+		.; then \
+		echo "========== ✔ Local image built successfully: $$IMAGE_TAG =========="; \
+	else \
+		echo "!!!!!!!!!! ❌ FAILED to build local image: $$IMAGE_TAG !!!!!!!!!!"; \
+		exit 1; \
+	fi
+
+
+# This target builds and pushes a multi-platform Docker image to the registry.
+build-push:
+	@echo "\n========== ● Building and pushing multi-platform image: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ==========\n"
+	@if [ "$(RUNTIME)" = "cpu" ]; then \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)"; \
+	else \
+		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)"; \
+	fi; \
+	\
+	@CACHE_TO_FLAG=""; \
+	if [ "$(REBUILD_FLAG)" = "true" ]; then \
+		echo "!!! PUSHING REFRESHED CACHE to registry !!!"; \
+		CACHE_TO_FLAG="--cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max"; \
+	fi; \
+	\
+	@IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
+	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)"; \
+	if docker buildx build \
+		--platform linux/amd64,linux/arm64 \
+		-f "$$DOCKERFILE_PATH" \
+		-t "$$IMAGE_TAG" \
+		--push \
+		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
+		$$CACHE_TO_FLAG \
+		.; then \
+		echo "========== ✔ Successfully built and pushed $$IMAGE_TAG =========="; \
+	else \
+		echo "!!!!!!!!!! ❌ FAILED to build and push multi-platform image: $$IMAGE_TAG !!!!!!!!!!"; \
+		exit 1; \
+	fi
+
+
+# This target pushes the images as the latest tag to the registry. Used in the CI/CD workflow if new git tag is created.
+release:
+	@echo "\n========== ● Tagging 'latest' for all images with version $(VERSION) ==========\n"
+	@set -e; \
+	PYTHON_VERSIONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
+	for python_version in $$PYTHON_VERSIONS; do \
+		for runtime in cpu cuda; do \
+			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
+			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
+			echo "Tagging $$IMAGE_TAG as $$LATEST_TAG"; \
+			docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
+		done; \
+	done; \
+	echo "========== ✔ All images tagged as latest ==========";
