@@ -89,7 +89,7 @@ docker-generate:
 		for runtime in $$RUNTIMES_TO_USE; do \
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
-	done
+	done; \
 	echo -e "\n======== ✔ All Dockerfiles generated successfully ========\n"
 
 

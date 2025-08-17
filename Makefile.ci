@@ -7,6 +7,7 @@ PYTHON_VERSION ?= 3.10
 
 # This target builds and tests a single Docker image for CI/CD workflows.
 build:
+# --- 1. Common Variable Setup ---
 	if [ "$(RUNTIME)" = "cpu" ]; then
 		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)";
 	else
@@ -21,7 +22,7 @@ build:
 		CACHE_TO_FLAG="--cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
 	fi;
 
-	# --- 2. Mode-Specific Argument Setup ---
+# --- 2. Mode-Specific Argument Setup ---
 	PLATFORM_FLAG="";
 	EXTRA_ARGS="";
 	if [ "$(MODE)" = "test" ]; then
@@ -37,7 +38,7 @@ build:
 		exit 1;
 	fi;
 
-	# --- 3. The Docker Build Command ---
+# --- 3. The Docker Build Command ---
 	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)";
 	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)";
 	if docker buildx build \
