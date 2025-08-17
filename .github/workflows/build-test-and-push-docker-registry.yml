@@ -122,15 +122,6 @@ jobs:
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }}
 
-            # Upload Docker test logs as artifacts - runs always, even if tests fail
-            - name: Upload Docker test logs
-              uses: actions/upload-artifact@v4
-              if: always()
-              with:
-                  name: docker-logs-${{ matrix.runtime }}-py${{ matrix.python_version }}
-                  path: docker/logs/
-                  retention-days: 30
-
             # Only if tests pass, build and push the multi-platform image to registry
             - name: Build and push multi-platform image on success
               run: |
@@ -158,4 +149,4 @@ jobs:
                   
             # Tag all successfully built images with "latest" tag for easy access
             - name: Tag and Push "latest" tag
-              run: make -f Makefile.deploy ci-release VERSION=${{ needs.generate-files.outputs.version }}
+              run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}

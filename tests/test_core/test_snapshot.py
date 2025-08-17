@@ -26,7 +26,7 @@ class TestCoreSnapshot:
         config_file.write_text('{"project_name": "test_snapshot"}')
 
         snapshot = Snapshot()
-        with pytest.raises(AssertionError, match=r"\n\nNot an OpenCrate project directory.\n"):
+        with pytest.raises(AssertionError, match=r"\n\nNot an Opectory.\n"):
             snapshot.setup(name="test_snapshot")
 
     def test_list_no_tags(self, tmp_path):
