@@ -45,6 +45,7 @@ install-dev-versions:
 		fi; \
 	done; \
 	pyenv local $$PYTHON_VERSIONS
+	pre-commit install
 	echo -e "\nDone installing the package with development environment and dependencies"
 
 
