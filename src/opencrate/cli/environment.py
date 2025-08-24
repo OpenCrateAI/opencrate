@@ -138,12 +138,12 @@ def start() -> None:
         try:
             container = cli.docker_client.containers.get(cli.config.get("docker_container"))
             if container.status == "running":
-                cli.console.print("✔ Container is already running")
+                cli.console.print("✓ Container is already running")
                 cli.get_help("enter_container")()
                 return
             elif container.status == "exited":
                 container.start()
-                cli.console.print("✔ Successfully restarted container")
+                cli.console.print("✓ Successfully restarted container")
                 cli.get_help("enter_container")()
                 return
         except NotFound:
@@ -151,7 +151,7 @@ def start() -> None:
 
         branch_name = cli.config.get("version")
         utils.run_command(f"docker compose --project-name={cli.config.get('name')} up oc_{cli.config.get('name')}_{branch_name} -d")
-        cli.console.print("✔ Created and started new container")
+        cli.console.print("✓ Created and started new container")
         cli.get_help("enter_container")()
 
 
@@ -172,7 +172,7 @@ def stop(down: bool = False, all: bool = False) -> None:
             container = cli.docker_client.containers.get(cli.config.get("docker_container"))
             if container.status == "exited":
                 if not down:
-                    cli.console.print(f"✔ {cli.config.get('version')} runtime is already stopped")
+                    cli.console.print(f"✓ {cli.config.get('version')} runtime is already stopped")
                     cli.get_help("start_container")()
                 else:
                     container.remove()
@@ -187,7 +187,7 @@ def stop(down: bool = False, all: bool = False) -> None:
                     utils.run_command(
                         f"docker compose --project-name={cli.config.get('name')} {'stop' if not down else 'down'}",
                     )
-                cli.console.print(f"✔ Stopped {cli.config.get('version')} runtime")
+                cli.console.print(f"✓ Stopped {cli.config.get('version')} runtime")
                 cli.get_help("start_container")()
         except NotFound:
             cli.console.print(
@@ -208,7 +208,7 @@ def enter() -> None:
         try:
             container = cli.docker_client.containers.get(cli.config.get("docker_container"))
             if container.status == "running":
-                cli.console.print(f"✔ Entering container {cli.config.get('docker_container')}")
+                cli.console.print(f"✓ Entering container {cli.config.get('docker_container')}")
                 os.execvp(
                     "docker",
                     [
@@ -412,7 +412,7 @@ def runtime(
 
         start()
 
-        cli.console.print(f"✔ Successfully commited environment changes to {cli.config.get('docker_image')}")
+        cli.console.print(f"✓ Successfully commited environment changes to {cli.config.get('docker_image')}")
         cli.docker_client.images.prune()
 
     elif switch:
@@ -479,7 +479,7 @@ def runtime(
         start()
         cli.docker_client.images.prune()
 
-        cli.console.print(f"✔ Successfully restored {cli.config.get('version')} runtime")
+        cli.console.print(f"✓ Successfully restored {cli.config.get('version')} runtime")
     elif delete:
         # cli.console.print(f"\n░▒▓█ [bold]Deleting runtime[/bold] > {name}\n")
 
@@ -512,7 +512,7 @@ def runtime(
                 container_name = f"{cli.config.get('name')}-{name}-container"
                 container = cli.docker_client.containers.get(container_name)
                 container.remove()
-                cli.console.print(f"✔ Deleted container {container_name}")
+                cli.console.print(f"✓ Deleted container {container_name}")
             except NotFound:
                 cli.console.print(f"× Container {container_name} not found, skipping...")
 
@@ -520,7 +520,7 @@ def runtime(
             try:
                 image_name = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
                 cli.docker_client.images.remove(image_name, force=True)
-                cli.console.print(f"✔ Deleted docker image {image_name}")
+                cli.console.print(f"✓ Deleted docker image {image_name}")
             except ImageNotFound:
                 cli.console.print(f"× Image {image_name} not found, skipping...")
 
@@ -528,7 +528,7 @@ def runtime(
             # Delete the git commit
             if commit_id_tag:
                 utils.run_command(f"git rebase --onto {commit_id_tag}^ {commit_id_tag}")
-                cli.console.print(f"✔ Deleted git commit {commit_id_tag}")
+                cli.console.print(f"✓ Deleted git commit {commit_id_tag}")
 
             cli.docker_client.images.prune()
 
@@ -585,7 +585,7 @@ def kill(confirm: bool = False) -> None:
             cli.docker_client.images.remove(cli.config.get("docker_image"), force=True)
             cli.docker_client.images.prune()
 
-        cli.console.print(f"✔ Removed {cli.config.get('version')} image")
+        cli.console.print(f"✓ Removed {cli.config.get('version')} image")
         if not has_commited_base_image:
             cli.get_help("build_image")()
     except ImageNotFound:
@@ -765,7 +765,7 @@ def branch(
 
             for container in matching_containers:
                 container.remove(force=True)
-                cli.console.print(f"✔ Deleted container {container.name}")
+                cli.console.print(f"✓ Deleted container {container.name}")
 
             try:
                 # Find matching images
@@ -779,11 +779,11 @@ def branch(
                     try:
                         # Try to delete without force first
                         cli.docker_client.images.remove(image_name, force=False)
-                        cli.console.print(f"✔ Deleted image {image_name}")
+                        cli.console.print(f"✓ Deleted image {image_name}")
                     except APIError:
                         # If deletion fails, untag the image instead
                         cli.docker_client.api.remove_image(image_name, force=False, noprune=False)
-                        cli.console.print(f"✔ Untagged image {image_name}")
+                        cli.console.print(f"✓ Untagged image {image_name}")
 
                 cli.docker_client.images.prune()
             except ImageNotFound:
@@ -794,7 +794,7 @@ def branch(
 
         with utils.spinner(cli.console, "Removing git branch ..."):
             utils.run_command(f"git branch -D {name}")
-            cli.console.print(f"✔ Deleted git branch {name}")
+            cli.console.print(f"✓ Deleted git branch {name}")
     elif switch:
         with utils.spinner(cli.console, f"Checking {name} branch availability ..."):
             branch_exists = utils.run_command(f"git branch --list {name}", ignore_error=True).strip()
@@ -803,7 +803,7 @@ def branch(
         if branch_exists:
             if current_branch == name:
                 cli.console.print(
-                    f"✔ You're already on branch '{name}'.",
+                    f"✓ You're already on branch '{name}'.",
                 )
                 return
 
@@ -856,14 +856,14 @@ def clone(git_url: str) -> None:
         # Clone the repository
         with utils.spinner(cli.console, f"Cloning {repo_name}..."):
             utils.run_command(f"git clone {git_url}")
-        cli.console.print(f"✔ Successfully cloned into [bold cyan]{repo_name}[/bold cyan]!")
+        cli.console.print(f"✓ Successfully cloned into [bold cyan]{repo_name}[/bold cyan]!")
 
         # Change into the new project directory
         os.chdir(repo_name)
-        cli.console.print(f"✔ Changed directory to [bold cyan]{repo_name}[/bold cyan]")
+        cli.console.print(f"✓ Changed directory to [bold cyan]{repo_name}[/bold cyan]")
 
         if os.path.exists(".opencrate/cli.config.json"):
-            cli.console.print("✔ Loaded project configuration")
+            cli.console.print("✓ Loaded project configuration")
         else:
             cli.console.print(
                 "[ERROR]: Cloned repository is not a valid OpenCrate project. Missing .opencrate/cli.config.json",
@@ -1068,12 +1068,12 @@ def snapshot(name: str, reset: bool = False, show: bool = False) -> None:
 
     cli.console.print(f"\n░▒▓█ [bold]Snapshot[/bold] > {cli.config.get('title')}\n")
     if reset:
-        cli.console.print(f"✔ Resetting {name} snapshot")
+        cli.console.print(f"✓ Resetting {name} snapshot")
         oc.snapshot.snapshot_name = name
         oc.snapshot.reset(confirm=True)
 
     if show:
-        cli.console.print(f"✔ Showing {name} snapshot")
+        cli.console.print(f"✓ Showing {name} snapshot")
 
         # TODO: Implement `oc snapshot train --tag`
 

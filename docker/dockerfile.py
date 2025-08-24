@@ -210,7 +210,7 @@ def main():
         dockerfile_content = generate_combined_dockerfile()
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
-        console.print(f"[green]-------- ✔ Dockerfile generated at {dockerfile_path} --------[/green]")
+        console.print(f"[green]-------- ✓ Dockerfile generated at {dockerfile_path} --------[/green]")
 
     if args.build:
         final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:{version}"
@@ -228,8 +228,8 @@ def main():
             console.print("[bold red]-------- 𐄂 Exiting due to build failure --------[/bold red]")
             sys.exit(1)
 
-        logger.info(f"-------- ✔ Successfully built {final_image_tag} --------")
-        console.print(f"[bold green]-------- ✔ Successfully built {final_image_tag} --------[/bold green]")
+        logger.info(f"-------- ✓ Successfully built {final_image_tag} --------")
+        console.print(f"[bold green]-------- ✓ Successfully built {final_image_tag} --------[/bold green]")
 
 
 if __name__ == "__main__":

@@ -48,7 +48,7 @@ build:
 		$$EXTRA_ARGS \
 		--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true \
 		.; then
-		echo "========== ✔ Command completed successfully for MODE=$(MODE) ==========";
+		echo "========== ✓ Command completed successfully for MODE=$(MODE) ==========";
 	else
 		echo "!!!!!!!!!! ❌ FAILED during MODE=$(MODE) for image $$IMAGE_TAG !!!!!!!!!!!!";
 		exit 1;
@@ -68,4 +68,4 @@ release:
 			docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
 		done; \
 	done; \
-	echo "========== ✔ All images tagged as latest ==========";
+	echo "========== ✓ All images tagged as latest ==========";

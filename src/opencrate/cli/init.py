@@ -346,7 +346,7 @@ def init():
 
         setup_git_repository(config["project_dir"], config["git_remote_url"])
 
-        console.print("\n✔ [bold]OpenCrate initialized successfully![/]")
+        console.print("\n✓ [bold]OpenCrate initialized successfully![/]")
     except Exception as e:
         error_traceback = traceback.format_exc()
         if os.path.exists(config["project_name"]):

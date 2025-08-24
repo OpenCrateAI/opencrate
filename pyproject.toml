@@ -60,6 +60,7 @@ dev = [
     "mkdocs",
     "mkdocs-material",
     "mkdocstrings-python",
+    "pre-commit",
 ]
 
 [project.scripts]

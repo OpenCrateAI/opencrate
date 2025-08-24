@@ -1,5 +1,6 @@
 SHELL := /bin/bash
 PYTHON_VERSION ?= 3.10
+RUNTIME ?= cuda
 HOST_GIT_EMAIL = $(shell git config user.email)
 HOST_GIT_NAME = $(shell git config user.name)
 
@@ -57,14 +58,17 @@ mkdocs:
 
 
 test-ruff:
+	@echo -e "\nRunning ruff linter..."
 	@ruff check src tests --exclude tests/pipelines
 
 
 test-mypy:
+	@echo -e "\nRunning mypy type checks..."
 	@mypy src tests --exclude tests/pipelines
 
 
 test-pytest:
+	@echo -e "\nRunning pytest unit tests..."
 	@PYTHONPATH=src pytest
 
 
@@ -91,7 +95,7 @@ docker-generate:
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
 	done; \
-	echo -e "\n======== ✔ All Dockerfiles generated successfully ========\n"
+	echo -e "\n======== ✓ All Dockerfiles generated successfully ========\n"
 
 
 # This target builds all supported OpenCrate images locally for all Python versions and runtimes.
@@ -105,7 +109,7 @@ docker-build: docker-generate
 			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
 		done; \
 	done; \
-	echo -e "\n======== ✔ All local images built successfully! ========\n";
+	echo -e "\n======== ✓ All local images built successfully! ========\n";
 
 
 # This target cleans up all Docker-related caches and unused images.
@@ -144,7 +148,7 @@ docker-test:
 		echo "!!!!!!!!!! ❌ Tests failed. Check log file: $$LOG_FILE" !!!!!!!!!!; \
 		exit 1; \
 	fi; \
-	echo -e "\n======== ✔ Tests completed successfully. Log saved to: $$LOG_FILE ========\n"
+	echo -e "\n======== ✓ Tests completed successfully. Log saved to: $$LOG_FILE ========\n"
 
 
 help:
