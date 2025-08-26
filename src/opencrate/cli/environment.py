@@ -5,7 +5,7 @@ import json
 import os
 import sys
 import traceback
-from typing import Any, Callable, Dict, Optional, Type, Union
+from typing import Any, Callable, Dict, Optional
 
 import docker
 from docker.errors import APIError, ImageNotFound, NotFound
@@ -927,7 +927,7 @@ def status() -> None:
 @app.command()
 @utils.handle_exceptions(cli.console)
 def launch(
-    workflow: Union[str, Type[OpenCrate]],
+    workflow,
     job: Optional[str] = None,
     start: str = "new",
     tag: Optional[str] = None,

@@ -315,11 +315,11 @@ def display_summary(path: str):
 
             # Add folders first
             for entry in folders:
-                tree.add(f"🖿  {entry.name}/")
+                tree.add(f"{entry.name}/")
 
             # Then add files
             for entry in files:
-                tree.add(f"/{entry.name}")
+                tree.add(f"{entry.name}")
 
         except OSError as e:
             console.print(f"[ERROR] > Unable to access {path}: {e}")
