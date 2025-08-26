@@ -1,6 +1,8 @@
 SHELL := /bin/bash
 PYTHON_VERSION ?= 3.10
 
+VERSION ?= $(shell cat VERSION | tr -d '\n')
+
 .SILENT:
 .ONESHELL:
 
@@ -57,14 +59,14 @@ build:
 
 # This target pushes the images as the latest tag to the registry. Used in the CI/CD workflow if new git tag is created.
 release:
-	@echo "\n========== ● Tagging 'latest' for all images with version $(VERSION) ==========\n"
+	@echo -e "\n========== ● Tagging 'latest' for all images with version $(VERSION) =========="
 	@set -e; \
 	PYTHON_VERSIONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
 	for python_version in $$PYTHON_VERSIONS; do \
 		for runtime in cpu cuda; do \
 			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
-			echo "Tagging $$IMAGE_TAG as $$LATEST_TAG"; \
+			echo -e "\n--- Tagging $$IMAGE_TAG as $$LATEST_TAG ---"; \
 			docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
 		done; \
 	done; \
