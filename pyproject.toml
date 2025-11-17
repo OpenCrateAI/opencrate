@@ -53,14 +53,22 @@ dev = [
     "pytest",
     "pytest-cov",
     "tox",
+    "torch",
+    "torchvision",
+    "soundfile",
+    "av",
     "types-requests",
     "types-PyYAML",
     "types-docker",
-    "torch",
     "mkdocs",
     "mkdocs-material",
     "mkdocstrings-python",
+    "mkdocs-jupyter",
     "pre-commit",
+    "fastapi",
+    "uvicorn",
+    "python_daemon",
+    "aiofiles",
 ]
 
 [project.scripts]
@@ -78,16 +86,7 @@ include = ["opencrate", "opencrate.*"]
 [tool.ruff]
 src = ["src"]
 line-length = 180
-
-extend-exclude = [
-    ".git",
-    ".mypy_cache",
-    ".ruff_cache",
-    ".tox",
-    ".venv",
-    "__pycache__",
-    "docs/_build",
-]
+extend-exclude = ["tests/pipelines", "docs"]
 
 [tool.ruff.lint]
 select = [
@@ -103,9 +102,9 @@ quote-style = "double"
 skip-magic-trailing-comma = false
 
 [tool.mypy]
-exclude = ".git, __pycache__, build, dist, .mypy_cache, .tox, .venv"
-disable_error_code = ["unreachable"]
 files = ["src", "tests"]
+exclude = "(^|/)(tests/pipelines)"
+disable_error_code = ["unreachable"]
 warn_return_any = false
 warn_unused_configs = true
 ignore_missing_imports = true
@@ -126,3 +125,4 @@ no_implicit_reexport = false
 filterwarnings = ["ignore::DeprecationWarning"]
 addopts = "--verbose --cov=opencrate --cov-report=term-missing --color=yes -vv"
 testpaths = ["tests"]
+norecursedirs = ["tests/pipelines"]
