@@ -29,7 +29,7 @@ jobs:
     # First job: Generate Dockerfiles for all Python versions and runtimes
     generate-files:
         name: Generate Dockerfiles
-        runs-on: ubuntu-latest
+        runs-on: depot-ubuntu-24.042222222
         # Output variables that other jobs can use - version string and rebuild flag
         outputs:
             version: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name || 'main' }}
@@ -106,6 +106,12 @@ jobs:
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
             # Build a local AMD64 image first for testing - faster than multi-platform build
+            - run: df -h
+            - name: Clean up
+              run: |
+                  sudo docker image prune --all --force
+                  sudo docker builder prune -a
+            - run: df -h
             - name: Build local image for testing
               run: |
                   make ci-build MODE=test \
