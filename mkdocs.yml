@@ -2,16 +2,31 @@ site_name: Opencrate
 
 nav:
   - Home: index.md
-  - API Reference:
-      - opencrate: reference/opencrate.md
-      - core: reference/core.md
+  - Learn:
+      - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
+  - Features:
+      - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
+  - Reference:
+      - OpenCrate: api/opencrate.md
+      - Snapshot: api/snapshot.md
+      - Configuration: api/config.md
+      - I/O: api/io.md
+      - Concurrency: api/concurrency.md
+      - Decorators: api/decorate.md
+      - Visualization: api/visualize.md
+  - Resources:
+      - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
+  - About:
+      - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
+  - Release Notes:
+      - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
 
 plugins:
   - search
   - mkdocstrings:
       handlers:
         python:
-          paths: [src/opencrate]  # Point directly to the package
+          paths: [src/opencrate] # Point directly to the package
           selection:
             docstrings_style: google
           rendering:
@@ -24,6 +39,9 @@ plugins:
             separate_signature: false
             members_order: source
             merge_init_into_class: true
+  - mkdocs-jupyter:
+      include_source: True
+      ignore_h1_titles: True
 
 markdown_extensions:
   - admonition
@@ -57,23 +75,21 @@ theme:
         icon: material/brightness-auto
         name: Light mode
       primary: black
-      accent: white
-
+      accent: yellow
     - media: "(prefers-color-scheme: light)"
       scheme: default
       toggle:
         icon: material/brightness-7
         name: Dark mode
       primary: black
-      accent: white
+      accent: yellow
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       toggle:
         icon: material/brightness-4
-        name: System Preferences    
+        name: System Preferences
       primary: black
-      accent: white
-      
+      accent: yellow
 
 extra:
   social:
