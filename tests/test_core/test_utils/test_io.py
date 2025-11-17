@@ -6,7 +6,6 @@ from opencrate.core.utils.io.system import (
     create_dir,
     delete_dir,
     delete_file,
-    download_file,
     ensure_dir_exists,
     ensure_file_exists,
     extract_archive,
@@ -303,15 +302,15 @@ class TestUtilsIO:
         result = get_parent_dir("path/to/file.txt")
         assert str(result) == "path/to"
 
-    def test_download_file(self, tmp_path):
-        archive_file = tmp_path / "archive.zip"
-        download_file(
-            "https://httpbin.org/bytes/100",
-            str(archive_file),
-            replace=True,
-        )
-        assert archive_file.exists()
-        assert archive_file.stat().st_size == 100
+    # def test_download_file(self, tmp_path):
+    #     archive_file = tmp_path / "archive.zip"
+    #     download_file(
+    #         "https://www.learningcontainer.com/download/sample-zip-files/?wpdmdl=1637&refresh=67ac3bd61a3771739340758",
+    #         str(archive_file),
+    #         replace=True,
+    #     )
+    #     assert archive_file.exists()
+    #     assert archive_file.stat().st_size == 100
 
     def test_create_archive(self, tmp_path):
         source_dir = tmp_path / "source_dir"

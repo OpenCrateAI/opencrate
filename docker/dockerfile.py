@@ -218,7 +218,7 @@ def main():
         logger.info(f"-------- ● Building image for {args.runtime}-py{args.python} --------")
         console.print(f"\n[yellow]-------- ● Building image for {args.runtime}-py{args.python} --------[/]")
 
-        build_command = f"docker buildx build -f {dockerfile_path} -t {final_image_tag} ."
+        build_command = f"docker buildx build -f {dockerfile_path} -t {final_image_tag} ."  #  --no-cache
 
         logger.info(f"> Executing build command: {build_command}")
 
