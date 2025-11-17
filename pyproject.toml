@@ -41,7 +41,6 @@ dependencies = [
     "nvidia-ml-py",
     "lovelyplots",
     "tqdm",
-    "pynvml",
     "pyinstrument",
     "memory_profiler",
 ]
