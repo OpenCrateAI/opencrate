@@ -52,6 +52,7 @@ dev = [
     "mypy",
     "pytest",
     "pytest-cov",
+    "pytest-random-order",
     "tox",
     "torch",
     "torchvision",
