@@ -69,7 +69,7 @@ class TestCoreSnapshot:
         snapshot.setup(name="test_snapshot")
 
         checkpoint = {"model_state": "dummy_state"}
-        snapshot.checkpoint(checkpoint, "checkpoint.pth")
+        snapshot.checkpoint("checkpoint.pth").save(checkpoint)
         assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth"))
 
     def test_figure_numpy(self, tmp_path):
@@ -82,8 +82,8 @@ class TestCoreSnapshot:
         snapshot.setup(name="test_snapshot")
 
         image = np.random.rand(100, 100, 3)
-        snapshot.figure(image, "image.png")
-        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png"))
+        snapshot.image("image.png").save(image)
+        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "images", "image.png"))
 
     def test_figure_pil(self, tmp_path):
         # Create config.json in tmp_path
@@ -95,8 +95,8 @@ class TestCoreSnapshot:
         snapshot.setup(name="test_snapshot")
 
         image = Image.new("RGB", (100, 100))
-        snapshot.figure(image, "image.png")
-        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png"))
+        snapshot.image("image.png").save(image)
+        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "images", "image.png"))
 
     def test_figure_matplotlib(self, tmp_path):
         # Create config.json in tmp_path
@@ -108,8 +108,8 @@ class TestCoreSnapshot:
         snapshot.setup(name="test_snapshot")
 
         fig = Figure()
-        snapshot.figure(fig, "figure.png")
-        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "figures", "figure.png"))
+        snapshot.image("figure.png").save(fig)
+        assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0", "images", "figure.png"))
 
     def test_setup_with_tag(self, tmp_path):
         # Create config.json in tmp_path
@@ -120,11 +120,11 @@ class TestCoreSnapshot:
         snapshot._config_dir = str(tmp_path)
         snapshot.setup(name="test_snapshot", tag="test_tag")
 
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag"))
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "checkpoints"))
-        assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "figures"))
+        assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "images"))
         assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "v0:test_tag", "test_snapshot.log"))
 
     def test_asset_path_access(self, tmp_path):
@@ -136,14 +136,12 @@ class TestCoreSnapshot:
         snapshot._config_dir = str(tmp_path)
         snapshot.setup(name="test_snapshot")
 
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
-        snapshot.bias(np.random.rand(100, 100, 3), "bias.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
+        snapshot.image("image2.png").save(np.random.rand(100, 100, 3))
         assert snapshot.path.checkpoint("checkpoint.pth") == os.path.join("snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth")
-        assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png")
-        assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "v0", "randoms", "random.png")
-        assert snapshot.path.bias("bias.png") == os.path.join("snapshots", "test_snapshot", "v0", "biases", "bias.png")
+        assert snapshot.path.image("image.png") == os.path.join("snapshots", "test_snapshot", "v0", "images", "image.png")
+        assert snapshot.path.image("image2.png") == os.path.join("snapshots", "test_snapshot", "v0", "images", "image2.png")
 
     def test_asset_path_access_with_tags(self, tmp_path):
         # Create config.json in tmp_path
@@ -154,9 +152,9 @@ class TestCoreSnapshot:
         snapshot._config_dir = str(tmp_path)
         snapshot.setup(name="test_snapshot", tag="test_tag")
 
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
+        snapshot.image("image2.png").save(np.random.rand(100, 100, 3))
         assert snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
             "snapshots",
             "test_snapshot",
@@ -164,8 +162,8 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag", "figures", "image.png")
-        assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag", "randoms", "random.png")
+        assert snapshot.path.image("image.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag", "images", "image.png")
+        assert snapshot.path.image("image2.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag", "images", "image2.png")
 
     def test_asset_path_access_different_tags(self, tmp_path):
         # Create config.json in tmp_path
@@ -176,19 +174,16 @@ class TestCoreSnapshot:
         snapshot._config_dir = str(tmp_path)
 
         snapshot.setup(name="test_snapshot", tag="test_tag1")
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
 
         snapshot.setup(name="test_snapshot", tag="test_tag2")
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
 
         snapshot.setup(name="test_snapshot", tag="test_tag3")
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
         assert snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
             "snapshots",
             "test_snapshot",
@@ -196,8 +191,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag3", "figures", "image.png")
-        assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag3", "randoms", "random.png")
+        assert snapshot.path.image("image.png") == os.path.join("snapshots", "test_snapshot", "v0:test_tag3", "images", "image.png")
         assert snapshot.path.checkpoint("checkpoint.pth", tag="test_tag1") == os.path.join(
             "snapshots",
             "test_snapshot",
@@ -205,8 +199,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png", tag="test_tag1") == os.path.join("snapshots", "test_snapshot", "v0:test_tag1", "figures", "image.png")
-        assert snapshot.path.random("random.png", tag="test_tag1") == os.path.join("snapshots", "test_snapshot", "v0:test_tag1", "randoms", "random.png")
+        assert snapshot.path.image("image.png", tag="test_tag1") == os.path.join("snapshots", "test_snapshot", "v0:test_tag1", "images", "image.png")
         assert snapshot.path.checkpoint("checkpoint.pth", tag="test_tag2") == os.path.join(
             "snapshots",
             "test_snapshot",
@@ -214,8 +207,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png", tag="test_tag2") == os.path.join("snapshots", "test_snapshot", "v0:test_tag2", "figures", "image.png")
-        assert snapshot.path.random("random.png", tag="test_tag2") == os.path.join("snapshots", "test_snapshot", "v0:test_tag2", "randoms", "random.png")
+        assert snapshot.path.image("image.png", tag="test_tag2") == os.path.join("snapshots", "test_snapshot", "v0:test_tag2", "images", "image.png")
 
     def test_asset_path_access_different_tags_with_version(self, tmp_path):
         # Create config.json in tmp_path
@@ -226,23 +218,20 @@ class TestCoreSnapshot:
         snapshot._config_dir = str(tmp_path)
 
         snapshot.setup(name="test_snapshot", tag="test_tag1")  # version 0, tag test_tag1
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
         assert snapshot.version == 0
 
         snapshot.version = None
         snapshot.setup(name="test_snapshot", tag="test_tag2")  # version 1, tag test_tag2
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
         assert snapshot.version == 1
 
         snapshot.version = None
         snapshot.setup(name="test_snapshot", tag="test_tag3")  # version 2, tag test_tag3
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
         assert snapshot.version == 2
         assert snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
             "snapshots",
@@ -251,8 +240,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "v2:test_tag3", "figures", "image.png")
-        assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "v2:test_tag3", "randoms", "random.png")
+        assert snapshot.path.image("image.png") == os.path.join("snapshots", "test_snapshot", "v2:test_tag3", "images", "image.png")
         assert snapshot.path.checkpoint("checkpoint.pth", version=1, tag="test_tag2") == os.path.join(
             "snapshots",
             "test_snapshot",
@@ -260,8 +248,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png", version=1, tag="test_tag2") == os.path.join("snapshots", "test_snapshot", "v1:test_tag2", "figures", "image.png")
-        assert snapshot.path.random("random.png", version=1, tag="test_tag2") == os.path.join("snapshots", "test_snapshot", "v1:test_tag2", "randoms", "random.png")
+        assert snapshot.path.image("image.png", version=1, tag="test_tag2") == os.path.join("snapshots", "test_snapshot", "v1:test_tag2", "images", "image.png")
         assert snapshot.path.checkpoint("checkpoint.pth", version=2, tag="test_tag3") == os.path.join(
             "snapshots",
             "test_snapshot",
@@ -269,8 +256,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png", version=2, tag="test_tag3") == os.path.join("snapshots", "test_snapshot", "v2:test_tag3", "figures", "image.png")
-        assert snapshot.path.random("random.png", version=2, tag="test_tag3") == os.path.join("snapshots", "test_snapshot", "v2:test_tag3", "randoms", "random.png")
+        assert snapshot.path.image("image.png", version=2, tag="test_tag3") == os.path.join("snapshots", "test_snapshot", "v2:test_tag3", "images", "image.png")
 
     def test_dev_version(self, tmp_path):
         # Create config.json in tmp_path
@@ -283,9 +269,8 @@ class TestCoreSnapshot:
 
         assert snapshot.version == "dev"
         assert os.path.isdir(os.path.join("snapshots", "test_snapshot", "dev:test_tag"))
-        snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-        snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-        snapshot.random(np.random.rand(100, 100, 3), "random.png")
+        snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+        snapshot.image("image.png").save(np.random.rand(100, 100, 3))
         snapshot.debug("This is a debug message")
         assert snapshot.path.checkpoint("checkpoint.pth") == os.path.join(
             "snapshots",
@@ -294,8 +279,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "figures", "image.png")
-        assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "randoms", "random.png")
+        assert snapshot.path.image("image.png") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "images", "image.png")
         assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "dev:test_tag", "test_snapshot.log"))
 
         snapshot.version = None
@@ -309,8 +293,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "figures", "image.png")
-        assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "randoms", "random.png")
+        assert snapshot.path.image("image.png") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "images", "image.png")
         assert os.path.isfile(os.path.join("snapshots", "test_snapshot", "dev:test_tag", "test_snapshot.log"))
         assert os.path.isfile(
             os.path.join(
@@ -334,8 +317,7 @@ class TestCoreSnapshot:
             "checkpoints",
             "checkpoint.pth",
         )
-        assert snapshot.path.figure("image.png", version="dev", tag="test_tag") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "figures", "image.png")
-        assert snapshot.path.random("random.png", version="dev", tag="test_tag") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "randoms", "random.png")
+        assert snapshot.path.image("image.png", version="dev", tag="test_tag") == os.path.join("snapshots", "test_snapshot", "dev:test_tag", "images", "image.png")
 
     def test_reset(self, tmp_path):
         # Create config.json in tmp_path
@@ -385,86 +367,20 @@ class TestCoreSnapshot:
         snapshot = Snapshot()
         snapshot._config_dir = str(tmp_path)
 
-        snapshot.debug("This is a debug message")
-        snapshot_name = snapshot.snapshot_name
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is a debug message" in log_content
-
-        snapshot.reset(confirm=True)
-        snapshot.version = None
-        snapshot.snapshot_name = ""
-        snapshot._setup_not_done = True
-        snapshot.info("This is an info message")
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is an info message" in log_content
-
-        snapshot.reset(confirm=True)
-        snapshot.version = None
-        snapshot.snapshot_name = ""
-        snapshot._setup_not_done = True
-        snapshot.warning("This is a warning message")
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is a warning message" in log_content
-
-        snapshot.reset(confirm=True)
-        snapshot.version = None
-        snapshot.snapshot_name = ""
-        snapshot._setup_not_done = True
-        snapshot.error("This is an error message")
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is an error message" in log_content
-
-        snapshot.reset(confirm=True)
-        snapshot.version = None
-        snapshot.snapshot_name = ""
-        snapshot._setup_not_done = True
-        snapshot.critical("This is a critical message")
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is a critical message" in log_content
-
-        snapshot.reset(confirm=True)
-        snapshot.version = None
-        snapshot.snapshot_name = ""
-        snapshot._setup_not_done = True
-        snapshot.success("This is a success message")
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is a success message" in log_content
-
-        snapshot.reset(confirm=True)
-        snapshot.version = None
-        snapshot.snapshot_name = ""
-        snapshot._setup_not_done = True
-        snapshot.exception("This is a exception message")
-        log_file_path = os.path.join("snapshots", snapshot_name, "v0", f"{snapshot_name}.log")
-        assert log_file_path == snapshot.log_path
-        assert os.path.isfile(log_file_path)
-        with open(log_file_path) as log_file:
-            log_content = log_file.read()
-            assert "This is a exception message" in log_content
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.debug("This is a debug message")
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.info("This is an info message")
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.warning("This is a warning message")
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.error("This is an error message")
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.critical("This is a critical message")
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.success("This is a success message")
+        with pytest.raises(RuntimeError, match=r"Snapshot setup is not done yet"):
+            snapshot.exception("This is an exception message")
 
     def test_history_logging(self, tmp_path):
         # Create config.json in tmp_path
@@ -599,7 +515,7 @@ class TestCoreSnapshot:
             snapshot.reset(confirm=True)
             snapshot.setup(name="test_snapshot")
 
-            snapshot.path.abc("whatever.pth")
+            snapshot.path.abc("whatever.pth", check_exists=True)
         with pytest.raises(
             AssertionError,
             match=r"No snapshot 'checkpoint_non_existing.pth' found in 'checkpoint' for version",
@@ -607,26 +523,14 @@ class TestCoreSnapshot:
             snapshot.version = None
             snapshot.reset(confirm=True)
             snapshot.setup(name="test_snapshot")
-            snapshot.checkpoint({"model_state": "dummy_state"}, "checkpoint.pth")
-            assert snapshot.path.checkpoint("checkpoint.pth") == os.path.join("snapshots", "test_snapshot", "v0", "checkpoints", "checkpoint.pth")
-            snapshot.path.checkpoint("checkpoint_non_existing.pth")
+            snapshot.checkpoint("checkpoint.pth").save({"model_state": "dummy_state"})
+            snapshot.path.checkpoint("checkpoint_non_existing.pth", check_exists=True)
         with pytest.raises(
             AssertionError,
-            match=r"No snapshot 'figure_non_existing.png' found in 'figure' for version",
+            match=r"No snapshot 'image_non_existing.png' found in 'image' for version",
         ):
             snapshot.version = None
             snapshot.reset(confirm=True)
             snapshot.setup(name="test_snapshot")
-            snapshot.figure(np.random.rand(100, 100, 3), "image.png")
-            assert snapshot.path.figure("image.png") == os.path.join("snapshots", "test_snapshot", "v0", "figures", "image.png")
-            snapshot.path.figure("figure_non_existing.png")
-        with pytest.raises(
-            AssertionError,
-            match=r"No snapshot 'random_non_existing.png' found in 'random' for version",
-        ):
-            snapshot.version = None
-            snapshot.reset(confirm=True)
-            snapshot.setup(name="test_snapshot")
-            snapshot.random(np.random.rand(100, 100, 3), "random.png")
-            assert snapshot.path.random("random.png") == os.path.join("snapshots", "test_snapshot", "v0", "randoms", "random.png")
-            snapshot.path.random("random_non_existing.png")
+            snapshot.image("image.png").save(np.random.rand(100, 100, 3))
+            snapshot.path.image("image_non_existing.png", check_exists=True)
