@@ -38,7 +38,7 @@ dependencies = [
     "jinja2",
     "imageio",
     "requests",
-    "pyyaml",
+    "nvidia-ml-py",
     "lovelyplots",
     "tqdm",
     "pynvml",
@@ -123,6 +123,6 @@ no_implicit_reexport = false
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
-addopts = "--verbose --cov=opencrate --cov-report=term-missing --color=yes -vv"
+addopts = "--random-order --verbose --cov=opencrate --cov-report=term-missing --color=yes -vv"
 testpaths = ["tests"]
 norecursedirs = ["tests/pipelines"]

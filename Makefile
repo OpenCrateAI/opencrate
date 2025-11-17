@@ -159,7 +159,7 @@ docker-test-all:
 			make docker-test PYTHON_VERSION=$$python_version RUNTIME=$$runtime; \
 		done; \
 	done; \
-	echo -e "\n======== ✓ All Docker tests completed successfully! ========\n";
+	echo -e "======== ✓ All Docker tests completed successfully! ========";
 
 
 help:
