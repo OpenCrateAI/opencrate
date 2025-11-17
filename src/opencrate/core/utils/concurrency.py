@@ -24,30 +24,64 @@ def parallelize_with_threads(
     title: str = "Parallelizing with threads",
     order_results: bool = False,
 ) -> List[Any]:
-    """
-    Executes a function in parallel using multithreading.
+    """Executes a function in parallel using a thread pool.
+
+    This function is ideal for I/O-bound tasks, such as making network requests
+    or reading from a disk, where threads can perform work while waiting for
+    external resources.
 
     Args:
-        func (Callable): The function to execute in parallel.
-        args_list (List[Any]): A list of argument tuples to pass to the function.
-        max_workers (Optional[int]): Maximum number of threads to use. If None, it defaults to the number of CPUs.
-        title (Optional[str]): The title to display in the progress bar.
-        order_results (bool): Whether to return results in the same order as the input arguments.
+        func (Callable[[Any], Any]): The function to execute in parallel.
+        args_list (List[Any]): A list of arguments to be passed to the function.
+            Each element can be a single value or a tuple of arguments.
+        max_workers (Optional[int]): The maximum number of threads to use.
+            If `None`, it defaults to the number of CPUs. Defaults to `None`.
+        title (str): A title for the progress bar.
+            Defaults to "Parallelizing with threads".
+        order_results (bool): If `True`, results are returned in the same
+            order as the input arguments. This may be slower if tasks have
+            varying completion times. Defaults to `False`.
 
     Returns:
         List[Any]: A list of results from the function calls.
 
     Example:
-        >>> import requests
-        >>> def io_bound_task(url):
-        ...     response = requests.get(url)
-        ...     return response.status_code
-        >>> results = parallelize_with_threads(
-        ...     io_bound_task, ["https://www.example.com"] * 20, max_workers=5, title="Downloading Files"
-        ... )
-        Downloading Files ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [217 avg it/s] [0.00 avg s/it]
-        >>> print(results) # the order of results may vary
-        [200, 200, 200, ..., 200]
+        Perform multiple network requests in parallel:
+        ```python
+        import requests
+
+        def download_url(url):
+            try:
+                return requests.get(url).status_code
+            except requests.RequestException:
+                return None
+
+        urls = ["https://www.google.com", "https://www.github.com"] * 5
+        results = parallelize_with_threads(download_url, urls, max_workers=5)
+        print(f"Received {len(results)} results: {results}")
+        ```
+        Output:
+        ```
+        Parallelizing with threads ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:01 [5 avg it/s] [0.18 avg s/it]
+        Received 10 results: [200, 200, 200, 200, 200, 200, 200, 200, 200, 200]
+        ```
+        ---
+        Process tasks with ordered results:
+        ```python
+        def process_data(item, duration):
+            time.sleep(duration)
+            return item * 2
+
+        args = [(1, 0.3), (2, 0.1), (3, 0.2)]
+        ordered_results = parallelize_with_threads(
+            process_data, args, order_results=True
+        )
+        print(f"Ordered results: {ordered_results}")
+        ```
+        Output:
+        ```
+        Ordered results: [2, 4, 6]
+        ```
     """
 
     results: List[Any] = []
@@ -73,27 +107,54 @@ def parallelize_with_processes(
     title: str = "Parallelizing with processes",
     order_results: bool = False,
 ) -> List[Any]:
-    """
-    Executes a function in parallel using multiprocessing. Best for tasks with varying execution times where order is not important.
+    """Executes a function in parallel using a process pool.
+
+    This function is best for CPU-bound tasks that can be executed independently,
+    as it leverages multiple CPU cores to perform computations simultaneously.
 
     Args:
-        func (Callable): The function to execute in parallel.
-        args_list (List[Any]): A list of argument tuples to pass to the function.
-        max_workers (Optional[int]): Maximum number of processes to use. If None, it defaults to the number of CPUs.
-        title (Optional[str]): The title to display in the progress bar.
-        order_results (bool): Whether to return results in the same order as the input arguments.
+        func (Callable[[Any], Any]): The function to execute in parallel.
+        args_list (List[Any]): A list of arguments for the function. Each
+            element can be a single value or a tuple of arguments.
+        max_workers (Optional[int]): The maximum number of processes to use.
+            If `None`, it defaults to the number of CPUs. Defaults to `None`.
+        title (str): A title for the progress bar.
+            Defaults to "Parallelizing with processes".
+        order_results (bool): If `True`, results are returned in the same
+            order as the input arguments. Defaults to `False`.
+
     Returns:
         List[Any]: A list of results from the function calls.
 
     Example:
-        >>> from math import factorial
-        >>> def cpu_bound_task(n):
-        ...     return factorial(n)
-        >>> numbers = [1000 + i for i in range(20)]
-        >>> results = parallelize_with_processes(cpu_bound_task, numbers, title="Computing factorials")
-        Computing factorials ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [681 avg it/s] [0.00 avg s/it]
-        >>> print(results) # the order of results may vary
-        [factorial(100000), factorial(100001), ..., factorial(100019)]
+        Perform CPU-intensive calculations in parallel:
+        ```python
+        def compute_square(n):
+            return n * n
+
+        numbers = list(range(10))
+        results = parallelize_with_processes(compute_square, numbers)
+        print(f"Results (order may vary): {results}")
+        ```
+        Output:
+        ```
+        Parallelizing with processes ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [15 avg it/s] [0.07 avg s/it]
+        Results (order may vary): [0, 1, 4, 9, 16, 25, 36, 49, 64, 81]
+        ```
+        ---
+        Process tasks with multiple arguments and ordered results:
+        ```python
+        def add(x, y):
+            return x + y
+
+        args = [(1, 2), (3, 4), (5, 6)]
+        ordered_results = parallelize_with_processes(add, args, order_results=True)
+        print(f"Ordered results: {ordered_results}")
+        ```
+        Output:
+        ```
+        Ordered results: [3, 7, 11]
+        ```
     """
 
     results: List[Any] = []
@@ -118,25 +179,40 @@ def parallize_with_batch_processes(
     batch_size: Optional[int] = None,
     title: Optional[str] = None,
 ) -> List[Any]:
-    """
-    Processes data in batches using multiprocessing. Best for tasks with uniform execution times where the order of results is important.
+    """Processes data in batches using a pool of worker processes.
+
+    This function is efficient for applying a function to a large dataset, as it
+    distributes the data in batches to worker processes. It preserves the order
+    of the results.
 
     Args:
-        func (Callable): The function to execute on each item in the data.
-        data (List[Any]): A list of data items to process.
-        batch_size (Optional[int]): Number of processes to use. If None, it defaults to the number of CPUs.
-        title (Optional[str]): The title to display in the progress bar.
+        func (Callable[[Any], Any]): The function to apply to each data item.
+        data (List[Any]): The list of data items to process.
+        batch_size (Optional[int]): The number of processes to use. If `None`,
+            it defaults to a value based on the number of CPUs. Defaults to `None`.
+        title (Optional[str]): A title for the progress bar.
+            Defaults to "Batch processing".
 
     Returns:
-        List[Any]: A list of results from processing the data.
+        List[Any]: A list of results in the same order as the input data.
 
     Example:
-        >>> def square(x):
-        ...     return x ** 2
-        >>> results = parallize_with_batch_processes(square, [1, 2, 3, 4], title="Computing squares")
-        Computing squares ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [684 avg it/s] [0.00 avg s/it]
-        >>> print(results) # the order of results is preserved
-        [1, 4, 9, 16]
+        Process a list of numbers in batches:
+        ```python
+        def process_item(x):
+            return x * 10
+
+        dataset = list(range(20))
+        results = parallize_with_batch_processes(
+            process_item, dataset, batch_size=4
+        )
+        print(f"Processed results: {results}")
+        ```
+        Output:
+        ```
+        Batch processing ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━ 100% 0:00:00 [180 avg it/s] [0.01 avg s/it]
+        Processed results: [0, 10, 20, 30, 40, 50, 60, 70, 80, 90, 100, 110, 120, 130, 140, 150, 160, 170, 180, 190]
+        ```
     """
 
     if batch_size is None:

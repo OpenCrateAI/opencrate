@@ -1,6 +1,6 @@
 import time
 from functools import lru_cache, wraps
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional, Tuple, Type, Union
 
 import numpy as np
 
@@ -22,24 +22,78 @@ def _took(elapsed_time: float) -> str:
 
 
 def timeit(record: bool = False) -> Callable[[Any], Any]:
-    """
-    Decorator to measure and log the execution time of a function, with optional accumulation.
+    """Measures and logs the execution time of a function.
+
+    This decorator prints the execution time of the decorated function each time it is
+    called. If `record` is set to `True`, it also records each execution time and
+    provides a `summarize()` method to display summary statistics.
 
     Args:
-        record (bool): Whether to record the execution times.
+        record (bool): If `True`, records execution times for later summary.
+            Defaults to `False`.
 
     Returns:
-        Callable[[Any], Any] The wrapped function with timing functionality.
+        Callable[[Any], Any]: The wrapped function with timing capabilities.
 
     Example:
-    >>> @timeit(record=True)
-    ... def slow_function():
-    ...     time.sleep(2)
-    ...     return "Done"
-    >>> slow_function()
-    slow_function() executed in
-    'Done'
-    >>> slow_function.finalize()
+        Basic usage to time a function call:
+        ```python
+        @timeit()
+        def slow_function():
+            time.sleep(1)
+            return "Done"
+
+        slow_function()
+        ```
+        Output:
+        ```
+        slow_function() executed in 1.002 secs
+        ```
+        ---
+        Record and summarize execution times:
+        ```python
+        @timeit(record=True)
+        def fast_function():
+            time.sleep(0.1)
+
+        for _ in range(5):
+            fast_function()
+
+        fast_function.summarize()
+        ```
+        Output:
+        ```
+        fast_function() executed in 100.23 ms
+        fast_function() executed in 100.11 ms
+        fast_function() executed in 100.35 ms
+        fast_function() executed in 100.18 ms
+        fast_function() executed in 100.09 ms
+        Total executions  : 5
+        Mean time taken   : 100.19 ms
+        Median time taken : 100.18 ms
+        Min time taken    : 100.09 ms
+        Max time taken    : 100.35 ms
+        Std deviation     : 0.09 ms
+        Total time taken  : 500.96 ms
+        ```
+        ---
+        Attempting to summarize without recording:
+        ```python
+        @timeit(record=False)
+        def another_function():
+            pass
+
+        another_function()
+        try:
+            another_function.summarize()
+        except Exception as e:
+            print(e)
+        ```
+        Output:
+        ```
+        another_function() executed in 0.0001 secs
+        Summarize is not enabled, set `record` argument to `True` to enable summary.
+        ```
     """
 
     def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
@@ -82,25 +136,45 @@ def timeit(record: bool = False) -> Callable[[Any], Any]:
 
 
 def memoize(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
-    """
-    Decorator to cache the results of a function to avoid redundant computations.
+    """Caches the results of a function to avoid redundant computations.
+
+    This decorator uses a Least Recently Used (LRU) cache to store the results
+    of function calls with specific arguments. If the same arguments are provided
+    again, the cached result is returned immediately without re-executing the
+    function.
 
     Args:
         func (Callable): The function to be decorated.
 
     Returns:
-        Callable[[Any], Any] The wrapped function with memoization functionality.
+        Callable[[Any], Any]: The wrapped function with memoization.
 
     Example:
-    >>> @memoize
-    ... def compute_fibonacci(n):
-    ...     if n < 2:
-    ...         return n
-    ...     return compute_fibonacci(n - 1) + compute_fibonacci(n - 2)
-    >>> compute_fibonacci(10)  # Computes and caches the results
-    55
-    >>> compute_fibonacci(10)  # Returns the cached result
-    55
+        Cache a computationally expensive function:
+        ```python
+        @memoize
+        def fibonacci(n):
+            if n < 2:
+                return n
+            return fibonacci(n - 1) + fibonacci(n - 2)
+
+        # First call computes and caches the result
+        start_time = time.time()
+        result1 = fibonacci(30)
+        duration1 = time.time() - start_time
+        print(f"Result: {result1}, Time: {duration1:.4f}s")
+
+        # Second call returns the cached result instantly
+        start_time = time.time()
+        result2 = fibonacci(30)
+        duration2 = time.time() - start_time
+        print(f"Result: {result2}, Time: {duration2:.4f}s")
+        ```
+        Output:
+        ```
+        Result: 832040, Time: 0.1523s
+        Result: 832040, Time: 0.0000s
+        ```
     """
 
     @wraps(func)
@@ -111,33 +185,87 @@ def memoize(func: Callable[[Any], Any]) -> Callable[[Any], Any]:
     return wrapper
 
 
-def retry(max_retries: int = 3, delay: float = 2.0, exceptions=None) -> Callable[[Any], Any]:
-    """
-    Decorator to retry a function call a specified number of times on failure.
+def retry(max_retries: int = 3, delay: float = 2.0, exceptions: Optional[Union[Type[BaseException], Tuple[Type[BaseException], ...]]] = None) -> Callable[[Any], Any]:
+    """Retries a function call a specified number of times on failure.
+
+    This decorator automatically re-executes a function if it raises an exception.
+    It can be configured to retry a specific number of times, with a delay between
+    attempts, and for specific exception types.
 
     Args:
-        max_retries (int): Maximum number of retry attempts. Default is 3.
-        delay (float): Delay between retries in seconds. Default is 2.0.
-        exceptions: Exception types to catch for retries. If None, catches all exceptions.
-                   If a list/tuple of exception types, only retries for those specific exceptions.
+        max_retries (int): Maximum number of retry attempts. Defaults to 3.
+        delay (float): Delay between retries in seconds. Defaults to 2.0.
+        exceptions (Exception or tuple of Exception, optional): An exception or tuple of exceptions to catch. If `None`, it catches all exceptions. Defaults to `None`.
 
     Returns:
-        Callable[[Any], Any] The wrapped function with retry functionality.
+        Callable[[Any], Any]: The wrapped function with retry functionality.
 
     Raises:
         Exception: If the function fails after all retry attempts.
 
     Example:
-    >>> @retry(max_retries=5, delay=1)
-    ... def api_call():
-    ...     response = requests.get("https://www.example.com")
-    ...     response.raise_for_status()
-    ...     return response.json()
-    >>> try:
-    ...     print(api_call())
-    ... except Exception as e:
-    ...     print(e)
-    api_call() failed after 5 retries
+        Successful execution after a few retries:
+        ```python
+        import random
+
+        @retry(max_retries=5, delay=1)
+        def flaky_api_call():
+            print("Attempting to call API...")
+            if random.random() > 0.7:
+                return "Success!"
+            raise ConnectionError("Failed to connect")
+
+        flaky_api_call()
+        ```
+        Output (will vary):
+        ```
+        Attempting to call API...
+        Retrying flaky_api_call()... (1/5)
+        Attempting to call API...
+        Retrying flaky_api_call()... (2/5)
+        Attempting to call API...
+        Success!
+        ```
+        ---
+        Failure after all retries:
+        ```python
+        @retry(max_retries=3, delay=0.5)
+        def always_fail():
+            print("Executing and failing...")
+            raise ValueError("Permanent error")
+
+        try:
+            always_fail()
+        except Exception as e:
+            print(e)
+        ```
+        Output:
+        ```
+        Executing and failing...
+        Retrying always_fail()... (1/3)
+        Executing and failing...
+        Retrying always_fail()... (2/3)
+        Executing and failing...
+        always_fail() failed after 3 retries:
+        Permanent error
+        ```
+        ---
+        Retry only for specific exceptions:
+        ```python
+        @retry(max_retries=3, delay=1, exceptions=ConnectionError)
+        def selective_retry():
+            # This will not be retried because it's not a ConnectionError
+            raise TypeError("This error will not be retried")
+
+        try:
+            selective_retry()
+        except TypeError as e:
+            print(f"Caught expected error: {e}")
+        ```
+        Output:
+        ```
+        Caught expected error: This error will not be retried
+        ```
     """
 
     def decorator(func):
@@ -151,7 +279,7 @@ def retry(max_retries: int = 3, delay: float = 2.0, exceptions=None) -> Callable
                 except Exception as e:
                     if exceptions is not None and not isinstance(
                         e,
-                        tuple(exceptions) if isinstance(exceptions, (list, tuple)) else (exceptions,),
+                        exceptions if isinstance(exceptions, tuple) else (exceptions,),
                     ):
                         raise
                     last_exception = e
@@ -164,28 +292,54 @@ def retry(max_retries: int = 3, delay: float = 2.0, exceptions=None) -> Callable
 
 
 def rate_limit(calls: int, period: float) -> Callable[[Any], Any]:
-    """
-    Decorator to limit the number of times a function can be called within a time period.
+    """Limits the number of times a function can be called within a time period.
+
+    This decorator restricts the execution frequency of a function. If the number
+    of calls exceeds the specified limit within the given period, it raises an
+    exception.
 
     Args:
         calls (int): Maximum number of allowed calls within the time period.
-        period (float): Time period in seconds.
+        period (float): The time period in seconds.
 
     Returns:
-        Callable[[Any], Any] The wrapped function with rate-limiting functionality.
+        Callable[[Any], Any]: The wrapped function with rate-limiting.
 
     Raises:
         Exception: If the rate limit is exceeded.
 
     Example:
-    >>> @rate_limit(calls=5, period=10)
-    ... def api_call():
-    ...     response = requests.get("https://www.example.com")
-    ...     return response.json()
-    >>> for _ in range(5):
-    ...     print(api_call())
-    >>> print(api_call())
-    api_call() rate limit exceeded. Try again in 5.00 seconds...
+        Limit a function to 2 calls every 5 seconds:
+        ```python
+        @rate_limit(calls=2, period=5)
+        def limited_function():
+            print("Function called.")
+
+        # First two calls succeed
+        limited_function()
+        limited_function()
+
+        # Third call fails
+        try:
+            limited_function()
+        except Exception as e:
+            print(e)
+
+        # Wait for the period to reset
+        time.sleep(5)
+        print("Waited 5 seconds...")
+
+        # Call succeeds again
+        limited_function()
+        ```
+        Output:
+        ```
+        Function called.
+        Function called.
+        limited_function() rate limit exceeded. Try again in 5.00 seconds
+        Waited 5 seconds...
+        Function called.
+        ```
     """
 
     def decorator(func: Callable[[Any], Any]) -> Callable[[Any], Any]:

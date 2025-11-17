@@ -1,25 +1,17 @@
-import csv
 import json
 import os
-import pickle
 import sys
+import time
 from functools import partial
+from glob import glob
 from shutil import copyfile, rmtree
-from typing import Any, Callable, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional, Union
 
-import numpy as np
-import numpy.typing as npt
-import pandas as pd
 from loguru import logger
-from matplotlib.figure import Figure
-from PIL import Image
+
+from .utils import io
 
 _has_torch = True
-
-try:
-    import torch
-except ImportError:
-    _has_torch = False
 
 
 class Snapshot:
@@ -195,197 +187,6 @@ class Snapshot:
         path = os.path.join("snapshots", self.snapshot_name, f"v{self.version}")
         return os.path.isdir(path)
 
-    def checkpoint(
-        self,
-        checkpoint: Any,
-        name: str,
-        custom_saver: Optional[Callable[[Any, str], None]] = None,
-    ) -> None:
-        """
-        Saves the given checkpoint object to a file with the specified name
-        within the "checkpoints" directory. If the directory or any necessary subdirectories
-        do not exist, they will be created. The method requires PyTorch to be installed.
-
-        Args:
-            checkpoint (Any): The checkpoint object to be saved. This is typically a model state dictionary or any other serializable object.
-            name (str): The name of the file to save the checkpoint to. If the name contains directory separators, the necessary directories will be created.
-                        Supported file extensions include: .json, .pkl/.pickle, .txt, .csv, .npy/.npz, and .pth/.pt
-        Raises:
-            AssertionError: If PyTorch is not installed and the checkpoint is a PyTorch model state.
-            ValueError: If the name does not have a valid file extension or if the checkpoint type is unsupported.
-
-        Example:
-            ```python
-            model_state = {
-                'epoch': 10,
-                'state_dict': model.state_dict(),
-                'optimizer': optimizer.state_dict()
-            }
-            oc.snapshot.checkpoint(model_state, 'training/epoch_10.pth')
-            ```
-        """
-
-        self._get_version()
-        path = self._get_version_path("checkpoints")
-        os.makedirs(path, exist_ok=True)
-
-        if os.path.sep in name:
-            os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
-
-        ckpt_path = os.path.join(path, name)
-
-        if name.endswith(".pth") or name.endswith(".pt"):
-            assert _has_torch, "\n\nPyTorch is not installed. Please install PyTorch to save a checkpoint.\n\n"
-            torch.save(checkpoint, ckpt_path)
-        elif name.endswith(".json"):
-            if isinstance(checkpoint, dict):
-                with open(ckpt_path, "w") as f:
-                    json.dump(checkpoint, f, indent=4)
-            elif isinstance(checkpoint, list):
-                with open(ckpt_path, "w") as f:
-                    json.dump(checkpoint, f, indent=4)
-        elif name.endswith(".pkl") or name.endswith(".pickle"):
-            with open(ckpt_path, "wb") as f:
-                pickle.dump(checkpoint, f)
-        elif name.endswith(".txt"):
-            with open(ckpt_path, "w") as f:
-                f.write(str(checkpoint))
-        elif name.endswith(".csv"):
-            if pd and isinstance(checkpoint, pd.DataFrame):
-                checkpoint.to_csv(ckpt_path, index=False)
-            elif isinstance(checkpoint, (list, tuple)) and all(isinstance(row, (list, tuple)) for row in checkpoint):
-                with open(ckpt_path, "w", newline="") as f:
-                    writer = csv.writer(f)
-                    writer.writerows(checkpoint)
-            else:
-                raise ValueError("\n\nCSV requires DataFrame or 2D iterable.\n")
-        elif name.endswith(".npy"):
-            if isinstance(checkpoint, np.ndarray):
-                np.save(ckpt_path, checkpoint)
-            else:
-                raise ValueError(f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npy file. Only numpy arrays are supported.\n")
-        elif name.endswith(".npz"):
-            if isinstance(checkpoint, dict):
-                for value in checkpoint.values():
-                    if not isinstance(value, np.ndarray):
-                        raise ValueError(f"\n\nUnsupported checkpoint type {type(value)} for .npz file. Only dictionaries with numpy arrays are supported but got.\n")
-                np.savez(ckpt_path, **checkpoint)
-            else:
-                raise ValueError(f"\n\nUnsupported checkpoint type {type(checkpoint)} for .npz file. Only dictionaries are supported.\n")
-        else:
-            assert custom_saver is not None, "\n\nUnsupported file extension. Please provide a valid file extension or a custom saver function - custom_saver(checkpoint, name).\n"
-            custom_saver(checkpoint, ckpt_path)
-
-    def json(self, data: Union[Dict[Any, Any], List[Any]], name: str) -> None:
-        """
-        Save a dictionary or list to a JSON file.
-
-        Args:
-            data (Dict): The dictionary or list to be saved.
-            name (str): The name of the file to save the data to. If the name contains directory separators,
-                the necessary directories will be created.
-        Raises:
-            AssertionError: If the data is not a dictionary or list.
-            ValueError: If the data type is not supported.
-        """
-
-        self._get_version()
-        path = self._get_version_path("jsons")
-        os.makedirs(path, exist_ok=True)
-
-        if os.path.sep in name:
-            os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
-
-        if isinstance(data, dict):
-            with open(os.path.join(path, name), "w") as f:
-                json.dump(data, f, indent=4)
-        elif isinstance(data, list):
-            with open(os.path.join(path, name), "w") as f:
-                json.dump(data, f, indent=4)
-        else:
-            raise ValueError(f"\n\nUnsupported data type {type(data)}. Only dictionaries and lists are supported.\n")
-
-    def csv(self, df: pd.DataFrame, name: str) -> None:
-        """
-        Save a pandas DataFrame to a CSV file.
-        """
-        self._get_version()
-        path = self._get_version_path("csvs")
-        os.makedirs(path, exist_ok=True)
-
-        if os.path.sep in name:
-            os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
-
-        df.to_csv(os.path.join(path, name), index=False)
-
-    def figure(
-        self,
-        image: Union[npt.NDArray[Any], Image.Image, Figure],
-        name: str,
-        dpi: Optional[int] = 500,
-    ) -> None:
-        """
-        Save an image to the specified path with the given name.
-        This method supports saving images of various types including numpy arrays, PIL images, and matplotlib figures.
-        The image is saved in the directory corresponding to the current version under a subdirectory named "figures".
-
-        Args:
-            image (Any): The image to be saved. Supported types are:
-                - numpy.ndarray: The image will be normalized to the range [0, 255] and saved as a PNG file.
-                  Supports formats: (H, W), (H, W, 1), (H, W, 3), (1, H, W), (3, H, W)
-                - PIL.Image.Image: The image will be saved directly.
-                - matplotlib.figure.Figure: The figure will be saved using matplotlib's savefig method.
-            name (str): The name of the file to save the image as. If the name contains directory separators,
-                the necessary directories will be created.
-        Raises:
-            AssertionError: If Pillow is not installed (for numpy arrays and PIL images).
-            ValueError: If the image type or format is not supported.
-        """
-
-        self._get_version()
-        path = self._get_version_path("figures")
-        os.makedirs(path, exist_ok=True)
-
-        if os.path.sep in name:
-            os.makedirs(os.path.join(path, os.path.dirname(name)), exist_ok=True)
-
-        if isinstance(image, Figure):
-            # Handle matplotlib figures
-            image.savefig(os.path.join(path, name), bbox_inches="tight", dpi=dpi)
-        elif isinstance(image, np.ndarray):
-            # Handle different numpy array formats
-            if image.ndim == 2:  # (H, W)
-                pass  # Keep as is
-            elif image.ndim == 3:
-                if image.shape[0] == 1:  # (1, H, W)
-                    image = np.transpose(image, (1, 2, 0))  # Convert to (H, W, 1)
-                    image = np.squeeze(image, axis=2)  # Convert to (H, W)
-                elif image.shape[0] == 3:  # (3, H, W)
-                    image = np.transpose(image, (1, 2, 0))  # Convert to (H, W, 3)
-                elif image.shape[2] == 1:  # (H, W, 1)
-                    image = np.squeeze(image, axis=2)  # Convert to (H, W)
-                elif image.shape[2] == 3:  # (H, W, 3)
-                    pass  # Keep as is
-                else:
-                    raise ValueError(f"\n\nUnsupported image shape {image.shape}. Supported formats: (H, W), (H, W, 1), (H, W, 3), (1, H, W), (3, H, W)\n")
-            else:
-                raise ValueError(f"\n\nUnsupported image dimensions {image.ndim}. Only 2D and 3D arrays are supported.\n")
-
-            # Normalize to [0, 255]
-            np_image = image.astype("float32")
-            np_image = (np_image - np_image.min()) / np.ptp(np_image)
-            np_image *= 255.0
-            np_image = np_image.astype("uint8")
-
-            # Convert to PIL and save
-            pil_image = Image.fromarray(np_image)
-            pil_image.save(os.path.join(path, name))
-
-        elif isinstance(image, Image.Image):
-            image.save(os.path.join(path, name))
-        else:
-            raise ValueError(f"\n\nUnsupported image type {type(image)}. Only numpy arrays, PIL images, and matplotlib figures are supported.\n")
-
     def reset(self, confirm: bool = False) -> None:
         assert os.path.isdir(self._config_dir), "\n\nNot an OpenCrate project directory.\n"
 
@@ -406,63 +207,243 @@ class Snapshot:
 
         self._write_config(config)
 
+    def _check_setup(self):
+        if self._setup_not_done:
+            raise RuntimeError("\n\nSnapshot setup is not done yet, please perform the setup with `oc.snapshot.setup()` before accessing the snapshot.\n")
+
     @property
     def path(self):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         return _PATH(self.version, self.tag, self.snapshot_name)  # type: ignore
 
     def debug(self, *messages: str):
-        if self._setup_not_done:
-            self.setup(log_level="DEBUG")
+        self._check_setup()
 
         self.logger.debug(" ".join([str(item) for item in messages]))
 
     def info(self, *messages: str):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         self.logger.info(" ".join([str(item) for item in messages]))
 
     def warning(self, *messages: str):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         self.logger.warning(" ".join([str(item) for item in messages]))
 
     def error(self, *messages: str):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         self.logger.error(" ".join([str(item) for item in messages]))
 
     def critical(self, *messages: str):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         self.logger.critical(" ".join([str(item) for item in messages]))
 
     def success(self, *messages: str):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         self.logger.success(" ".join([str(item) for item in messages]))
 
     def exception(self, *messages: str):
-        if self._setup_not_done:
-            self.setup()
+        self._check_setup()
 
         self.logger.exception(" ".join([str(item) for item in messages]))
 
-    def __getattribute__(self, name: str) -> Any:
+    # def __getattribute__(self, name: str) -> Any:
+    #     try:
+    #         return super().__getattribute__(name)
+    #     except AttributeError:
+    #         if name.endswith("s"):
+    #             return partial(self._log_asset, snapshot_type=name + "es")
+    #         else:
+    #             return partial(self._log_asset, snapshot_type=name + "s")
+
+    # def _log_asset(self, item: Any, name: str, snapshot_type: str) -> None:
+    #     self._get_version()
+    #     path = self._get_version_path(snapshot_type)
+    #     os.makedirs(path, exist_ok=True)
+
+    #     with open(f"{path}/{name}", "wb") as file:
+    #         file.write(pickle.dumps(item))
+
+    # oc.snapshot.json("data.json").save(data)
+    # oc.snapshot.json("data.json").load()
+
+    def __getattribute__(self, attr_name: str) -> Any:
         try:
-            return super().__getattribute__(name)
+            return super().__getattribute__(attr_name)
         except AttributeError:
-            if name.endswith("s"):
-                return partial(self._log_asset, snapshot_type=name + "es")
+            return partial(self._log_asset, snapshot_type=attr_name)
+
+    def _log_asset(self, name: str, snapshot_type: str, handler=None, verbose=False) -> Any:
+        handlers = {
+            "json": io.json,
+            "csv": io.csv,
+            "image": io.image,
+            "video": io.video,
+            "audio": io.audio,
+            "text": io.text,
+            "yaml": io.yaml,
+            "checkpoint": io.checkpoint,
+        }
+
+        if snapshot_type in handlers.keys():
+            if snapshot_type.endswith("s"):
+                snapshot_dir_name = snapshot_type + "es"
             else:
-                return partial(self._log_asset, snapshot_type=name + "s")
+                snapshot_dir_name = snapshot_type + "s"
+        else:
+            snapshot_dir_name = snapshot_type
+
+        _path = os.path.join(self._get_version_path(snapshot_dir_name), name)
+        if os.path.splitext(_path)[1] == "":
+            os.makedirs(_path, exist_ok=True)
+
+        self._get_version()
+
+        class _Artifact:
+            def __init__(
+                self,
+                outer_instance,
+                snapshot_type,
+                name,
+                handler,
+                verbose,
+            ):
+                self.outer_instance = outer_instance
+                self.path = _path
+                self.verbose = verbose
+                self.name = name
+                self.snapshot_type = snapshot_type
+
+                self.actor = handlers.get(snapshot_type)
+                if self.actor is None:
+                    if handler is not None:
+                        if not (hasattr(handler, "save") and hasattr(handler, "load")):
+                            raise ValueError("\n\n`handler` must be a class with `save` and `load` methods.\n")
+                        # Instantiate the custom handler, passing it the artifact instance
+                        custom_handler = handler()
+                        custom_handler.path = self.path
+                        custom_handler.verbose = self.verbose
+                        custom_handler.name = self.name
+                        custom_handler.snapshot_type = self.snapshot_type
+                        self.actor = custom_handler
+
+                    else:
+                        raise ValueError(f"\n\nNo built-in artifact handler for type '{snapshot_type}', please provide a `handler`.\n")
+
+            def __getattr__(self, name):
+                if name not in [
+                    "save",
+                    "load",
+                    "delete",
+                    "backup",
+                    "list_backups",
+                    "exists",
+                    "__str__",
+                    "__repr__",
+                ]:
+                    return getattr(self.actor, name)
+                return getattr(self, name)
+
+            @property
+            def exists(self):
+                return os.path.exists(self.path)
+
+            def save(self, artifact, *args, **kwargs):
+                os.makedirs(os.path.dirname(self.path), exist_ok=True)
+                if self.actor is not None:
+                    self.actor.save(artifact, self.path, *args, **kwargs)
+                if self.verbose:
+                    self.outer_instance.info(f"✓ '{self.name}' of '{self.snapshot_type}' saved successfully at '{self.path}'.")
+
+            def load(self, *args, **kwargs):
+                if self.actor is not None:
+                    loaded_artifact = self.actor.load(self.path, *args, **kwargs)
+                else:
+                    loaded_artifact = None
+                if self.verbose:
+                    self.outer_instance.info(f"✓ '{self.name}' of '{self.snapshot_type}' loaded successfully from '{self.path}'.")
+                return loaded_artifact
+
+            def delete(self, confirm: bool = False) -> None:
+                """Delete the artifact file from the snapshot.
+
+                Args:
+                    confirm (bool): Must be True to actually delete the file
+
+                Raises:
+                    ValueError: If confirm is not True
+                """
+                if not os.path.exists(self.path):
+                    if self.verbose:
+                        self.outer_instance.info(f"✗ '{self.name}' of '{self.snapshot_type}' does not exist at '{self.path}'.")
+                    return
+
+                if not confirm:
+                    raise ValueError(f"\n\nPlease confirm deletion by setting confirm=True. This will permanently delete '{self.name}'.\n")
+
+                os.remove(self.path)
+                if self.verbose:
+                    self.outer_instance.info(f"✓ '{self.name}' of '{self.snapshot_type}' deleted successfully.")
+
+            def backup(self, tag: Optional[str] = None) -> Optional[str]:
+                """
+                Create a backup of the artifact file by appending a timestamp to its name.
+                """
+                if not os.path.exists(self.path):
+                    if self.verbose:
+                        self.outer_instance.info(f"✗ '{self.name}' of '{self.snapshot_type}' does not exist at '{self.path}', cannot create backup.")
+                    return None
+
+                path_name, ext = os.path.splitext(self.path)
+
+                if tag is None:
+                    timestamp = time.strftime("%H:%M:%S_%d-%b-%Y")
+                    backup_path = f"{path_name}.backup_{timestamp}{ext}"
+                else:
+                    backup_path = f"{path_name}.backup_{tag}{ext}"
+
+                copyfile(self.path, backup_path)
+                if self.verbose:
+                    self.outer_instance.info(f"✓ Backup of '{self.name}' of '{self.snapshot_type}' created at '{backup_path}'.")
+                return backup_path
+                if self.verbose:
+                    self.outer_instance.info(f"✓ Backup of '{self.name}' of '{self.snapshot_type}' created at '{backup_path}'.")
+                return backup_path
+
+            def list_backups(self) -> List[str]:
+                backup_paths = glob(f"{os.path.splitext(self.path)[0]}.backup_*")
+                return [os.path.basename(path) for path in backup_paths]
+
+            def __str__(self):
+                if os.path.exists(self.path):
+                    stat = os.stat(self.path)
+                    size_bytes = stat.st_size
+
+                    # Format size nicely
+                    if size_bytes < 1024:
+                        size_str = f"{size_bytes} bytes"
+                    elif size_bytes < 1024 * 1024:
+                        size_str = f"{size_bytes / 1024:.1f} KB"
+                    elif size_bytes < 1024 * 1024 * 1024:
+                        size_str = f"{size_bytes / (1024 * 1024):.1f} MB"
+                    else:
+                        size_str = f"{size_bytes / (1024 * 1024 * 1024):.1f} GB"
+
+                    last_modified = time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(stat.st_mtime))
+
+                    return f"Artifact: {self.name}\nType: {self.snapshot_type}\nPath: {os.path.abspath(self.path)}\nSize: {size_str}\nLast modified: {last_modified}"
+                else:
+                    return f"Artifact {self.name} is not created yet at path: {os.path.abspath(self.path)}"
+
+            def __repr__(self):
+                return self.__str__()
+
+        return _Artifact(self, snapshot_type, name, handler, verbose)
 
     def _snapshot_name(self) -> str:
         if self._name:
@@ -524,22 +505,8 @@ class Snapshot:
         self.version = config["snapshot_version"][self.snapshot_name]
 
     def _get_version_path(self, snapshot_type: str) -> str:
-        # version_name = f"v{self.version}" if self.version != "dev" else self.version
-
-        # if self.tag:
-        #     version_name = f"{version_name}:{self.tag}"
-
-        # return os.path.join("snapshots", self.snapshot_name, str(version_name), snapshot_type)
-
+        self._check_setup()
         return os.path.join("snapshots", self.snapshot_name, self.version_name, snapshot_type)
-
-    def _log_asset(self, item: Any, name: str, snapshot_type: str) -> None:
-        self._get_version()
-        path = self._get_version_path(snapshot_type)
-        os.makedirs(path, exist_ok=True)
-
-        with open(f"{path}/{name}", "wb") as file:
-            file.write(pickle.dumps(item))
 
 
 class _PATH:
@@ -553,7 +520,8 @@ class _PATH:
             name: Optional[str] = None,
             version: Optional[Union[str, int]] = None,
             tag: Optional[str] = None,
-            check_exists: bool = True,
+            check_exists: bool = False,
+            ensure_dir: bool = False,
         ) -> str:
             if version is None:
                 version = self.version
@@ -564,12 +532,18 @@ class _PATH:
             elif self.tag:
                 version = f"{version}:{self.tag}"
 
-            if snapshot_type.endswith("s"):
-                asset_type_plural = snapshot_type + "es"
-            else:
-                asset_type_plural = snapshot_type + "s"
+            # Match the logic from _log_asset
+            handlers = {"json", "csv", "image", "video", "audio", "text", "yaml", "checkpoint"}
 
-            asset_dir = os.path.join("snapshots", self.snapshot_name, str(version), asset_type_plural)
+            if snapshot_type in handlers:
+                if snapshot_type.endswith("s"):
+                    snapshot_dir_name = snapshot_type + "es"
+                else:
+                    snapshot_dir_name = snapshot_type + "s"
+            else:
+                snapshot_dir_name = snapshot_type
+
+            asset_dir = os.path.join("snapshots", self.snapshot_name, str(version), snapshot_dir_name)
 
             if name is None:
                 return asset_dir
@@ -580,6 +554,9 @@ class _PATH:
             asset_path = os.path.join(asset_dir, name)
             if check_exists:
                 assert os.path.exists(asset_path), f"\n\nNo snapshot '{name}' found in '{snapshot_type}' for version '{version}'.\n"
+
+            if ensure_dir:
+                os.makedirs(asset_dir, exist_ok=True)
 
             return asset_path
 

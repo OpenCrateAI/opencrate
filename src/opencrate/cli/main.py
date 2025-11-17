@@ -1,5 +1,6 @@
 from . import (
     environment,  # noqa: F401 # direct command file must be imported
+    host_access,  # noqa: F401 # direct command file must be imported
     init,  # noqa: F401 # direct command file must be imported
 )
 from .app import app

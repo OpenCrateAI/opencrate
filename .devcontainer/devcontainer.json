@@ -28,7 +28,6 @@
                 "mhutchie.git-graph",
                 "charliermarsh.ruff",
                 "ms-python.debugpy",
-                "ms-python.isort",
                 "ms-python.mypy-type-checker",
                 "ms-python.python",
                 "ms-python.vscode-pylance",

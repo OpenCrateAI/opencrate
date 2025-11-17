@@ -131,7 +131,7 @@ def start() -> None:
         try:
             cli.docker_client.images.get(cli.config.get("docker_image"))
         except ImageNotFound:
-            cli.console.print("× Docker image not found, skipping...")
+            cli.console.print("✗ Docker image not found, skipping...")
             cli.get_help("build_image")()
             return
 
@@ -191,7 +191,7 @@ def stop(down: bool = False, all: bool = False) -> None:
                 cli.get_help("start_container")()
         except NotFound:
             cli.console.print(
-                f"× Runtime {cli.config.get('version')} not found, skipping...",
+                f"✗ Runtime {cli.config.get('version')} not found, skipping...",
             )
             if not down:
                 cli.get_help("start_container")()
@@ -223,7 +223,7 @@ def enter() -> None:
                 cli.console.print("[ERROR]: Container is not running")
                 cli.get_help("start_container")()
         except NotFound:
-            cli.console.print("× Container not found, skipping...")
+            cli.console.print("✗ Container not found, skipping...")
             cli.get_help("start_container")()
 
 
@@ -514,7 +514,7 @@ def runtime(
                 container.remove()
                 cli.console.print(f"✓ Deleted container {container_name}")
             except NotFound:
-                cli.console.print(f"× Container {container_name} not found, skipping...")
+                cli.console.print(f"✗ Container {container_name} not found, skipping...")
 
             # Delete the docker image
             try:
@@ -522,7 +522,7 @@ def runtime(
                 cli.docker_client.images.remove(image_name, force=True)
                 cli.console.print(f"✓ Deleted docker image {image_name}")
             except ImageNotFound:
-                cli.console.print(f"× Image {image_name} not found, skipping...")
+                cli.console.print(f"✗ Image {image_name} not found, skipping...")
 
         with utils.spinner(cli.console, "Cleaning up git history ..."):
             # Delete the git commit
@@ -590,7 +590,7 @@ def kill(confirm: bool = False) -> None:
             cli.get_help("build_image")()
     except ImageNotFound:
         cli.console.print(
-            f"× {cli.config.get('version')} runtime image not found, skipping...",
+            f"✗ {cli.config.get('version')} runtime image not found, skipping...",
             style="bold red",
         )
     except Exception as e:
@@ -788,7 +788,7 @@ def branch(
                 cli.docker_client.images.prune()
             except ImageNotFound:
                 cli.console.print(
-                    f"× Image {image_name} not found, skipping...",
+                    f"✗ Image {image_name} not found, skipping...",
                     style="bold red",
                 )
 

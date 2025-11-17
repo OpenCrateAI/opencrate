@@ -10,5 +10,8 @@
     "docker_container": "",
     "runtime": "",
     "git_name": "",
-    "git_email": ""
+    "git_email": [
+        "tb-cli",
+        
+    ]
 }

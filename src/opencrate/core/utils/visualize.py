@@ -138,18 +138,59 @@ def image_stack(
     alpha: Union[float, List[Optional[float]]] = 1.0,
     save: Optional[str] = None,
 ) -> None:
-    """
-    Display images in a stack grid format.
+    """Displays images in a stacked grid format, where each list of images
+    forms a column.
+
+    This function is useful for comparing corresponding images side-by-side,
+    such as original images, heatmaps, and masked versions.
 
     Args:
-        stack_lists: List of image lists, each representing a column
-        titles: Optional titles for each column
-        figsize: Figure size (width, height)
-        bgr2rgb: Whether to convert BGR to RGB
-        normalize: Whether to normalize images
-        cmap: Colormap(s) to use
-        alpha: Alpha value(s) for transparency
-        save: Path to save the figure
+        stack_lists (List[List[Union[Image.Image, npt.NDArray[Any]]]]): A list
+            where each inner list contains images for one column. All inner
+            lists must have the same length.
+        titles (Optional[List[str]]): A list of titles for each column.
+            Defaults to `None`.
+        figsize (Tuple[float, float]): The size of the figure. Defaults to (8, 8).
+        bgr2rgb (bool): If `True`, converts images from BGR to RGB.
+            Defaults to `False`.
+        normalize (bool): If `True`, normalizes images to the [0, 1] range.
+            Defaults to `True`.
+        cmap (Optional[Union[str, List[Optional[str]]]]): The colormap(s) to apply.
+            Can be a single string or a list of strings for each image.
+            Defaults to `None`.
+        alpha (Union[float, List[Optional[float]]]): The alpha (transparency)
+            value(s). Can be a single float or a list of floats for each image.
+            Defaults to 1.0.
+        save (Optional[str]): The file path to save the figure. If `None`, the
+            figure is not saved. Defaults to `None`.
+
+    Example:
+        Display two columns of images with titles:
+        ```python
+        # Create dummy images
+        originals = [np.random.rand(50, 50) for _ in range(3)]
+        processed = [img * 0.5 for img in originals]
+
+        oc.visualize.image_stack(
+            [originals, processed],
+            titles=["Original", "Processed"],
+            figsize=(6, 9)
+        )
+        ```
+        ---
+        Display with mixed colormaps and transparency:
+        ```python
+        # Create dummy images
+        image1 = np.random.rand(50, 50)
+        heatmap = np.random.rand(50, 50)
+
+        oc.visualize.image_stack(
+            [[image1], [heatmap]],
+            titles=["Image", "Heatmap"],
+            cmap=["gray", "hot"],
+            alpha=[1.0, 0.7]
+        )
+        ```
     """
     # Validate input types
     if not isinstance(stack_lists, list):
@@ -214,19 +255,45 @@ def image_grid(
     title: Optional[str] = None,
     save: Optional[str] = None,
 ) -> Figure:
-    """
-    Display images in a grid format.
+    """Displays a list of images in a grid format.
+
+    This function is ideal for visualizing a collection of images, such as a
+    dataset sample or the output of a generative model.
 
     Args:
-        grid_list: List of images or batch of images as numpy array
-        shape: Grid shape (rows, cols)
-        figsize: Figure size
-        bgr2rgb: Whether to convert BGR to RGB
-        normalize: Whether to normalize images
-        cmap: Colormap(s) to use
-        alpha: Alpha value(s) for transparency
-        title: Figure title
-        save: Path to save the figure
+        grid_list (Union[List[Union[Image.Image, npt.NDArray[Any]]], npt.NDArray[Any]]):
+            A list of images or a 4D numpy array (batch of images).
+        shape (Tuple[int, int]): The grid dimensions (rows, cols).
+            Defaults to (3, 3).
+        figsize (int): The size of the figure. The figure will be square.
+            Defaults to 10.
+        bgr2rgb (bool): If `True`, converts images from BGR to RGB.
+            Defaults to `False`.
+        normalize (bool): If `True`, normalizes images to the [0, 1] range.
+            Defaults to `True`.
+        cmap (Optional[Union[str, List[Optional[str]]]]): The colormap(s) to apply.
+            Defaults to `None`.
+        alpha (Union[float, List[Optional[float]]]): The alpha (transparency)
+            value(s). Defaults to 1.0.
+        title (Optional[str]): A title for the entire figure. Defaults to `None`.
+        save (Optional[str]): The file path to save the figure. Defaults to `None`.
+
+    Returns:
+        Figure: The matplotlib Figure object.
+
+    Example:
+        Display a grid of random grayscale images:
+        ```python
+        images = [np.random.rand(50, 50) for _ in range(9)]
+        oc.visualize.image_grid(images, shape=(3, 3), title="Grayscale Images")
+        ```
+        ---
+        Display a batch of RGB images from a numpy array:
+        ```python
+        # Create a batch of 4 random RGB images
+        image_batch = np.random.rand(4, 50, 50, 3)
+        oc.visualize.image_grid(image_batch, shape=(2, 2), title="RGB Batch")
+        ```
     """
     # Validate inputs
     if not isinstance(shape, (tuple, list)) or len(shape) != 2:
@@ -296,22 +363,57 @@ def labeled_images(
     alpha: Union[float, List[Optional[float]]] = 1.0,
     show: bool = True,
 ) -> Figure:
-    """
-    Display labeled images in a grid format.
+    """Displays a grid of images with their corresponding labels.
+
+    This function is perfect for visualizing datasets for classification tasks,
+    showing both the image and its ground truth or predicted label.
 
     Args:
-        image_batch: Batch of images
-        label_batch: Corresponding labels
-        shape: Grid shape (rows, cols)
-        label_names: Optional mapping from label indices to names
-        figsize: Figure size
-        title: Figure title
-        bgr2rgb: Whether to convert BGR to RGB
-        normalize: Whether to normalize images
-        save: Path to save the figure
-        cmap: Colormap(s) to use
-        alpha: Alpha value(s) for transparency
-        show: Whether to display the figure
+        image_batch (Union[List[Union[Image.Image, npt.NDArray[Any]]], npt.NDArray[Any]]):
+            A list of images or a 4D numpy array (batch of images).
+        label_batch (Union[List[str], npt.NDArray[Any]]): A list of labels
+            corresponding to the images.
+        shape (Tuple[int, int]): The grid dimensions (rows, cols).
+        label_names (Optional[List[str]]): A list of strings to map numeric
+            labels to human-readable names. Defaults to `None`.
+        figsize (int): The size of the figure. The figure will be square.
+            Defaults to 10.
+        title (Optional[str]): A title for the entire figure. Defaults to `None`.
+        bgr2rgb (bool): If `True`, converts images from BGR to RGB.
+            Defaults to `False`.
+        normalize (bool): If `True`, normalizes images to the [0, 1] range.
+            Defaults to `True`.
+        save (Optional[str]): The file path to save the figure. Defaults to `None`.
+        cmap (Optional[Union[str, List[Optional[str]]]]): The colormap(s) to apply.
+            Defaults to `None`.
+        alpha (Union[float, List[Optional[float]]]): The alpha (transparency)
+            value(s). Defaults to 1.0.
+        show (bool): If `True`, displays the plot. Defaults to `True`.
+
+    Returns:
+        Figure: The matplotlib Figure object.
+
+    Example:
+        Display images with numeric labels:
+        ```python
+        images = [np.random.rand(28, 28) for _ in range(4)]
+        labels = [0, 1, 1, 0]
+        oc.visualize.labeled_images(images, labels, shape=(2, 2))
+        ```
+        ---
+        Display images with mapped label names:
+        ```python
+        images = [np.random.rand(28, 28, 3) for _ in range(4)]
+        labels = [1, 0, 1, 0]
+        class_names = ["Cat", "Dog"]
+        oc.visualize.labeled_images(
+            images,
+            labels,
+            shape=(2, 2),
+            label_names=class_names,
+            title="Cats and Dogs"
+        )
+        ```
     """
     # Validate inputs
     if not isinstance(shape, (tuple, list)) or len(shape) != 2:

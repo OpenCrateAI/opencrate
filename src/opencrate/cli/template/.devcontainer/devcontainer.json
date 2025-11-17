@@ -27,7 +27,6 @@
                 "mechatroner.rainbow-csv",
                 "mhutchie.git-graph",
                 "charliermarsh.ruff",
-                "ms-python.isort",
                 "ms-python.mypy-type-checker",
                 "ms-python.python",
                 "ms-python.vscode-pylance",
