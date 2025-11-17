@@ -1,6 +1,6 @@
 import csv
 import os
-from typing import Any, List, Union
+from typing import Any, List, Optional, Union
 
 import numpy as np
 import pandas as pd
@@ -10,7 +10,7 @@ from numpy.typing import NDArray
 CsvDataType = Union[List[Any], NDArray[Any], "pd.DataFrame"]
 
 
-def load(path: str, lib: str = "pandas", **kwargs: Any) -> list[list[Any]] | NDArray[Any] | pd.DataFrame:
+def load(path: str, lib: str = "pandas", **kwargs: Any) -> CsvDataType:
     """
     Loads data from a CSV file using different libraries.
 
@@ -68,7 +68,7 @@ def load(path: str, lib: str = "pandas", **kwargs: Any) -> list[list[Any]] | NDA
         raise OSError(f"Failed to load CSV from {path}: {e}")
 
 
-def save(data: CsvDataType, path: str, lib: str | None = None, **kwargs: Any) -> None:
+def save(data: CsvDataType, path: str, lib: Optional[str] = None, **kwargs: Any) -> None:
     """
     Saves data to a CSV file using different libraries.
 
@@ -122,7 +122,7 @@ def save(data: CsvDataType, path: str, lib: str | None = None, **kwargs: Any) ->
         elif isinstance(data, pd.DataFrame):
             lib = "pandas"
         else:
-            raise ValueError("Could not infer library from data type. Please specify 'lib'.")
+            raise ValueError(f"Could not infer library from data type. Data type: {type(data)}, supported types are list, np.ndarray, pd.DataFrame.")
 
     # Ensure the output directory exists
     output_dir = os.path.dirname(path)
