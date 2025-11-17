@@ -106,12 +106,6 @@ jobs:
                   password: ${{ secrets.DOCKERHUB_TOKEN }}
 
             # Build a local AMD64 image first for testing - faster than multi-platform build
-            - run: df -h
-            - name: Clean up
-              run: |
-                  sudo docker image prune --all --force
-                  sudo docker builder prune -a
-            - run: df -h
             - name: Build local image for testing
               run: |
                   make ci-build MODE=test \
@@ -119,7 +113,12 @@ jobs:
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }} \
                     REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
-
+            - run: df -h
+            - name: Clean up
+              run: |
+                  sudo docker image prune --all --force
+                  sudo docker builder prune -a
+            - run: df -h
             # Run tests on the locally built image to ensure it works correctly
             - name: Test local image
               run: |
