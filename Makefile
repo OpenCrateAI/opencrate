@@ -130,7 +130,7 @@ docker-test:
 	mkdir -p tests/logs; \
 	echo "--- Running tests in Docker container from image: $$IMAGE_TAG ---"; \
 	echo "--- Log file: $$LOG_FILE ---"; \
-	docker run --rm -it \
+	docker run --rm \
 		-v $(shell pwd)/tests:/home/opencrate/tests \
 		-v $(shell pwd)/src:/home/opencrate/src \
 		-v $(shell pwd)/Makefile:/home/opencrate/Makefile:ro \
