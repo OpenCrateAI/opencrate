@@ -306,11 +306,12 @@ class TestUtilsIO:
     def test_download_file(self, tmp_path):
         archive_file = tmp_path / "archive.zip"
         download_file(
-            "https://www.learningcontainer.com/download/sample-zip-files/?wpdmdl=1637&refresh=67ac3bd61a3771739340758",
+            "https://httpbin.org/bytes/100",
             str(archive_file),
             replace=True,
         )
         assert archive_file.exists()
+        assert archive_file.stat().st_size == 100
 
     def test_create_archive(self, tmp_path):
         source_dir = tmp_path / "source_dir"
