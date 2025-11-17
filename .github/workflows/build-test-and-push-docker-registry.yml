@@ -117,7 +117,11 @@ jobs:
             - name: Clean up
               run: |
                   sudo docker image prune --all --force
-                  sudo docker builder prune -a
+                  sudo docker buildx prune -a --force
+                  sudo apt clean -y
+                  sudo apt autoclean -y
+                  sudo apt autoremove --purge -y
+                  sudo rm -rf ~/.cache/*
             - run: df -h
             # Run tests on the locally built image to ensure it works correctly
             - name: Test local image
