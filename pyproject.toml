@@ -53,6 +53,7 @@ dev = [
     "pytest",
     "pytest-cov",
     "pytest-random-order",
+    "pytest-sugar",
     "tox",
     "torch",
     "torchvision",
