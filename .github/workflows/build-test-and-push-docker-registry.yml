@@ -62,7 +62,7 @@ jobs:
             - name: Upload Dockerfiles as artifact
               uses: actions/upload-artifact@v4
               with:
-                  name: dockerfiles
+                  name: generated-dockerfiles
                   path: ./docker/dockerfiles
 
     # Second job: Build and test images for all Python/runtime combinations in parallel
@@ -87,7 +87,7 @@ jobs:
             - name: Download Dockerfiles artifact
               uses: actions/download-artifact@v4
               with:
-                  name: dockerfiles
+                  name: generated-dockerfiles
                   path: ./docker/dockerfiles
 
             # Set up QEMU for multi-platform builds (ARM64 support)
@@ -113,6 +113,8 @@ jobs:
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }} \
                     REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+            
+            # Perform cleanup to save storage
             - name: Clean up before
               run: df -h
             - name: Clean up
@@ -125,6 +127,7 @@ jobs:
                   sudo rm -rf ~/.cache/*
             - name: Clean up after
               run: df -h
+            
             # Run tests on the locally built image to ensure it works correctly
             - name: Test local image
               run: |
@@ -133,6 +136,13 @@ jobs:
                     RUNTIME=${{ matrix.runtime }} \
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }}
+            
+            # Save generated Dockerfiles as artifacts for the build job
+            - name: Upload test logs
+              uses: actions/upload-artifact@v4
+              with:
+                  name: test-logs-${{ matrix.runtime }}-py${{ matrix.python_version }}
+                  path: ./tests/logs
 
             # Only if tests pass, build and push the multi-platform image to registry
             - name: Build and push multi-platform image on success`
