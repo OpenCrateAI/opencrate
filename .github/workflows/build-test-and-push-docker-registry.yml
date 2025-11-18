@@ -2,173 +2,169 @@ name: Build, Test, and Push Docker Registry
 
 # Define when this workflow should run
 on:
-    # Trigger on new version tags - runs when a new release tag is pushed
-    push:
-        tags:
-            - 'v*.*.*'
-    
-    # Add a scheduled trigger to run every Sunday at 3 AM UTC - keeps images fresh weekly
-    schedule:
-        - cron: '0 3 * * 0'
+  # Trigger on new version tags - runs when a new release tag is pushed
+  push:
+    tags:
+      - "v*.*.*"
 
-    # Add a manual trigger with a rebuild option - allows developers to force rebuild when needed
-    workflow_dispatch:
-        inputs:
-            REBUILD_BASE:
-                description: 'Force a pull of new base layers and refresh the cache?'
-                required: true
-                type: boolean
-                default: false
+  # Add a scheduled trigger to run every Sunday at 3 AM UTC - keeps images fresh weekly
+  schedule:
+    - cron: "0 3 * * 0"
 
-# Global environment variables - shared cache image names for CPU and CUDA builds
-env:
-    CACHE_IMAGE_CPU: braindotai/opencrate-build-cache:cpu-latest
-    CACHE_IMAGE_CUDA: braindotai/opencrate-build-cache:cuda-latest
+  # Add a manual trigger with a rebuild option - allows developers to force rebuild when needed
+  workflow_dispatch:
+    inputs:
+      REBUILD_BASE:
+        description: "Force a pull of new base layers and refresh the cache?"
+        required: true
+        type: boolean
+        default: false
 
 jobs:
-    # First job: Generate Dockerfiles for all Python versions and runtimes
-    generate-files:
-        name: Generate Dockerfiles
-        runs-on: ubuntu-latest
-        # Output variables that other jobs can use - version string and rebuild flag
-        outputs:
-            version: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && github.ref_name || 'main' }}
-            rebuild_flag: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event.inputs.REBUILD_BASE }}
-        steps:
-            # Get the source code from the repository
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  # First job: Generate Dockerfiles for all Python versions and runtimes
+  generate-files:
+    name: Generate Dockerfiles
+    runs-on: ubuntu-latest
+    # Output variables that other jobs can use - version string and rebuild flag
+    outputs:
+      version: ${{ steps.get_version.outputs.VERSION }}
+      rebuild_flag: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event.inputs.REBUILD_BASE }}
+      # rebuild_flag will be true for scheduled runs, tag pushes, or if the manual rebuild option is selected
+    steps:
+      # Get the source code from the repository
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            # Extract version from Git reference for tagging images
-            - name: Get the version from the Git ref
-              id: get_version
-              run: echo "VERSION=${{ github.ref_name }}" >> $GITHUB_OUTPUT
-            
-            # Set up Python 3.10 for running the Dockerfile generator
-            - name: Set up Python
-              uses: actions/setup-python@v5
-              with:
-                  python-version: '3.10'
+      # Extract version from VERSION file for consistent tagging
+      - name: Get the version from VERSION file
+        id: get_version
+        run: echo "VERSION=$(cat VERSION | tr -d '\n')" >> $GITHUB_OUTPUT
 
-            # Install required Python packages for the Dockerfile generator script
-            - name: Install Python dependencies
-              run: pip install rich loguru
+      # Set up Python 3.10 for running the Dockerfile generator
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
 
-            # Generate all Dockerfiles using the project's Makefile
-            - name: Generate all Dockerfiles
-              run: make docker-generate
+      # Install required Python packages for the Dockerfile generator script
+      - name: Install Python dependencies
+        run: pip install rich loguru
 
-            # Save generated Dockerfiles as artifacts for the build job
-            - name: Upload Dockerfiles as artifact
-              uses: actions/upload-artifact@v4
-              with:
-                  name: generated-dockerfiles
-                  path: ./docker/dockerfiles
+      # Generate all Dockerfiles using the project's Makefile
+      - name: Generate all Dockerfiles
+        run: make docker-generate
 
-    # Second job: Build and test images for all Python/runtime combinations in parallel
-    build-and-test:
-        name: Build & Test ${{ matrix.runtime }}-py${{ matrix.python_version }}
-        runs-on: ubuntu-latest
-        # Wait for Dockerfile generation to complete before starting
-        needs: generate-files
-        # Matrix strategy runs this job for each combination of runtime and Python version
-        strategy:
-            fail-fast: false
-            matrix:
-                runtime: [cpu, cuda]
-                python_version: ['3.7', '3.8', '3.9', '3.10', '3.11', '3.12', '3.13']
+      # Save generated Dockerfiles as artifacts for the build job
+      - name: Upload Dockerfiles as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: generated-dockerfiles
+          path: ./docker/dockerfiles
 
-        steps:
-            # Get the source code for building Docker images
-            - name: Checkout repository
-              uses: actions/checkout@v4
+  # Second job: Build and test images for all Python/runtime combinations in parallel
+  build-and-test:
+    name: Build & Test ${{ matrix.runtime }}-py${{ matrix.python_version }}
+    runs-on: ubuntu-latest
+    # Wait for Dockerfile generation to complete before starting
+    needs: generate-files
+    # Matrix strategy runs this job for each combination of runtime and Python version
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [cpu, cuda]
+        python_version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
 
-            # Download the generated Dockerfiles from the previous job
-            - name: Download Dockerfiles artifact
-              uses: actions/download-artifact@v4
-              with:
-                  name: generated-dockerfiles
-                  path: ./docker/dockerfiles
+    steps:
+      # Get the source code for building Docker images
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-            # Set up QEMU for multi-platform builds (ARM64 support)
-            - name: Set up QEMU
-              uses: docker/setup-qemu-action@v3
+      # Download the generated Dockerfiles from the previous job
+      - name: Download Dockerfiles artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-dockerfiles
+          path: ./docker/dockerfiles
 
-            # Set up Docker Buildx for advanced build features and multi-platform support
-            - name: Set up Docker Buildx
-              uses: docker/setup-buildx-action@v3
+      # Set up QEMU for multi-platform builds (ARM64 support)
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
 
-            # Login to Docker Hub to push images to the registry
-            - name: Login to Docker Hub
-              uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
+      # Set up Docker Buildx for advanced build features and multi-platform support
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
 
-            # Build a local AMD64 image first for testing - faster than multi-platform build
-            - name: Build local image for testing
-              run: |
-                  make ci-build MODE=test \
-                    RUNTIME=${{ matrix.runtime }} \
-                    PYTHON_VERSION=${{ matrix.python_version }} \
-                    VERSION=${{ needs.generate-files.outputs.version }} \
-                    REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
-            
-            # Perform cleanup to save storage
-            - name: Clean up before
-              run: df -h
-            - name: Clean up
-              run: |
-                  sudo docker buildx prune -a --force
-                  sudo apt clean -y
-                  sudo apt autoclean -y
-                  sudo apt autoremove --purge -y
-                  sudo rm -rf ~/.cache/*
-            - name: Clean up after
-              run: df -h
-            
-            # Run tests on the locally built image to ensure it works correctly
-            - name: Test local image
-              run: |
-                  make docker-test \
-                    DEPS=ci
-                    RUNTIME=${{ matrix.runtime }} \
-                    PYTHON_VERSION=${{ matrix.python_version }} \
-                    VERSION=${{ needs.generate-files.outputs.version }}
-            
-            # Save generated Dockerfiles as artifacts for the build job
-            - name: Upload test logs
-              if: always()
-              uses: actions/upload-artifact@v4
-              with:
-                  name: test-logs-${{ matrix.runtime }}-py${{ matrix.python_version }}
-                  path: ./tests/logs
+      # Login to Docker Hub to push images to the registry
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-            # Only if tests pass, build and push the multi-platform image to registry
-            - name: Build and push multi-platform image on success`
-              run: |
-                  make ci-build MODE=push \
-                    RUNTIME=${{ matrix.runtime }} \
-                    PYTHON_VERSION=${{ matrix.python_version }} \
-                    VERSION=${{ needs.generate-files.outputs.version }} \
-                    REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
-          
-    # Third job: Tag successful builds as "latest" - only runs for version tag releases
-    release-latest:
-        name: Tag "latest"
-        runs-on: ubuntu-latest
-        # Wait for all builds to complete successfully before tagging as latest
-        needs: [generate-files, build-and-test]
-        # Only tag latest on successful tag pushes, not on scheduled runs or manual triggers
-        if: success() && github.event_name == 'push' && github.ref_type == 'tag'
-        steps:
-            # Login to Docker Hub to update the latest tags
-            - name: Login to Docker Hub
-              uses: docker/login-action@v3
-              with:
-                  username: ${{ secrets.DOCKERHUB_USERNAME }}
-                  password: ${{ secrets.DOCKERHUB_TOKEN }}
-                  
-            # Tag all successfully built images with "latest" tag for easy access
-            - name: Tag and Push "latest" tag
-              run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}
+      # Build a local AMD64 image first for testing - faster than multi-platform build
+      - name: Build local image for testing
+        run: |
+          make ci-build MODE=test \
+            RUNTIME=${{ matrix.runtime }} \
+            PYTHON_VERSION=${{ matrix.python_version }} \
+            VERSION=${{ needs.generate-files.outputs.version }} \
+            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+
+      # Perform cleanup to save storage
+      - name: Clean up before
+        run: df -h
+      - name: Clean up
+        run: |
+          sudo docker buildx prune -a --force
+          sudo apt clean -y
+          sudo apt autoclean -y
+          sudo apt autoremove --purge -y
+          sudo rm -rf ~/.cache/*
+      - name: Clean up after
+        run: df -h
+
+      # Run tests on the locally built image to ensure it works correctly
+      - name: Test local image
+        run: |
+          make docker-test \
+            DEPS=ci \
+            RUNTIME=${{ matrix.runtime }} \
+            PYTHON_VERSION=${{ matrix.python_version }} \
+            VERSION=${{ needs.generate-files.outputs.version }}
+
+      # Save generated Dockerfiles as artifacts for the build job
+      - name: Upload test logs
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-logs-${{ matrix.runtime }}-py${{ matrix.python_version }}
+          path: ./tests/logs
+
+      # Only if tests pass, build and push the multi-platform image to registry
+      - name: Build and push multi-platform image on success`
+        run: |
+          make ci-build MODE=push \
+            RUNTIME=${{ matrix.runtime }} \
+            PYTHON_VERSION=${{ matrix.python_version }} \
+            VERSION=${{ needs.generate-files.outputs.version }} \
+            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+
+  # Third job: Tag successful builds as "latest" - only runs for version tag releases
+  release-latest:
+    name: Tag "latest"
+    runs-on: ubuntu-latest
+    # Wait for all builds to complete successfully before tagging as latest
+    needs: [generate-files, build-and-test]
+    # Only tag latest on successful tag pushes, not on scheduled runs or manual triggers
+    if: success() && github.event_name == 'push' && github.ref_type == 'tag'
+    steps:
+      # Login to Docker Hub to update the latest tags
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      # Tag all successfully built images with "latest" tag for easy access
+      - name: Tag and Push "latest" tag
+        run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}

@@ -1,5 +1,7 @@
 SHELL := /bin/bash
 PYTHON_VERSION ?= 3.10
+RUNTIME ?= cuda
+CACHE_IMAGE_PREFIX ?= braindotai/opencrate-build-cache
 
 VERSION ?= $(shell cat VERSION | tr -d '\n')
 
@@ -10,11 +12,8 @@ VERSION ?= $(shell cat VERSION | tr -d '\n')
 # This target builds and tests a single Docker image for CI/CD workflows.
 build:
 # --- 1. Common Variable Setup ---
-	if [ "$(RUNTIME)" = "cpu" ]; then
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CPU)";
-	else
-		CACHE_IMAGE_VAR="$(CACHE_IMAGE_CUDA)";
-	fi;
+	# Use per-Python-version cache to avoid parallel write conflicts
+	CACHE_IMAGE_VAR="$(CACHE_IMAGE_PREFIX):$(RUNTIME)-py$(PYTHON_VERSION)";
 
 	PULL_FLAG="";
 	CACHE_TO_FLAG="";
