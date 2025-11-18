@@ -199,27 +199,30 @@ docker-test:
 			pip install .[$(DEPS)] --quiet --extra-index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
 			echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)" && \
 			if [ "$(DEPS)" = "ci" ]; then \
-				make test-all; \
-			else \
 				make test-ruff test-pytest; \
+			else \
+				make test-all; \
 			fi' | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
 		echo -e "\n$(BOLD_RED)======== ✗ Tests failed ========$(RESET)"; \
 		echo -e "$(BOLD_RED)Check log file: $$LOG_FILE$(RESET)\n"; \
 		exit 1; \
 	fi; \
-	echo -e "\n$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)"; \
 	echo -e "$(GREEN)Log saved to: $$LOG_FILE$(RESET)\n"
-	RUNTIMES_TO_USE="cpu cuda"; \
-	echo -e "  $(BOLD_BLUE)▶ Python versions: $$PYTHON_VERSIONS_TO_USE$(RESET)"; \
-	echo -e "  $(BOLD_BLUE)▶ Runtimes: $$RUNTIMES_TO_USE$(RESET)\n"; \
+	echo -e "\n$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)"; \
+
+docker-test-all:
+	@echo -e "$(BOLD_YELLOW)\n======== ● Testing OpenCrate in Docker Versions ========$(RESET)"
+	@PYTHON_VERSIONS_TO_USE="$${PYTHON_VERSIONS:-3.7 3.8 3.9 3.10 3.11 3.12 3.13}"; \
+	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
+	echo -e "$(BOLD_BLUE)- Python versions: $$PYTHON_VERSIONS_TO_USE$(RESET)"; \
+	echo -e "$(BOLD_BLUE)- Runtimes: $$RUNTIMES_TO_USE$(RESET)"; \
 	for python_version in $$PYTHON_VERSIONS_TO_USE; do \
 		for runtime in $$RUNTIMES_TO_USE; do \
-			echo -e "$(BOLD_BLUE)\n▶ Testing $$runtime-py$$python_version$(RESET)"; \
 			make docker-test PYTHON_VERSION=$$python_version RUNTIME=$$runtime; \
 		done; \
 	done; \
-	echo -e "\n$(BOLD_GREEN)======== ✓ All Docker tests completed successfully! ========$(RESET)\n";
+	echo -e "$(BOLD_GREEN)======== ✓ All Docker tests completed successfully! ========$(RESET)\n";
 
 
 help:

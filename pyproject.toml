@@ -79,7 +79,6 @@ ci = [
     "torch",
     "types-requests",
     "types-PyYAML",
-    "types-docker",
 ]
 
 [project.scripts]
