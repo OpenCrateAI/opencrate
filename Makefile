@@ -196,8 +196,13 @@ docker-test:
 			echo "$(BOLD_BLUE)▶ Installing dependencies...$(RESET)" && \
 			pip install pip --quiet --upgrade --root-user-action=ignore && \
 			pip install .[$(DEPS)] --quiet --extra-index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
-			echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)" && \
-			make test-all' | tee $$LOG_FILE; \
+			if [ "$(DEPS)" = "ci" ]; then \
+				echo "\n$(BOLD_BLUE)▶ Running CI test suite...$(RESET)"; \
+				make test-ruff test-pytest; \
+			else \
+				echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)"; \
+				make test-all; \ # we don't wanna run mypy in ci (some type hint libraries aren't supported for all python versions)
+			fi' | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
 		echo -e "\n$(BOLD_RED)======== ✗ Tests failed ========$(RESET)"; \
 		echo -e "$(BOLD_RED)Check log file: $$LOG_FILE$(RESET)\n"; \
@@ -205,11 +210,6 @@ docker-test:
 	fi; \
 	echo -e "\n$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)"; \
 	echo -e "$(GREEN)Log saved to: $$LOG_FILE$(RESET)\n"
-
-# must be run outside of opencrate's development environment
-docker-test-all:
-	@set -e;
-	@echo -e "$(BOLD_YELLOW)\n======== ● Running all Docker tests ========$(RESET)\n"
 	@PYTHON_VERSIONS_TO_USE="3.7 3.8 3.9 3.10 3.11 3.12 3.13"; \
 	RUNTIMES_TO_USE="cpu cuda"; \
 	echo -e "  $(BOLD_BLUE)▶ Python versions: $$PYTHON_VERSIONS_TO_USE$(RESET)"; \

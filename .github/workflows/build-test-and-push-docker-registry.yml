@@ -141,7 +141,7 @@ jobs:
           path: ./tests/logs
 
       # Only if tests pass, build and push the multi-platform image to registry
-      - name: Build and push multi-platform image on success`
+      - name: Build and push multi-platform image on success
         run: |
           make ci-build MODE=push \
             RUNTIME=${{ matrix.runtime }} \
