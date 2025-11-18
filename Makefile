@@ -67,7 +67,7 @@ install-dev-versions:
 	echo -e "  $(BOLD_BLUE)▶ Target versions: $$PYTHON_VERSIONS$(RESET)"; \
 	for version in $$PYTHON_VERSIONS; do \
 		if ! pyenv versions --bare | grep -q "^$$version\\."; then \
-			echo -e "  $(YELLOW)  ▶ Installing Python $$version...$(RESET)"; \
+			echo -e "  $(BOLD_YELLOW)  ▶ Installing Python $$version...$(RESET)"; \
 			pyenv install $$version; \
 		else \
 			echo -e "  $(GREEN)  ✓ Python $$version already installed$(RESET)"; \
@@ -129,7 +129,7 @@ docker-generate:
 	mkdir -p ./docker/dockerfiles; \
 	for python_version in $$PYTHON_VERSIONS_TO_USE; do \
 		for runtime in $$RUNTIMES_TO_USE; do \
-			echo -e "  $(YELLOW)▶ Generating Dockerfile for $$runtime-py$$python_version...$(RESET)"; \
+			echo -e "  $(BOLD_YELLOW)▶ Generating Dockerfile for $$runtime-py$$python_version...$(RESET)"; \
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
 	done; \
@@ -146,7 +146,7 @@ docker-build: docker-generate
 	echo -e "  $(BOLD_BLUE)▶ Runtimes: $$RUNTIMES_TO_USE$(RESET)\n"; \
 	for python_version in $$PYTHON_VERSIONS_TO_USE; do \
 		for runtime in $$RUNTIMES_TO_USE; do \
-			echo -e "  $(YELLOW)▶ Building image for $$runtime-py$$python_version...$(RESET)"; \
+			echo -e "  $(BOLD_YELLOW)▶ Building image for $$runtime-py$$python_version...$(RESET)"; \
 			python3.10 docker/dockerfile.py --build --python=$$python_version --runtime=$$runtime --log-level=DEBUG; \
 		done; \
 	done; \
@@ -183,7 +183,7 @@ docker-test:
 	else \
 		TTY_FLAG=""; \
 	fi; \
-	echo -e "$(YELLOW)▶ Starting Docker container...$(RESET)"; \
+	echo -e "$(BOLD_YELLOW)▶ Starting Docker container...$(RESET)"; \
 	docker run --rm $$TTY_FLAG \
 		-v $(shell pwd)/tests:/home/opencrate/tests \
 		-v $(shell pwd)/src:/home/opencrate/src \
