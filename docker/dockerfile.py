@@ -161,6 +161,7 @@ RUN chsh -s $(which zsh) || true \\
 FROM base
 
 # Install Python from deadsnakes PPA
+RUN apt update -y && apt upgrade -y
 RUN sed -i -e 's/python3.10/python{args.python}/g' ~/.aliases.sh \\
     && add-apt-repository ppa:deadsnakes/ppa -y \\
     && apt-get update \\
@@ -206,17 +207,17 @@ def main():
     dockerfile_path = f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
 
     if args.generate:
-        console.print(f"\n[yellow]-------- ● Generating dockerfile for {args.runtime}-py{args.python} --------[/]")
+        console.print(f"\n[yellow]    ● Generating dockerfile for {args.runtime}-py{args.python}[/]")
         dockerfile_content = generate_combined_dockerfile()
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
-        console.print(f"[green]-------- ✓ Dockerfile generated at {dockerfile_path} --------[/green]")
+        console.print(f"[green]    ✓ Dockerfile generated at {dockerfile_path}[/green]")
 
     if args.build:
         final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:{version}"
 
-        logger.info(f"-------- ● Building image for {args.runtime}-py{args.python} --------")
-        console.print(f"\n[yellow]-------- ● Building image for {args.runtime}-py{args.python} --------[/]")
+        logger.info(f"    ● Building image for {args.runtime}-py{args.python}")
+        console.print(f"\n[yellow]    ● Building image for {args.runtime}-py{args.python}[/]")
 
         build_command = f"docker buildx build -f {dockerfile_path} -t {final_image_tag} ."  #  --no-cache
 
@@ -225,11 +226,11 @@ def main():
         build_result = stream_shell_command_logs(logger, console, command_str=build_command, log_level=args.log_level)
 
         if build_result == "Failed":
-            console.print("[bold red]-------- 𐄂 Exiting due to build failure --------[/bold red]")
+            console.print("[bold red]    𐄂 Exiting due to build failure[/bold red]")
             sys.exit(1)
 
-        logger.info(f"-------- ✓ Successfully built {final_image_tag} --------")
-        console.print(f"[bold green]-------- ✓ Successfully built {final_image_tag} --------[/bold green]")
+        logger.info(f"    ✓ Successfully built {final_image_tag}")
+        console.print(f"[bold green]    ✓ Successfully built {final_image_tag}[/bold green]")
 
 
 if __name__ == "__main__":
