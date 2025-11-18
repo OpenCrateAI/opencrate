@@ -196,7 +196,7 @@ docker-test:
 			echo "$(BOLD_BLUE)▶ Installing dependencies...$(RESET)" && \
 			pip install .[$(DEPS)] --quiet --extra-index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
 			echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)" && \
-			make test' | tee $$LOG_FILE; \
+			make test-all' | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
 		echo -e "\n$(BOLD_RED)======== ✗ Tests failed ========$(RESET)"; \
 		echo -e "$(BOLD_RED)Check log file: $$LOG_FILE$(RESET)\n"; \
