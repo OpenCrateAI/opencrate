@@ -113,7 +113,8 @@ jobs:
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }} \
                     REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
-            - run: df -h
+            - name: Clean up before
+              run: df -h
             - name: Clean up
               run: |
                   sudo docker image prune --all --force
@@ -122,11 +123,13 @@ jobs:
                   sudo apt autoclean -y
                   sudo apt autoremove --purge -y
                   sudo rm -rf ~/.cache/*
-            - run: df -h
+            - name: Clean up after
+              run: df -h
             # Run tests on the locally built image to ensure it works correctly
             - name: Test local image
               run: |
                   make docker-test \
+                    DEPS=ci
                     RUNTIME=${{ matrix.runtime }} \
                     PYTHON_VERSION=${{ matrix.python_version }} \
                     VERSION=${{ needs.generate-files.outputs.version }}

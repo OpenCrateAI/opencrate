@@ -43,6 +43,7 @@ dependencies = [
     "tqdm",
     "pyinstrument",
     "memory_profiler",
+    "PyYAML",
 ]
 
 [project.optional-dependencies]
@@ -68,8 +69,17 @@ dev = [
     "pre-commit",
     "fastapi",
     "uvicorn",
-    "python_daemon",
-    "aiofiles",
+]
+ci = [
+    "ruff",
+    "mypy",
+    "pytest",
+    "pytest-cov",
+    "pytest-random-order",
+    "torch",
+    "types-requests",
+    "types-PyYAML",
+    "types-docker",
 ]
 
 [project.scripts]
@@ -121,6 +131,7 @@ warn_unreachable = true
 warn_no_return = false
 warn_unused_ignores = true
 no_implicit_reexport = false
+pretty = true
 
 [tool.pytest.ini_options]
 filterwarnings = ["ignore::DeprecationWarning"]
