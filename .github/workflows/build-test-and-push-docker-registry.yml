@@ -119,7 +119,6 @@ jobs:
               run: df -h
             - name: Clean up
               run: |
-                  sudo docker image prune --all --force
                   sudo docker buildx prune -a --force
                   sudo apt clean -y
                   sudo apt autoclean -y
