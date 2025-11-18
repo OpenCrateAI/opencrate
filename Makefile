@@ -21,6 +21,7 @@ BOLD_RED := \033[1;31m
 BOLD_GREEN := \033[1;32m
 BOLD_YELLOW := \033[1;33m
 BOLD_BLUE := \033[1;34m
+BOLD_ORANGE := \033[1;38;5;214m
 
 
 start:
@@ -170,14 +171,14 @@ docker-clean:
 docker-test:
 	@set -e;
 	@echo -e "$(BOLD_YELLOW)\n======== ● Testing OpenCrate in Docker ========$(RESET)"
-	@echo -e "$(BOLD_BLUE)- Python: $(BOLD)$(PYTHON_VERSION)$(RESET)"
-	@echo -e "$(BOLD_BLUE)- Runtime: $(BOLD)$(RUNTIME)$(RESET)"
-	@echo -e "$(BOLD_BLUE)- Dependencies: $(BOLD)$(DEPS)$(RESET)\n"
+	@echo -e "$(BOLD_ORANGE)- Python: $(BOLD)$(PYTHON_VERSION)$(RESET)"
+	@echo -e "$(BOLD_ORANGE)- Runtime: $(BOLD)$(RUNTIME)$(RESET)"
+	@echo -e "$(BOLD_ORANGE)- Dependencies: $(BOLD)$(DEPS)$(RESET)\n"
 	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)"; \
 	LOG_FILE="tests/logs/test-py$(PYTHON_VERSION)-$(RUNTIME).log"; \
 	mkdir -p tests/logs; \
-	echo -e "$(BOLD_BLUE)- Image: $(BOLD)$$IMAGE_TAG$(RESET)"; \
-	echo -e "$(BOLD_BLUE)- Log file: $(BOLD)$$LOG_FILE$(RESET)\n"; \
+	echo -e "$(BOLD_ORANGE)- Image: $(BOLD)$$IMAGE_TAG$(RESET)"; \
+	echo -e "$(BOLD_ORANGE)- Log file: $(BOLD)$$LOG_FILE$(RESET)\n"; \
 	if [ -t 0 ]; then \
 		TTY_FLAG="-it"; \
 	else \
@@ -196,12 +197,11 @@ docker-test:
 			echo "$(BOLD_BLUE)▶ Installing dependencies...$(RESET)" && \
 			pip install pip --quiet --upgrade --root-user-action=ignore && \
 			pip install .[$(DEPS)] --quiet --extra-index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
+			echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)" && \
 			if [ "$(DEPS)" = "ci" ]; then \
-				echo "\n$(BOLD_BLUE)▶ Running CI test suite...$(RESET)"; \
-				make test-ruff test-pytest; \
+				make test-all; \
 			else \
-				echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)"; \
-				make test-all; \ # we don't wanna run mypy in ci (some type hint libraries aren't supported for all python versions)
+				make test-ruff test-pytest; \
 			fi' | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
 		echo -e "\n$(BOLD_RED)======== ✗ Tests failed ========$(RESET)"; \
@@ -210,7 +210,6 @@ docker-test:
 	fi; \
 	echo -e "\n$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)"; \
 	echo -e "$(GREEN)Log saved to: $$LOG_FILE$(RESET)\n"
-	@PYTHON_VERSIONS_TO_USE="3.7 3.8 3.9 3.10 3.11 3.12 3.13"; \
 	RUNTIMES_TO_USE="cpu cuda"; \
 	echo -e "  $(BOLD_BLUE)▶ Python versions: $$PYTHON_VERSIONS_TO_USE$(RESET)"; \
 	echo -e "  $(BOLD_BLUE)▶ Runtimes: $$RUNTIMES_TO_USE$(RESET)\n"; \
