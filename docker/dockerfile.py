@@ -207,11 +207,11 @@ def main():
     dockerfile_path = f"./docker/dockerfiles/Dockerfile.{args.runtime}-py{args.python}"
 
     if args.generate:
-        console.print(f"\n[yellow]    ● Generating dockerfile for {args.runtime}-py{args.python}[/]")
+        console.print(f"\n[yellow]  ● Generating dockerfile for {args.runtime}-py{args.python}[/]")
         dockerfile_content = generate_combined_dockerfile()
         with open(dockerfile_path, "w") as f:
             f.write(dockerfile_content)
-        console.print(f"[green]    ✓ Dockerfile generated at {dockerfile_path}[/green]")
+        console.print(f"[green]  ✓ Dockerfile generated at {dockerfile_path}[/green]")
 
     if args.build:
         final_image_tag = f"braindotai/opencrate-{args.runtime}-py{args.python}:{version}"

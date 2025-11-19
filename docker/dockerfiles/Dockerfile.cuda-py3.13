@@ -49,6 +49,7 @@ RUN chsh -s $(which zsh) || true \
 FROM base
 
 # Install Python from deadsnakes PPA
+RUN apt update -y && apt upgrade -y
 RUN sed -i -e 's/python3.10/python3.13/g' ~/.aliases.sh \
     && add-apt-repository ppa:deadsnakes/ppa -y \
     && apt-get update \

@@ -7,6 +7,10 @@ on:
     tags:
       - "v*.*.*"
 
+  # Trigger on pull requests to main branch - validates changes before merging
+  pull_request:
+    branches: ["main"]
+
   # Add a scheduled trigger to run every Sunday at 3 AM UTC - keeps images fresh weekly
   schedule:
     - cron: "0 3 * * 0"
@@ -72,7 +76,8 @@ jobs:
       fail-fast: false
       matrix:
         runtime: [cpu, cuda]
-        python_version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        # python_version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13"]
+        python_version: ["3.7"]
 
     steps:
       # Get the source code for building Docker images

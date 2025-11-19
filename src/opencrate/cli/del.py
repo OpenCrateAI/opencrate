@@ -234,7 +234,7 @@
 #         worker = asyncio.create_task(command_worker())
 #         server_state.workers.append(worker)
 
-#     server_state.logger.info(f"✅ Started {len(server_state.workers)} worker tasks")
+#     server_state.logger.info(f"✓ Started {len(server_state.workers)} worker tasks")
 #     server_state.logger.info(f"📁 Logs directory: {server_state.log_dir}")
 #     server_state.logger.info(f"🔧 Max concurrent requests: {server_state.max_concurrent_requests}")
 
@@ -248,7 +248,7 @@
 #         await server_state.request_queue.put(None)
 
 #     await asyncio.gather(*server_state.workers, return_exceptions=True)
-#     server_state.logger.info("✅ Server stopped")
+#     server_state.logger.info("✓ Server stopped")
 
 
 # # FastAPI app
@@ -383,7 +383,7 @@
 #             except OSError:
 #                 break
 
-#         print("✅ Server stopped successfully")
+#         print("✓ Server stopped successfully")
 #         return True
 
 #     except (ValueError, OSError, FileNotFoundError) as e:
@@ -405,7 +405,7 @@
 #             pid = int(f.read().strip())
 
 #         os.kill(pid, 0)  # Check if process exists
-#         print(f"✅ Server is running (PID: {pid})")
+#         print(f"✓ Server is running (PID: {pid})")
 #         print(f"📁 Logs directory: {log_dir}")
 
 #         # Try to get server stats
