@@ -106,6 +106,9 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Create local cache directory
+        run: mkdir -p /tmp/buildx-cache
+
       # Build a local AMD64 image first for testing - faster than multi-platform build
       - name: Build local image for testing
         run: |
@@ -113,7 +116,8 @@ jobs:
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
             VERSION=${{ needs.generate-files.outputs.version }} \
-            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }} \
+            LOCAL_CACHE_PATH=/tmp/buildx-cache
 
       # Perform cleanup to save storage
       - name: Clean up before
@@ -152,7 +156,8 @@ jobs:
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
             VERSION=${{ needs.generate-files.outputs.version }} \
-            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }}
+            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }} \
+            LOCAL_CACHE_PATH=/tmp/buildx-cache
 
   # Third job: Tag successful builds as "latest" - only runs for version tag releases
   release-latest:

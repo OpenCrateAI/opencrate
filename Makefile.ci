@@ -24,42 +24,52 @@ BOLD_ORANGE := \033[1;38;5;214m
 
 # This target builds and tests a single Docker image for CI/CD workflows.
 build:
-	PLATFORM_FLAG="";
-	OUTPUT_ARGS="";
-	if [ "$(MODE)" = "test" ]; then
-		echo -e "$(BOLD_YELLOW)\n======== ● Building local image: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ========$(RESET)\n";
-		PLATFORM_FLAG="--platform linux/amd64";
-		OUTPUT_ARGS="--load";
-	elif [ "$(MODE)" = "push" ]; then
-		echo -e "$(BOLD_YELLOW)\n======== ● Building and pushing multi-platform: $(RUNTIME)-py$(PYTHON_VERSION):$(VERSION) ========$(RESET)\n";
-		PLATFORM_FLAG="--platform linux/amd64,linux/arm64";
-		OUTPUT_ARGS="--push";
-	else
-		echo -e "$(BOLD_RED)\n!!!!!!!! ✗ ERROR: Invalid MODE specified. Must be 'test' or 'push'. !!!!!!!!$(RESET)\n";
-		exit 1;
-	fi;
-
 	CACHE_IMAGE_VAR="$(CACHE_IMAGE_PREFIX):$(RUNTIME)-py$(PYTHON_VERSION)";
 
-# Only pull new base images (python:3.10-slim, etc) if explicitly requested via manual flag.
+# 1. Base Image Pull Logic
 	PULL_FLAG="";
 	if [ "$(REBUILD_FLAG)" = "true" ]; then
-		echo -e "  $(BOLD_ORANGE)! FORCE PULL: Updating base images from Docker Hub !$(RESET)";
+		echo -e "  $(BOLD_ORANGE)! FORCE PULL: Updating base images !$(RESET)";
 		PULL_FLAG="--pull";
 	fi;
 
-# A. READ CACHE: Always try to read from the registry cache
+# 2. REGISTRY Cache Logic (Remote)
+# We always try to pull from remote registry to warm the cache
 	CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
 
-# B. WRITE CACHE: Only write to registry if we are PUSHING *and* (dependencies changed or requested)
-# We cannot write to registry cache when using --load (MODE=test), so strict check for push mode is required.
 	if [ "$(MODE)" = "push" ] && { [ "$(CACHE_UPDATE)" = "true" ] || [ "$(REBUILD_FLAG)" = "true" ]; }; then
-		echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Uploading new build layers to $$CACHE_IMAGE_VAR !$(RESET)\n";
+		# Only push to remote registry if we are actually releasing and have changes
 		CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
-	else
-		echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping cache upload (Local/No-Change)$(RESET)\n";
 	fi;
 
+# 3. LOCAL Cache Logic (The Bridge between Test -> Push)
+# If LOCAL_CACHE_PATH is set (e.g., by GitHub Actions), we use it to share state between steps
+	if [ -n "$(LOCAL_CACHE_PATH)" ]; then
+		echo -e "  $(BOLD_BLUE)⚡ Local Cache Enabled at: $(LOCAL_CACHE_PATH)$(RESET)";
+		# Always read from local cache
+		CACHE_ARGS="$$CACHE_ARGS --cache-from type=local,src=$(LOCAL_CACHE_PATH)";
+		# Always write to local cache (so Step 1 populates it for Step 2)
+		# mode=max ensures we cache the intermediate pip install layers
+		CACHE_ARGS="$$CACHE_ARGS --cache-to type=local,dest=$(LOCAL_CACHE_PATH),mode=max";
+	fi;
+
+# 4. Mode Specifics
+	PLATFORM_FLAG="";
+	OUTPUT_ARGS="";
+	if [ "$(MODE)" = "test" ]; then
+		echo -e "$(BOLD_YELLOW)\n======== ● Building local (Test): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)\n";
+		PLATFORM_FLAG="--platform linux/amd64";
+		OUTPUT_ARGS="--load";
+	elif [ "$(MODE)" = "push" ]; then
+		echo -e "$(BOLD_YELLOW)\n======== ● Building & Pushing (Release): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)\n";
+		PLATFORM_FLAG="--platform linux/amd64,linux/arm64";
+		OUTPUT_ARGS="--push";
+	else
+		echo -e "$(BOLD_RED)\n!!!!!!!! ✗ ERROR: Invalid MODE !!!!!!!!$(RESET)\n";
+		exit 1;
+	fi;
+
+# 5. Execution
 	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)";
 	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)";
 	
