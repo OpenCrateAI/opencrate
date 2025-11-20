@@ -6,7 +6,7 @@ This GitHub Actions workflow automates the process of building, testing, and pub
 
 ## Workflow Triggers
 
-The workflow runs automatically under three different scenarios:
+The workflow runs automatically under four different scenarios:
 
 ### 1. Version Tag Push (Release)
 ```yaml
@@ -18,7 +18,16 @@ push:
 - **Purpose**: Build, test, and publish official release images
 - **Outcome**: Images are pushed to Docker Hub and tagged as "latest"
 
-### 2. Scheduled Weekly Build
+### 2. Pull Request to Main Branch
+```yaml
+pull_request:
+  branches: ["main"]
+```
+- **When**: A pull request is opened or updated targeting the main branch
+- **Purpose**: Validate changes before merging (CI validation)
+- **Outcome**: Images are built and tested, but NOT pushed to Docker Hub
+
+### 3. Scheduled Weekly Build
 ```yaml
 schedule:
   - cron: '0 3 * * 0'
@@ -27,7 +36,7 @@ schedule:
 - **Purpose**: Keep images fresh with latest base layers and security updates
 - **Outcome**: Images are rebuilt and pushed, but NOT tagged as "latest"
 
-### 3. Manual Trigger
+### 4. Manual Trigger
 ```yaml
 workflow_dispatch:
   inputs:
@@ -63,7 +72,7 @@ The workflow consists of three sequential jobs:
 ### Job 2: `build-and-test`
 **Purpose**: Build and test images for all configurations in parallel
 
-**Matrix Strategy**: Runs 14 parallel jobs (2 runtimes × 7 Python versions)
+**Matrix Strategy**: Runs 16 parallel jobs (2 runtimes × 8 Python versions)
 - Runtimes: `cpu`, `cuda`
 - Python versions: `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`
 
@@ -74,19 +83,29 @@ The workflow consists of three sequential jobs:
    - Set up QEMU (for ARM64 support)
    - Set up Docker Buildx
    - Login to Docker Hub
+   - Create local cache directory (`/tmp/buildx-cache`)
 
-2. **Build Local Test Image**:
+2. **Build Local Test Image** (MODE=test):
+   - Uses `make ci-build MODE=test` with hybrid caching strategy
    - Platform: `linux/amd64` only (faster for testing)
-   - Uses layer caching from registry
+   - Caching layers:
+     - Reads from registry cache (per-Python-version)
+     - Reads from local cache (`/tmp/buildx-cache`)
+     - Writes to local cache for reuse in push step
    - Image tag: `braindotai/opencrate-{runtime}-py{version}:{VERSION}`
    - Example: `braindotai/opencrate-cpu-py3.10:v0.1.0-rc`
+   - Image is loaded locally (not pushed)
 
 3. **Clean Up Storage**:
+   - Display disk usage before cleanup
    - Prune Docker buildx cache
-   - Clean apt cache
+   - Clean apt cache and autoremove packages
+   - Clear user cache directory
+   - Display disk usage after cleanup
 
 4. **Test Local Image**:
    - Run tests inside the freshly built Docker container
+   - Uses `make docker-test` with `DEPS=ci`
    - Tests include: ruff linting, mypy type checking, pytest
    - Logs are saved to `./tests/logs/test-py{version}-{runtime}.log`
 
@@ -95,22 +114,29 @@ The workflow consists of three sequential jobs:
    - Artifact name: `test-logs-{runtime}-py{version}`
    - Example: `test-logs-cuda-py3.11`
 
-6. **Build and Push Multi-Platform Image** (only if tests pass):
+6. **Build and Push Multi-Platform Image** (MODE=push, only if tests pass):
+   - Uses `make ci-build MODE=push` with hybrid caching strategy
    - Platforms: `linux/amd64`, `linux/arm64`
+   - Caching layers:
+     - Reads from registry cache (per-Python-version)
+     - Reads from local cache (populated by test step)
+     - Conditionally writes to registry cache (if REBUILD_FLAG or CACHE_UPDATE)
    - Pushed to Docker Hub with version tag
-   - Updates build cache in registry
+   - Updates build cache in registry (when applicable)
 
 ### Job 3: `release-latest`
 **Purpose**: Tag successful builds as "latest"
 
 **Condition**: Only runs if:
 - All build-and-test jobs succeeded AND
-- Triggered by a version tag push (NOT scheduled or manual)
+- Triggered by a version tag push (NOT scheduled, manual, or PR)
 
 **Steps**:
 1. Login to Docker Hub
-2. Tag all images with "latest" tag
+2. Tag images with "latest" tag for Python 3.7-3.12
 3. Example: `braindotai/opencrate-cpu-py3.10:v0.1.0-rc` → `braindotai/opencrate-cpu-py3.10:latest`
+
+**Note**: Python 3.13 images are built and pushed but not yet tagged as "latest" (update `Makefile.ci` to include 3.13 when ready)
 
 ## Version Management
 
@@ -239,8 +265,26 @@ git push origin v1.1.0-rc1
 
 **Result**: Images built with fresh base layers, tested, and pushed (NOT tagged as "latest")
 
-#### Scenario 4: Testing Without Publishing
-If you want to test the workflow without publishing:
+#### Scenario 4: Testing Changes via Pull Request
+```bash
+# Make your changes
+git checkout -b feature/my-awesome-feature
+
+# Update code and tests
+# ...
+
+# Commit and push
+git add .
+git commit -m "Add awesome feature"
+git push origin feature/my-awesome-feature
+
+# Open a PR targeting main branch on GitHub
+```
+
+**Result**: Images built and tested in CI, but NOT pushed to Docker Hub. Perfect for validating changes before merging.
+
+#### Scenario 5: Testing Without Publishing (Manual)
+If you want to test the workflow without opening a PR:
 
 1. Create a feature branch
 2. Update VERSION file
@@ -263,14 +307,31 @@ braindotai/opencrate-{runtime}-py{python_version}:{version}
 
 ## Build Caching Strategy
 
-The workflow uses Docker BuildKit caching to speed up builds with **per-Python-version cache images** to avoid parallel write conflicts.
+The workflow uses a **hybrid caching strategy** combining local filesystem cache and remote registry cache to optimize build performance and reliability.
 
-### Cache Images
+### Two-Stage Build Process
+
+Each matrix job builds the image twice:
+
+1. **Test Stage** (`MODE=test`):
+   - Builds for `linux/amd64` only
+   - Loads image locally for testing
+   - Populates local cache (`/tmp/buildx-cache`)
+
+2. **Push Stage** (`MODE=push`):
+   - Builds for `linux/amd64,linux/arm64`
+   - Reuses local cache from test stage
+   - Pushes to Docker Hub
+   - Updates registry cache (conditionally)
+
+### Cache Layers
+
+#### 1. Registry Cache (Remote)
 Each Python version and runtime combination has its own dedicated cache image:
 - `braindotai/opencrate-build-cache:cpu-py3.7`
 - `braindotai/opencrate-build-cache:cpu-py3.8`
 - `braindotai/opencrate-build-cache:cpu-py3.9`
-- ... (and so on for all Python versions)
+- ... (and so on for all Python versions including 3.13)
 - `braindotai/opencrate-build-cache:cuda-py3.7`
 - `braindotai/opencrate-build-cache:cuda-py3.8`
 - ... (etc.)
@@ -281,16 +342,38 @@ Each Python version and runtime combination has its own dedicated cache image:
 - ✓ No race conditions during concurrent builds
 - ✓ Each build can safely update its own cache
 
-### Cache Behavior
-- **Normal builds**: Use existing cache layers from the specific Python version's cache
-- **Force rebuild** (`REBUILD_BASE=true`): Pull fresh base images and update the version-specific cache
-- **Scheduled builds**: Automatically force rebuild to get security updates
+**Registry Cache Behavior:**
+- **Always reads** from registry cache (with `ignore-error=true`)
+- **Only writes** when `MODE=push` AND (`REBUILD_FLAG=true` OR `CACHE_UPDATE=true`)
+- Uses `mode=max` to cache all layers including intermediate steps
+
+#### 2. Local Cache (Filesystem)
+A temporary local cache directory (`/tmp/buildx-cache`) bridges the test and push stages:
+
+**Local Cache Behavior:**
+- **Test stage**: Reads from local cache (if exists), writes to local cache
+- **Push stage**: Reads from local cache (populated by test stage), writes to local cache
+- Uses `mode=max` to ensure pip install layers are cached
+- Ephemeral - exists only for the duration of the workflow run
+
+**Benefits:**
+- ✓ Dramatically speeds up the push stage (reuses test build layers)
+- ✓ Reduces build time for multi-platform images
+- ✓ No network overhead between test and push stages
+- ✓ Guaranteed cache hit for the second build
+
+### Cache Behavior by Trigger Type
+
+- **Pull Requests**: Read-only from registry cache, local cache used between stages, no cache writes to registry
+- **Tag Pushes**: Full caching enabled (read + write to registry cache)
+- **Scheduled Builds**: Force rebuild with `--pull` flag, updates registry cache
+- **Manual Triggers**: Optionally force rebuild with `REBUILD_BASE=true`
 
 ### When to Force Rebuild
 - Base images have critical security updates
 - Want to test with latest dependencies
 - Cache corruption suspected
-- Weekly refresh (automatic)
+- Weekly refresh (automatic on Sundays)
 
 ## Troubleshooting
 
@@ -353,9 +436,9 @@ Each Python version and runtime combination has its own dedicated cache image:
 ## Monitoring and Notifications
 
 ### Success Indicators
-- ✓ All 14 matrix jobs complete successfully
-- ✓ Images pushed to Docker Hub
-- ✓ "latest" tags updated (for tag pushes only)
+- ✓ All 16 matrix jobs complete successfully (8 Python versions × 2 runtimes)
+- ✓ Images pushed to Docker Hub (except for PR builds)
+- ✓ "latest" tags updated (for tag pushes only, Python 3.7-3.12)
 
 ### Failure Handling
 - Individual matrix job failures don't stop other jobs (`fail-fast: false`)
