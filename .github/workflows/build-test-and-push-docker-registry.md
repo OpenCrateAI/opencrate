@@ -2,7 +2,7 @@
 
 ## Overview
 
-This GitHub Actions workflow automates the process of building, testing, and publishing OpenCrate Docker images for multiple Python versions (3.7-3.13) and runtime configurations (CPU and CUDA). The workflow ensures that all images are thoroughly tested before being pushed to Docker Hub.
+This GitHub Actions workflow automates the process of building, testing, and publishing OpenCrate Docker images for multiple Python versions (3.7-3.14) and runtime configurations (CPU and CUDA). The workflow ensures that all images are thoroughly tested before being pushed to Docker Hub.
 
 ## Workflow Triggers
 
@@ -22,10 +22,23 @@ push:
 ```yaml
 pull_request:
   branches: ["main"]
+  paths:
+    - "src/**"
+    - "tests/**"
+    - "docker/**"
+    - "pyproject.toml"
+    - "setup.cfg"
+    - "setup.py"
+    - "Makefile"
+    - "Makefile.ci"
+    - "VERSION"
+    - "PYTHON_VERSIONS"
+    - ".github/workflows/build-test-and-push-docker-registry.yml"
 ```
-- **When**: A pull request is opened or updated targeting the main branch
+- **When**: A pull request is opened or updated targeting the main branch, AND changes are detected in relevant files (source code, tests, docker config, dependencies).
 - **Purpose**: Validate changes before merging (CI validation)
-- **Outcome**: Images are built and tested, but NOT pushed to Docker Hub
+- **Outcome**: Images are built and tested, but NOT pushed to Docker Hub.
+- **Optimization**: Does not run for documentation-only changes (e.g., README.md updates).
 
 ### 3. Scheduled Weekly Build
 ```yaml
@@ -61,49 +74,50 @@ The workflow consists of three sequential jobs:
 **Steps**:
 1. Checkout repository
 2. Read VERSION from the `VERSION` file (e.g., `v0.1.0-rc`)
-3. Set up Python 3.10
-4. Generate Dockerfiles for all Python versions and runtimes
-5. Upload generated Dockerfiles as artifacts
+3. Set up Python 3.10 and install dependencies (`rich`, `loguru`)
+4. **Set Python Matrix**: Read `PYTHON_VERSIONS` file to generate the list of target versions dynamically
+5. Generate Dockerfiles for all Python versions and runtimes
+6. Upload generated Dockerfiles as artifacts
 
 **Outputs**:
 - `version`: The version string from the VERSION file
 - `rebuild_flag`: Whether to force rebuild base layers (`true` for scheduled/tag pushes)
+- `python_versions_json`: JSON array of Python versions to be used in the matrix
 
 ### Job 2: `build-and-test`
 **Purpose**: Build and test images for all configurations in parallel
 
-**Matrix Strategy**: Runs 16 parallel jobs (2 runtimes × 8 Python versions)
+**Matrix Strategy**: Runs parallel jobs for each combination of:
 - Runtimes: `cpu`, `cuda`
-- Python versions: `3.7`, `3.8`, `3.9`, `3.10`, `3.11`, `3.12`, `3.13`
+- Python versions: Dynamically sourced from `PYTHON_VERSIONS` file (e.g., 3.7 through 3.14)
 
 **Steps**:
 1. **Setup**:
-   - Checkout repository
+   - Checkout repository (fetch depth 2 for diff checks)
    - Download generated Dockerfiles
    - Set up QEMU (for ARM64 support)
    - Set up Docker Buildx
    - Login to Docker Hub
-   - Create local cache directory (`/tmp/buildx-cache`)
 
-2. **Build Local Test Image** (MODE=test):
+2. **Check for Dependency Changes**:
+   - Runs `make check-dependency-changes` to detect modifications in `pyproject.toml` or `setup.cfg`
+   - Determines if `CACHE_UPDATE` should be true (if dependencies changed or `REBUILD_BASE` is requested)
+
+3. **Build Local Test Image** (MODE=test):
    - Uses `make ci-build MODE=test` with hybrid caching strategy
    - Platform: `linux/amd64` only (faster for testing)
    - Caching layers:
      - Reads from registry cache (per-Python-version)
-     - Reads from local cache (`/tmp/buildx-cache`)
      - Writes to local cache for reuse in push step
    - Image tag: `braindotai/opencrate-{runtime}-py{version}:{VERSION}`
    - Example: `braindotai/opencrate-cpu-py3.10:v0.1.0-rc`
    - Image is loaded locally (not pushed)
 
-3. **Clean Up Storage**:
-   - Display disk usage before cleanup
-   - Prune Docker buildx cache
-   - Clean apt cache and autoremove packages
-   - Clear user cache directory
-   - Display disk usage after cleanup
+4. **Light Cleanup**:
+   - Cleans apt cache and user cache (`~/.cache/*`)
+   - **Crucial**: Does NOT prune Docker Buildx cache to ensure layers are available for the push step
 
-4. **Test Local Image**:
+5. **Test Local Image**:
    - Run tests inside the freshly built Docker container
    - Uses `make docker-test` with `DEPS=ci`
    - Tests include: ruff linting, mypy type checking, pytest
@@ -133,10 +147,8 @@ The workflow consists of three sequential jobs:
 
 **Steps**:
 1. Login to Docker Hub
-2. Tag images with "latest" tag for Python 3.7-3.12
+2. Tag images with "latest" tag for all Python versions listed in `PYTHON_VERSIONS`
 3. Example: `braindotai/opencrate-cpu-py3.10:v0.1.0-rc` → `braindotai/opencrate-cpu-py3.10:latest`
-
-**Note**: Python 3.13 images are built and pushed but not yet tagged as "latest" (update `Makefile.ci` to include 3.13 when ready)
 
 ## Version Management
 
@@ -316,7 +328,6 @@ Each matrix job builds the image twice:
 1. **Test Stage** (`MODE=test`):
    - Builds for `linux/amd64` only
    - Loads image locally for testing
-   - Populates local cache (`/tmp/buildx-cache`)
 
 2. **Push Stage** (`MODE=push`):
    - Builds for `linux/amd64,linux/arm64`
@@ -330,11 +341,12 @@ Each matrix job builds the image twice:
 Each Python version and runtime combination has its own dedicated cache image:
 - `braindotai/opencrate-build-cache:cpu-py3.7`
 - `braindotai/opencrate-build-cache:cpu-py3.8`
-- `braindotai/opencrate-build-cache:cpu-py3.9`
-- ... (and so on for all Python versions including 3.13)
+- ...
+- `braindotai/opencrate-build-cache:cpu-py3.14`
 - `braindotai/opencrate-build-cache:cuda-py3.7`
 - `braindotai/opencrate-build-cache:cuda-py3.8`
-- ... (etc.)
+- ...
+- `braindotai/opencrate-build-cache:cuda-py3.14`
 
 **Why per-version caches?**
 - ✓ Prevents parallel write conflicts in matrix builds
@@ -346,15 +358,6 @@ Each Python version and runtime combination has its own dedicated cache image:
 - **Always reads** from registry cache (with `ignore-error=true`)
 - **Only writes** when `MODE=push` AND (`REBUILD_FLAG=true` OR `CACHE_UPDATE=true`)
 - Uses `mode=max` to cache all layers including intermediate steps
-
-#### 2. Local Cache (Filesystem)
-A temporary local cache directory (`/tmp/buildx-cache`) bridges the test and push stages:
-
-**Local Cache Behavior:**
-- **Test stage**: Reads from local cache (if exists), writes to local cache
-- **Push stage**: Reads from local cache (populated by test stage), writes to local cache
-- Uses `mode=max` to ensure pip install layers are cached
-- Ephemeral - exists only for the duration of the workflow run
 
 **Benefits:**
 - ✓ Dramatically speeds up the push stage (reuses test build layers)
@@ -426,7 +429,7 @@ A temporary local cache directory (`/tmp/buildx-cache`) bridges the test and pus
 - Monitor workflow runs after pushing tags
 - Download and review test logs for failures
 
-### ❌ DON'T
+### ✗ DON'T
 - Don't create tags without updating VERSION file
 - Don't push tags for untested code
 - Don't manually edit Dockerfiles in `docker/dockerfiles/` (they're auto-generated)
@@ -456,11 +459,3 @@ A temporary local cache directory (`/tmp/buildx-cache`) bridges the test and pus
 - **Makefile.ci**: CI-specific build targets
 - **docker/dockerfile.py**: Dockerfile generator script
 - **tests/**: Test suite for all Python versions
-
-## Questions or Issues?
-
-If you encounter problems with the workflow:
-1. Check this documentation
-2. Review test logs in Artifacts
-3. Test locally using Makefile targets
-4. Open an issue with workflow run link and error logs

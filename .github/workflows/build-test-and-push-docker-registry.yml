@@ -6,8 +6,20 @@ on:
       - "v*.*.*"
   pull_request:
     branches: ["main"]
+    paths:
+      - "src/**"
+      - "tests/**"
+      - "docker/**"
+      - "pyproject.toml"
+      - "setup.cfg"
+      - "setup.py"
+      - "Makefile"
+      - "Makefile.ci"
+      - "VERSION"
+      - "PYTHON_VERSIONS"
+      - ".github/workflows/build-test-and-push-docker-registry.yml"
   schedule:
-    - cron: "0 3 * * 0"
+    - cron: "0 3 * * 0" # Weekly on Sunday at 03:00
   workflow_dispatch:
     inputs:
       REBUILD_BASE:
@@ -16,10 +28,20 @@ on:
         type: boolean
         default: false
 
+# 1. Concurrency: Cancel in-progress runs for the same PR
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+# 2. Permissions: Least privilege (Read-only by default)
+permissions:
+  contents: read
+
 jobs:
   generate-files:
     name: Generate Dockerfiles & Matrix
     runs-on: ubuntu-latest
+    timeout-minutes: 2
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
       rebuild_flag: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event.inputs.REBUILD_BASE }}
@@ -62,6 +84,7 @@ jobs:
     name: Build & Test ${{ matrix.runtime }}-py${{ matrix.python_version }}
     runs-on: ubuntu-latest
     needs: generate-files
+    timeout-minutes: 5
     strategy:
       fail-fast: false
       matrix:

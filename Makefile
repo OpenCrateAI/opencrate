@@ -157,7 +157,7 @@ docker-build:
 		echo -e "  $(BOLD_ORANGE)! Cache update forced !$(RESET)"; \
 		CACHE_UPDATE="true"; \
 	else \
-		echo -e "  $(GREEN)✓ No dependency changes. Using read-only cache with fast build.$(RESET) ✓"; \
+		echo -e "  $(GREEN)✓ No dependency changes. Using read-only cache with fast build$(RESET)"; \
 	fi; \
 	\
 	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
