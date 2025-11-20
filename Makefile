@@ -1,10 +1,9 @@
 SHELL := /bin/bash
+
+# 1. Default variables
 PYTHON_VERSION ?= 3.10
 RUNTIME ?= cuda
 DEPS ?= dev
-
-# 1. Read supported versions from file (replace newlines with spaces)
-PYTHON_VERSIONS_LIST := $(shell cat PYTHON_VERSIONS | tr '\n' ' ')
 
 # 2. Detect dependency changes (Robust check for working tree AND last commit)
 # This variable is used for local make commands
@@ -71,9 +70,11 @@ install-dev-package:
 
 
 install-dev-versions:
+	@set -e; \
+	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
 	@echo -e "$(BOLD_YELLOW)● Installing Python versions for testing...$(RESET)"
-	@echo -e "  $(BOLD_BLUE)▶ Target versions: $(PYTHON_VERSIONS_LIST)$(RESET)"; \
-	for version in $(PYTHON_VERSIONS_LIST); do \
+	@echo -e "  $(BOLD_BLUE)▶ Target versions: $$PYTHON_VERSIONS_LIST $(RESET)"; \
+	for version in $$PYTHON_VERSIONS_LIST; do \
 		if ! pyenv versions --bare | grep -q "^$$version\\."; then \
 			echo -e "  $(BOLD_YELLOW)  ▶ Installing Python $$version...$(RESET)"; \
 			pyenv install $$version; \
@@ -81,7 +82,7 @@ install-dev-versions:
 			echo -e "  $(GREEN)  ✓ Python $$version already installed$(RESET)"; \
 		fi; \
 	done; \
-	pyenv local $(PYTHON_VERSIONS_LIST)
+	pyenv local $$PYTHON_VERSIONS_LIST
 	@echo -e "  $(BOLD_BLUE)▶ Installing pre-commit hooks...$(RESET)"
 	@pre-commit install
 	@echo -e "$(BOLD_GREEN)✓ All Python versions and tools installed$(RESET)"
@@ -126,15 +127,17 @@ test-clean:
 	@rm -rf .mypy_cache .pytest_cache .ruff_cache .tox .coverage
 	@echo -e "$(BOLD_GREEN)✓ Test artifacts cleaned$(RESET)"
 
+
 # This target generates Dockerfiles for all supported Python versions and runtimes.
 docker-generate:
 	@set -e; \
+	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
 	echo -e "$(BOLD_YELLOW)\n======== ● Generating all Dockerfiles ========$(RESET)\n"
 	@RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
-	echo -e "  $(BOLD_BLUE)▶ Python versions: $(PYTHON_VERSIONS_LIST)$(RESET)"; \
+	echo -e "  $(BOLD_BLUE)▶ Python versions: $$PYTHON_VERSIONS_LIST $(RESET)"; \
 	echo -e "  $(BOLD_BLUE)▶ Runtimes: $$RUNTIMES_TO_USE$(RESET)\n"; \
 	mkdir -p ./docker/dockerfiles; \
-	for python_version in $(PYTHON_VERSIONS_LIST); do \
+	for python_version in $$PYTHON_VERSIONS_LIST ; do \
 		for runtime in $$RUNTIMES_TO_USE; do \
 			python3.10 docker/dockerfile.py --generate --python=$$python_version --runtime=$$runtime; \
 		done; \
@@ -145,6 +148,7 @@ docker-generate:
 # This target builds all supported OpenCrate images locally.
 docker-build:
 	@set -e; \
+	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
 	echo -e "$(BOLD_YELLOW)\n======== ● Building all OpenCrate images locally ========$(RESET)\n"; \
 	CACHE_UPDATE="false"; \
 	if [ "$(REBUILD_FLAG)" = "true" ]; then \
@@ -157,12 +161,12 @@ docker-build:
 		echo -e "  $(BOLD_ORANGE)! Cache update forced !$(RESET)"; \
 		CACHE_UPDATE="true"; \
 	else \
-		echo -e "  $(GREEN)✓ No dependency changes. Using read-only cache with fast build$(RESET)"; \
+		echo -e "  $(GREEN)✓ No dependency changes. Using read-only cache with fast build ✓$(RESET)"; \
 	fi; \
 	\
 	RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
 	\
-	for python_version in $(PYTHON_VERSIONS_LIST); do \
+	for python_version in $$PYTHON_VERSIONS_LIST; do \
 		for runtime in $$RUNTIMES_TO_USE; do \
 			make -f Makefile.ci build \
 				MODE=test \
@@ -174,26 +178,6 @@ docker-build:
 		done; \
 	done; \
 	echo -e "\n$(BOLD_GREEN)======== ✓ All local images built successfully! ========$(RESET)\n";
-
-
-# Helper target for CI to strictly check changes against previous commit
-check-dependency-changes:
-	@if (git diff --name-only HEAD~1 HEAD -- 2>/dev/null || true) | grep -E 'pyproject.toml|setup.cfg' > /dev/null; then \
-		echo "true"; \
-	else \
-		echo "false"; \
-	fi
-
-# This target cleans up all Docker-related caches and unused images.
-docker-clean:
-	@echo -e "$(BOLD_YELLOW)● Cleaning Docker resources...$(RESET)"
-	@echo -e "  $(BOLD_BLUE)▶ Cleaning container cache...$(RESET)"; \
-	docker container prune -f; \
-	@echo -e "  $(BOLD_BLUE)▶ Cleaning buildx cache...$(RESET)"; \
-	docker buildx prune -f; \
-	@echo -e "  $(BOLD_BLUE)▶ Cleaning image cache...$(RESET)"; \
-	docker image prune -f;
-	@echo -e "$(BOLD_GREEN)✓ Docker cleanup completed$(RESET)"
 
 
 # This target runs tests inside a Docker container for a specific Python version and runtime.
@@ -240,17 +224,32 @@ docker-test:
 	echo -e "\n$(GREEN)Log saved to: $$LOG_FILE$(RESET)"
 	echo -e "$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)"; \
 
+
 docker-test-all:
+	@set -e; \
+	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
 	@echo -e "$(BOLD_YELLOW)\n======== ● Testing OpenCrate in Docker Versions ========$(RESET)"
 	@RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
-	echo -e "$(BOLD_BLUE)- Python versions: $(PYTHON_VERSIONS_LIST)$(RESET)"; \
+	echo -e "$(BOLD_BLUE)- Python versions: $$PYTHON_VERSIONS_LIST $(RESET)"; \
 	echo -e "$(BOLD_BLUE)- Runtimes: $$RUNTIMES_TO_USE$(RESET)"; \
-	for python_version in $(PYTHON_VERSIONS_LIST); do \
+	for python_version in $$PYTHON_VERSIONS_LIST; do \
 		for runtime in $$RUNTIMES_TO_USE; do \
 			make docker-test PYTHON_VERSION=$$python_version RUNTIME=$$runtime; \
 		done; \
 	done; \
 	echo -e "$(BOLD_GREEN)======== ✓ All Docker tests completed successfully! ========$(RESET)\n";
+
+
+# This target cleans up all Docker-related caches and unused images.
+docker-clean:
+	@echo -e "$(BOLD_YELLOW)● Cleaning Docker resources...$(RESET)"
+	@echo -e "  $(BOLD_BLUE)▶ Cleaning container cache...$(RESET)"; \
+	docker container prune -f; \
+	@echo -e "  $(BOLD_BLUE)▶ Cleaning buildx cache...$(RESET)"; \
+	docker buildx prune -f; \
+	@echo -e "  $(BOLD_BLUE)▶ Cleaning image cache...$(RESET)"; \
+	docker image prune -f;
+	@echo -e "$(BOLD_GREEN)✓ Docker cleanup completed$(RESET)"
 
 
 help:

@@ -25,6 +25,16 @@ BOLD_YELLOW := \033[1;33m
 BOLD_BLUE := \033[1;34m
 BOLD_ORANGE := \033[1;38;5;214m
 
+
+# Helper target for CI to strictly check changes against previous commit
+check-dependency-changes:
+	@if (git diff --name-only HEAD~1 HEAD -- 2>/dev/null || true) | grep -E 'pyproject.toml|setup.cfg' > /dev/null; then \
+		echo "true"; \
+	else \
+		echo "false"; \
+	fi
+
+
 # This target builds and tests a single Docker image for CI/CD workflows.
 build:
 	CACHE_IMAGE_VAR="$(CACHE_IMAGE_PREFIX):$(RUNTIME)-py$(PYTHON_VERSION)";
@@ -36,19 +46,7 @@ build:
 		PULL_FLAG="--pull";
 	fi;
 
-# 2. REGISTRY Cache Logic (Remote)
-# Always read from remote cache to warm the internal builder
-	CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
-
-# Only push to remote registry if we are PUSHING and (deps changed or forced)
-	if [ "$(MODE)" = "push" ] && { [ "$(CACHE_UPDATE)" = "true" ] || [ "$(REBUILD_FLAG)" = "true" ]; }; then
-		echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Uploading new build layers to $$CACHE_IMAGE_VAR !$(RESET)";
-		CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
-	else
-		echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping cache upload $(RESET)";
-	fi;
-
-# 3. Mode Specifics
+# 2. Mode Specifics
 	PLATFORM_FLAG="";
 	OUTPUT_ARGS="";
 	if [ "$(MODE)" = "test" ]; then
@@ -62,6 +60,18 @@ build:
 	else
 		echo -e "$(BOLD_RED)\n!!!!!!!! ✗ ERROR: Invalid MODE !!!!!!!!$(RESET)\n";
 		exit 1;
+	fi;
+
+# 3. REGISTRY Cache Logic (Remote)
+# Always read from remote cache to warm the internal builder
+	CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
+
+# Only push to remote registry if we are PUSHING and (deps changed or forced)
+	if [ "$(MODE)" = "push" ] && { [ "$(CACHE_UPDATE)" = "true" ] || [ "$(REBUILD_FLAG)" = "true" ]; }; then
+		echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Uploading new build layers to $$CACHE_IMAGE_VAR !\n$(RESET)";
+		CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
+	else
+		echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping cache upload ✓\n$(RESET)";
 	fi;
 
 # 4. Execution

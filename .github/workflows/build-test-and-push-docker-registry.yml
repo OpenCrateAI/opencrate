@@ -207,7 +207,7 @@ jobs:
       - name: Check for Dependency Changes
         id: check_changes
         run: |
-          CHANGED=$(make check-dependency-changes)
+          CHANGED=$(make ci-check-dependency-changes)
           echo "Dependencies Changed: $CHANGED"
           REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
 
