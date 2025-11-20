@@ -31,14 +31,14 @@ on:
 # 1. Concurrency: Cancel in-progress runs for the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 
 # 2. Permissions: Least privilege (Read-only by default)
 permissions:
   contents: read
 
 jobs:
-  generate-files:
+  generate-dockerfiles:
     name: Generate Dockerfiles & Matrix
     runs-on: ubuntu-latest
     timeout-minutes: 2
@@ -80,17 +80,17 @@ jobs:
           name: generated-dockerfiles
           path: ./docker/dockerfiles
 
-  build-and-test:
+  build-and-test-images:
     name: Build & Test ${{ matrix.runtime }}-py${{ matrix.python_version }}
     runs-on: ubuntu-latest
-    needs: generate-files
-    timeout-minutes: 5
+    needs: generate-dockerfiles
+    timeout-minutes: 10
     strategy:
       fail-fast: false
       matrix:
         runtime: [cpu, cuda]
         # Use the JSON array generated in the previous job
-        python_version: ${{ fromJson(needs.generate-files.outputs.python_versions_json) }}
+        python_version: ${{ fromJson(needs.generate-dockerfiles.outputs.python_versions_json) }}
 
     steps:
       # Fetch depth 2 is required for git diff HEAD~1 HEAD to work
@@ -128,13 +128,13 @@ jobs:
           # 1. Manual Rebuild Flag is true OR
           # 2. Dependencies Changed (true)
 
-          REBUILD_FLAG="${{ needs.generate-files.outputs.rebuild_flag }}"
+          REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
 
           if [ "$REBUILD_FLAG" = "true" ] || [ "$CHANGED" = "true" ]; then
-            echo "CACHE_UPDATE=true" >> $GITHUB_ENV
+            echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
             echo "Build Strategy: FORCE CACHE UPDATE"
           else
-            echo "CACHE_UPDATE=false" >> $GITHUB_ENV
+            echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
             echo "Build Strategy: READ ONLY CACHE"
           fi
 
@@ -143,14 +143,16 @@ jobs:
           make ci-build MODE=test \
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
-            VERSION=${{ needs.generate-files.outputs.version }} \
-            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }} \
-            CACHE_UPDATE=${{ env.CACHE_UPDATE }}
+            VERSION=${{ needs.generate-dockerfiles.outputs.version }} \
+            REBUILD_FLAG=${{ needs.generate-dockerfiles.outputs.rebuild_flag }} \
+            CACHE_UPDATE=${{ steps.check_changes.outputs.CACHE_UPDATE }}
 
       # OPTIMIZED CLEANUP: Only clean files, DO NOT prune Docker Buildx cache
       - name: Light Cleanup
         run: |
           sudo apt clean -y
+          sudo apt autoremove -y
+          sudo rm -rf /var/lib/apt/lists/*
           sudo rm -rf ~/.cache/*
 
       - name: Test local image
@@ -159,7 +161,7 @@ jobs:
             DEPS=ci \
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
-            VERSION=${{ needs.generate-files.outputs.version }}
+            VERSION=${{ needs.generate-dockerfiles.outputs.version }}
 
       - name: Upload test logs
         if: always()
@@ -168,21 +170,68 @@ jobs:
           name: test-logs-${{ matrix.runtime }}-py${{ matrix.python_version }}
           path: ./tests/logs
 
-      # Only push if tests passed AND it is not a Pull Request
+  build-and-push-images:
+    name: Push ${{ matrix.runtime }}-py${{ matrix.python_version }}
+    runs-on: ubuntu-latest
+    needs: [generate-dockerfiles, build-and-test-images]
+    if: success() && github.event_name != 'pull_request'
+    strategy:
+      fail-fast: false
+      matrix:
+        runtime: [cpu, cuda]
+        python_version: ${{ fromJson(needs.generate-dockerfiles.outputs.python_versions_json) }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Download Dockerfiles artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: generated-dockerfiles
+          path: ./docker/dockerfiles
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Check for Dependency Changes
+        id: check_changes
+        run: |
+          CHANGED=$(make check-dependency-changes)
+          echo "Dependencies Changed: $CHANGED"
+          REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
+
+          if [ "$REBUILD_FLAG" = "true" ] || [ "$CHANGED" = "true" ]; then
+            echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
+            echo "Build Strategy: FORCE CACHE UPDATE"
+          else
+            echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
+            echo "Build Strategy: READ ONLY CACHE"
+          fi
+
       - name: Build and push multi-platform image
-        if: github.event_name != 'pull_request'
         run: |
           make ci-build MODE=push \
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
-            VERSION=${{ needs.generate-files.outputs.version }} \
-            REBUILD_FLAG=${{ needs.generate-files.outputs.rebuild_flag }} \
-            CACHE_UPDATE=${{ env.CACHE_UPDATE }}
+            VERSION=${{ needs.generate-dockerfiles.outputs.version }} \
+            REBUILD_FLAG=${{ needs.generate-dockerfiles.outputs.rebuild_flag }} \
+            CACHE_UPDATE=${{ steps.check_changes.outputs.CACHE_UPDATE }}
 
   release-latest:
     name: Tag "latest"
     runs-on: ubuntu-latest
-    needs: [generate-files, build-and-test]
+    needs: [generate-dockerfiles, build-and-push-images]
     if: success() && github.event_name == 'push' && github.ref_type == 'tag'
     steps:
       - name: Login to Docker Hub
@@ -196,4 +245,4 @@ jobs:
         uses: actions/checkout@v4
 
       - name: Tag and Push "latest" tag
-        run: make ci-release VERSION=${{ needs.generate-files.outputs.version }}
+        run: make ci-release VERSION=${{ needs.generate-dockerfiles.outputs.version }}

@@ -68,7 +68,7 @@ workflow_dispatch:
 
 The workflow consists of three sequential jobs:
 
-### Job 1: `generate-files`
+### Job 1: `generate-dockerfiles`
 **Purpose**: Generate Dockerfiles and set up workflow variables
 
 **Steps**:
@@ -84,7 +84,7 @@ The workflow consists of three sequential jobs:
 - `rebuild_flag`: Whether to force rebuild base layers (`true` for scheduled/tag pushes)
 - `python_versions_json`: JSON array of Python versions to be used in the matrix
 
-### Job 2: `build-and-test`
+### Job 2: `build-and-test-images`
 **Purpose**: Build and test images for all configurations in parallel
 
 **Matrix Strategy**: Runs parallel jobs for each combination of:
@@ -123,26 +123,42 @@ The workflow consists of three sequential jobs:
    - Tests include: ruff linting, mypy type checking, pytest
    - Logs are saved to `./tests/logs/test-py{version}-{runtime}.log`
 
-5. **Upload Test Logs**:
+6. **Upload Test Logs**:
    - Upload logs as artifacts (runs even if tests fail)
    - Artifact name: `test-logs-{runtime}-py{version}`
    - Example: `test-logs-cuda-py3.11`
 
-6. **Build and Push Multi-Platform Image** (MODE=push, only if tests pass):
+### Job 3: `build-and-push-images`
+**Purpose**: Build and push multi-platform images to Docker Hub
+
+**Condition**: Only runs if:
+- All `build-and-test-images` jobs succeeded (ensuring no partial releases)
+- Not a Pull Request
+
+**Matrix Strategy**: Same as `build-and-test` (parallel execution)
+
+**Steps**:
+1. **Setup**:
+   - Checkout repository
+   - Download generated Dockerfiles
+   - Set up QEMU and Docker Buildx
+   - Login to Docker Hub
+
+2. **Check for Dependency Changes**:
+   - Re-evaluates dependency changes to determine cache strategy
+
+3. **Build and Push Multi-Platform Image** (MODE=push):
    - Uses `make ci-build MODE=push` with hybrid caching strategy
    - Platforms: `linux/amd64`, `linux/arm64`
-   - Caching layers:
-     - Reads from registry cache (per-Python-version)
-     - Reads from local cache (populated by test step)
-     - Conditionally writes to registry cache (if REBUILD_FLAG or CACHE_UPDATE)
-   - Pushed to Docker Hub with version tag
-   - Updates build cache in registry (when applicable)
+   - Reuses local cache from test stage (if available/applicable) or registry cache
+   - Pushes to Docker Hub
+   - Updates registry cache (conditionally)
 
-### Job 3: `release-latest`
+### Job 4: `release-latest`
 **Purpose**: Tag successful builds as "latest"
 
 **Condition**: Only runs if:
-- All build-and-test jobs succeeded AND
+- All `build-and-push-images` jobs succeeded AND
 - Triggered by a version tag push (NOT scheduled, manual, or PR)
 
 **Steps**:
