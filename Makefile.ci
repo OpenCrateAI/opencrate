@@ -4,6 +4,9 @@ RUNTIME ?= cuda
 VERSION ?= $(shell cat VERSION | tr -d '\n')
 CACHE_IMAGE_PREFIX ?= braindotai/opencrate-build-cache
 
+# Read versions from shared file
+PYTHON_VERSIONS_LIST := $(shell cat PYTHON_VERSIONS | tr '\n' ' ')
+
 # Defaults
 REBUILD_FLAG ?= false
 CACHE_UPDATE ?= false
@@ -84,8 +87,7 @@ build:
 release:
 	@echo -e "$(BOLD_YELLOW)\n======== ● Tagging 'latest' for all images with version $(VERSION) ========$(RESET)\n"
 	@set -e; \
-	PYTHON_VERSIONS="3.7 3.8 3.9 3.10 3.11 3.12"; \
-	for python_version in $$PYTHON_VERSIONS; do \
+	for python_version in $(PYTHON_VERSIONS_LIST); do \
 		for runtime in cpu cuda; do \
 			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
 			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
