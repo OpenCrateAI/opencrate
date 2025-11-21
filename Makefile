@@ -228,7 +228,7 @@ docker-test:
 docker-test-all:
 	@set -e; \
 	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
-	@echo -e "$(BOLD_YELLOW)\n======== ● Testing OpenCrate in Docker Versions ========$(RESET)"
+	echo -e "$(BOLD_YELLOW)\n======== ● Testing OpenCrate in Docker Versions ========$(RESET)"
 	@RUNTIMES_TO_USE="$${RUNTIMES:-cpu cuda}"; \
 	echo -e "$(BOLD_BLUE)- Python versions: $$PYTHON_VERSIONS_LIST $(RESET)"; \
 	echo -e "$(BOLD_BLUE)- Runtimes: $$RUNTIMES_TO_USE$(RESET)"; \
