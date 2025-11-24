@@ -154,7 +154,7 @@ jobs:
           sudo apt autoremove -y
           sudo rm -rf /var/lib/apt/lists/*
           sudo rm -rf ~/.cache/*
-          sudo rm -rf /tmp/*
+          [ -d /tmp ] && sudo rm -rf /tmp/*
 
       - name: Test local image
         run: |
