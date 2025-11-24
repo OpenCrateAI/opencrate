@@ -60,6 +60,12 @@ build:
 	if [ "$(REBUILD_FLAG)" = "true" ]; then
 		echo -e "  $(BOLD_ORANGE)! FORCE PULL: Updating base images !$(RESET)";
 		PULL_FLAG="--pull";
+		if [ "$(MODE)" = "test" ]; then
+			echo -e "  $(BOLD_ORANGE)! TEST MODE: Disabling remote cache !$(RESET)";
+			PULL_FLAG="--pull --no-cache";
+		else
+			echo -e "  $(BOLD_ORANGE)! PUSH MODE: Enabling remote cache !$(RESET)";
+		fi;
 	fi;
 
 # 3. REGISTRY Cache Logic (Remote)
