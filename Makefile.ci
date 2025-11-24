@@ -62,28 +62,16 @@ build:
 		exit 1;
 	fi;
 
-# 3. Cache Logic
-	# Define GHA Cache Scope (Unique per image variant)
-	GHA_SCOPE="opencrate-$(RUNTIME)-py$(PYTHON_VERSION)";
-
-	# Always read from Registry (Long-term) and GHA (Short-term/Inter-job)
+# 3. REGISTRY Cache Logic (Remote)
+# Always read from remote cache to warm the internal builder
 	CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
-	CACHE_ARGS="$$CACHE_ARGS --cache-from type=gha,scope=$$GHA_SCOPE";
 
-	if [ "$(MODE)" = "test" ]; then
-		# TEST: Write to GHA cache so the Push job can pick it up
-		# This saves the amd64 layers so the next job doesn't rebuild them
-		echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Exporting layers to GHA (scope: $$GHA_SCOPE) !$(RESET)";
-		CACHE_ARGS="$$CACHE_ARGS --cache-to type=gha,scope=$$GHA_SCOPE,mode=max";
-
-	elif [ "$(MODE)" = "push" ]; then
-		# PUSH: Write to Registry if needed (Long-term storage)
-		if { [ "$(CACHE_UPDATE)" = "true" ] || [ "$(REBUILD_FLAG)" = "true" ]; }; then
-			echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Uploading new build layers to $$CACHE_IMAGE_VAR !$(RESET)";
-			CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
-		else
-			echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping registry cache upload $(RESET)";
-		fi;
+# Only push to remote registry if we are PUSHING and (deps changed or forced)
+	if [ "$(MODE)" = "push" ] && { [ "$(CACHE_UPDATE)" = "true" ] || [ "$(REBUILD_FLAG)" = "true" ]; }; then
+		echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Uploading new build layers to $$CACHE_IMAGE_VAR !\n$(RESET)";
+		CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
+	else
+		echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping cache upload ✓\n$(RESET)";
 	fi;
 
 # 4. Execution
