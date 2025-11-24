@@ -149,7 +149,7 @@ docker-generate:
 docker-build:
 	@set -e; \
 	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
-	echo -e "$(BOLD_YELLOW)\n======== ● Building all OpenCrate images locally ========$(RESET)\n"; \
+	echo -e "$(BOLD_YELLOW)\n======== ● Building all OpenCrate images locally ========$(RESET)"; \
 	CACHE_UPDATE="false"; \
 	if [ "$(REBUILD_FLAG)" = "true" ]; then \
 		echo -e "  $(BOLD_ORANGE)! Manual Rebuild Flag Detected !"; \

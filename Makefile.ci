@@ -39,27 +39,27 @@ check-dependency-changes:
 build:
 	CACHE_IMAGE_VAR="$(CACHE_IMAGE_PREFIX):$(RUNTIME)-py$(PYTHON_VERSION)";
 
-# 1. Base Image Pull Logic
-	PULL_FLAG="";
-	if [ "$(REBUILD_FLAG)" = "true" ]; then
-		echo -e "  $(BOLD_ORANGE)! FORCE PULL: Updating base images !$(RESET)";
-		PULL_FLAG="--pull";
-	fi;
-
-# 2. Mode Specifics
+# 1. Mode Specifics
 	PLATFORM_FLAG="";
 	OUTPUT_ARGS="";
 	if [ "$(MODE)" = "test" ]; then
-		echo -e "$(BOLD_YELLOW)\n======== ● Building local (Test): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)\n";
+		echo -e "$(BOLD_YELLOW)\n======== ● Building local (Test): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)";
 		PLATFORM_FLAG="--platform linux/amd64";
 		OUTPUT_ARGS="--load";
 	elif [ "$(MODE)" = "push" ]; then
-		echo -e "$(BOLD_YELLOW)\n======== ● Building & Pushing (Release): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)\n";
+		echo -e "$(BOLD_YELLOW)\n======== ● Building & Pushing (Release): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)";
 		PLATFORM_FLAG="--platform linux/amd64,linux/arm64";
 		OUTPUT_ARGS="--push";
 	else
 		echo -e "$(BOLD_RED)\n!!!!!!!! ✗ ERROR: Invalid MODE !!!!!!!!$(RESET)\n";
 		exit 1;
+	fi;
+
+# 2. Base Image Pull Logic
+	PULL_FLAG="";
+	if [ "$(REBUILD_FLAG)" = "true" ]; then
+		echo -e "  $(BOLD_ORANGE)! FORCE PULL: Updating base images !$(RESET)";
+		PULL_FLAG="--pull";
 	fi;
 
 # 3. REGISTRY Cache Logic (Remote)
