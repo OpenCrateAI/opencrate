@@ -1,0 +1,11 @@
+# https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# =============================================================================
+# Protected directories - require maintainer review
+# =============================================================================
+
+# GitHub Actions workflows and configuration
+/.github/* @braindotai
+
+VERSION @braindotai
+PYTHON_VERSIONS @braindotai

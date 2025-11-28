@@ -112,6 +112,8 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
+        # Skip for fork PRs as they don't need registry access
+        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -133,19 +135,19 @@ jobs:
             # Non-PR: Check if dependencies changed
             CHANGED=$(make ci-check-dependency-changes)
 
-            # Pass through the rebuild flag from generate-dockerfiles
-            echo "REBUILD_FLAG=$REBUILD_FLAG" >> $GITHUB_OUTPUT
-
-            # Update cache if rebuild requested OR dependencies changed
+            # Fresh build (--pull --no-cache) if REBUILD_FLAG=true OR dependencies changed
             if [ "$REBUILD_FLAG" = "true" ]; then
+              echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
               echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (REBUILD_FLAG=true)\033[0m"
+              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) + update remote cache (REBUILD_FLAG=true)\033[0m"
             elif [ "$CHANGED" = "true" ]; then
+              echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
               echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (Dependencies changed)\033[0m"
+              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) + update remote cache (Dependencies changed)\033[0m"
             else
+              echo "REBUILD_FLAG=false" >> $GITHUB_OUTPUT
               echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-              echo -e "\033[1;38;5;214mBuild Strategy: Using remote cache\033[0m"
+              echo -e "\033[1;38;5;214mBuild Strategy: Using remote cache (read-only)\033[0m"
             fi
           fi
 

@@ -53,27 +53,29 @@ build:
 		exit 1;
 	fi;
 
-	# 2. Cache Strategy based on REBUILD_FLAG and MODE
+	# 2. Cache Strategy based on REBUILD_FLAG, CACHE_UPDATE, and MODE
 	PULL_FLAG="";
 	CACHE_ARGS="";
 
 	if [ "$(REBUILD_FLAG)" = "true" ]; then
 		# =============================================================
-		# REBUILD MODE: Force fresh build and update cache
+		# REBUILD MODE: Force fresh build with --pull --no-cache
 		# =============================================================
 		echo -e "  $(BOLD_ORANGE)! FORCE REBUILD: Pulling fresh base images !$(RESET)";
-		PULL_FLAG="--pull";
+		echo -e "  $(BOLD_ORANGE)! NO-CACHE: Ignoring all existing cache !$(RESET)";
+		PULL_FLAG="--pull --no-cache";
 
-		if [ "$(MODE)" = "test" ]; then
-			# TEST + REBUILD: Build completely fresh (no cache read), then save to cache
-			echo -e "  $(BOLD_ORANGE)! NO-CACHE: Ignoring all existing cache !$(RESET)";
+		if [ "$(CACHE_UPDATE)" = "true" ] && [ "$(MODE)" = "test" ]; then
+			# REBUILD + CACHE_UPDATE: Save fresh layers to remote cache
 			echo -e "  $(BOLD_ORANGE)! CACHE-TO: Will update remote cache with fresh layers !\n$(RESET)";
-			PULL_FLAG="--pull --no-cache";
 			CACHE_ARGS="--cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
-		else
-			# PUSH + REBUILD: Use the fresh cache saved by test job (don't rebuild)
+		elif [ "$(MODE)" = "push" ]; then
+			# PUSH + REBUILD: Use the fresh cache saved by test job
 			echo -e "  $(GREEN)✓ Using fresh cache from test job ✓\n$(RESET)";
 			CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
+		else
+			# REBUILD but NO cache update (e.g., PRs)
+			echo -e "  $(GREEN)✓ CACHE ISOLATED: No remote cache read/write ✓\n$(RESET)";
 		fi;
 	else
 		# =============================================================
