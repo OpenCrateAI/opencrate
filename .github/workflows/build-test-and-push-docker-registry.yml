@@ -44,7 +44,7 @@ jobs:
     timeout-minutes: 2
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
-      rebuild_flag: ${{ github.event_name == 'schedule' || github.event_name == 'push' || github.event.inputs.REBUILD_BASE }}
+      rebuild_flag: ${{ github.event_name == 'schedule' || github.event.inputs.REBUILD_BASE }}
       # Output the python versions as a JSON array for the matrix
       python_versions_json: ${{ steps.set_matrix.outputs.PYTHON_VERSIONS_JSON }}
     steps:
@@ -158,14 +158,17 @@ jobs:
             REBUILD_FLAG=${{ steps.check_changes.outputs.REBUILD_FLAG }} \
             CACHE_UPDATE=${{ steps.check_changes.outputs.CACHE_UPDATE }}
 
+      - name: Scan image for vulnerabilities
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: "braindotai/opencrate-${{ matrix.runtime }}-py${{ matrix.python_version }}:${{ needs.generate-dockerfiles.outputs.version }}"
+
       # OPTIMIZED CLEANUP: Only clean files, DO NOT prune Docker Buildx cache
       - name: Light Cleanup
         run: |
           sudo apt clean -y
           sudo apt autoremove -y
           [ -d /var/lib/apt/lists/ ] && sudo rm -rf /var/lib/apt/lists/*
-          [ -d ~/.cache ] && sudo rm -rf ~/.cache/*
-          [ -d /tmp ] && sudo rm -rf /tmp/*
 
       - name: Test local image
         run: |

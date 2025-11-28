@@ -81,7 +81,7 @@ The workflow consists of four sequential jobs:
 
 **Outputs**:
 - `version`: The version string from the VERSION file
-- `rebuild_flag`: Whether to force rebuild base layers (`true` for scheduled/tag pushes)
+- `rebuild_flag`: Whether to force rebuild base layers (`true` for scheduled builds or manual `REBUILD_BASE=true`)
 - `python_versions_json`: JSON array of Python versions to be used in the matrix
 
 ### Job 2: `build-and-test-images`
@@ -99,14 +99,16 @@ The workflow consists of four sequential jobs:
    - Set up Docker Buildx
    - Login to Docker Hub
 
-2. **Check for Dependency Changes**:
-   - Runs `make ci-check-dependency-changes` to detect modifications in `pyproject.toml` or `setup.cfg`
-   - Determines if `CACHE_UPDATE` should be true (if dependencies changed or `REBUILD_BASE` is requested)
+2. **Determine Build Strategy**:
+   - For **Pull Requests**: Always forces fresh build (`--pull --no-cache`) with NO cache updates (isolation & security)
+   - For **Non-PRs**: Runs `make ci-check-dependency-changes` to detect modifications in `pyproject.toml` or `setup.cfg`
+   - Determines `REBUILD_FLAG` and `CACHE_UPDATE` based on event type and dependency changes
 
 3. **Build Local Test Image** (MODE=test):
    - Uses `make ci-build MODE=test` with registry caching strategy
    - Platform: `linux/amd64` only
    - Caching behavior (registry cache):
+     - **PRs**: Fresh build with `--pull --no-cache`, NO cache writes (complete isolation)
      - If `REBUILD_FLAG=true`: Builds fresh with `--pull --no-cache`, then writes to registry cache
      - If `CACHE_UPDATE=true`: Reads from registry cache AND writes updated layers back
      - Otherwise: Read-only from registry cache
@@ -114,18 +116,21 @@ The workflow consists of four sequential jobs:
    - Example: `braindotai/opencrate-cpu-py3.10:v0.1.0-rc`
    - Image is loaded locally (not pushed)
 
-4. **Light Cleanup**:
-   - Cleans apt cache and user cache (`~/.cache/*`)
-   - Cleans temporary files in `/tmp`
+4. **Scan Image for Vulnerabilities**:
+   - Uses Trivy security scanner to detect vulnerabilities in the built image
+   - Scans the freshly built Docker image before running tests
+
+5. **Light Cleanup**:
+   - Cleans apt cache and package lists
    - **Note**: Does NOT prune Docker Buildx cache (preserves build metadata)
 
-5. **Test Local Image**:
+6. **Test Local Image**:
    - Run tests inside the freshly built Docker container
    - Uses `make docker-test` with `DEPS=ci`
    - Tests include: ruff linting, mypy type checking, pytest
    - Logs are saved to `./tests/logs/test-py{version}-{runtime}.log`
 
-6. **Upload Test Logs**:
+7. **Upload Test Logs**:
    - Upload logs as artifacts (runs even if tests fail)
    - Artifact name: `test-logs-{runtime}-py{version}`
    - Example: `test-logs-cuda-py3.11`
@@ -371,7 +376,11 @@ Each Python version and runtime combination has its own dedicated cache image:
 - ✓ Each build can safely update its own cache
 
 **Registry Cache Behavior:**
-- **Test job (`MODE=test`)**:
+- **Pull Requests**:
+  - **Complete isolation**: Fresh build with `--pull --no-cache`
+  - Never reads from or writes to registry cache
+  - Ensures untested code cannot pollute shared cache
+- **Test job (`MODE=test`) for non-PRs**:
   - Always reads from registry cache (with `ignore-error=true`)
   - Writes to cache when `REBUILD_FLAG=true` OR `CACHE_UPDATE=true`
   - If `REBUILD_FLAG=true`: Uses `--pull --no-cache` to build fresh, then saves to cache
@@ -389,10 +398,10 @@ Each Python version and runtime combination has its own dedicated cache image:
 
 | Trigger | Test Job (MODE=test) | Push Job (MODE=push) |
 |---------|---------------------|---------------------|
-| **Pull Request** | Read from cache | Does not run |
-| **Tag Push** | Read + Write cache | Read from cache only |
+| **Pull Request** | Fresh build (`--pull --no-cache`), NO cache writes | Does not run |
+| **Tag Push** | Read from cache (+ write if deps changed) | Read from cache only |
 | **Scheduled** | Fresh build (`--pull --no-cache`) + Write cache | Read from cache only |
-| **Manual (REBUILD_BASE=false)** | Read from cache | Read from cache only |
+| **Manual (REBUILD_BASE=false)** | Read from cache (+ write if deps changed) | Read from cache only |
 | **Manual (REBUILD_BASE=true)** | Fresh build (`--pull --no-cache`) + Write cache | Read from cache only |
 
 **Key principle**: Push job ALWAYS reads from cache, never writes. This ensures the pushed image matches the tested image.
