@@ -66,7 +66,7 @@ workflow_dispatch:
 
 ## Workflow Architecture
 
-The workflow consists of three sequential jobs:
+The workflow consists of four sequential jobs:
 
 ### Job 1: `generate-dockerfiles`
 **Purpose**: Generate Dockerfiles and set up workflow variables
@@ -100,22 +100,24 @@ The workflow consists of three sequential jobs:
    - Login to Docker Hub
 
 2. **Check for Dependency Changes**:
-   - Runs `make check-dependency-changes` to detect modifications in `pyproject.toml` or `setup.cfg`
+   - Runs `make ci-check-dependency-changes` to detect modifications in `pyproject.toml` or `setup.cfg`
    - Determines if `CACHE_UPDATE` should be true (if dependencies changed or `REBUILD_BASE` is requested)
 
 3. **Build Local Test Image** (MODE=test):
-   - Uses `make ci-build MODE=test` with hybrid caching strategy
-   - Platform: `linux/amd64` only (faster for testing)
-   - Caching layers:
-     - Reads from registry cache (per-Python-version)
-     - Writes to local cache for reuse in push step
+   - Uses `make ci-build MODE=test` with registry caching strategy
+   - Platform: `linux/amd64` only
+   - Caching behavior (registry cache):
+     - If `REBUILD_FLAG=true`: Builds fresh with `--pull --no-cache`, then writes to registry cache
+     - If `CACHE_UPDATE=true`: Reads from registry cache AND writes updated layers back
+     - Otherwise: Read-only from registry cache
    - Image tag: `braindotai/opencrate-{runtime}-py{version}:{VERSION}`
    - Example: `braindotai/opencrate-cpu-py3.10:v0.1.0-rc`
    - Image is loaded locally (not pushed)
 
 4. **Light Cleanup**:
    - Cleans apt cache and user cache (`~/.cache/*`)
-   - **Crucial**: Does NOT prune Docker Buildx cache to ensure layers are available for the push step
+   - Cleans temporary files in `/tmp`
+   - **Note**: Does NOT prune Docker Buildx cache (preserves build metadata)
 
 5. **Test Local Image**:
    - Run tests inside the freshly built Docker container
@@ -129,7 +131,7 @@ The workflow consists of three sequential jobs:
    - Example: `test-logs-cuda-py3.11`
 
 ### Job 3: `build-and-push-images`
-**Purpose**: Build and push multi-platform images to Docker Hub
+**Purpose**: Push tested images to Docker Hub using cached layers
 
 **Condition**: Only runs if:
 - All `build-and-test-images` jobs succeeded (ensuring no partial releases)
@@ -144,15 +146,12 @@ The workflow consists of three sequential jobs:
    - Set up QEMU and Docker Buildx
    - Login to Docker Hub
 
-2. **Check for Dependency Changes**:
-   - Re-evaluates dependency changes to determine cache strategy
-
-3. **Build and Push Multi-Platform Image** (MODE=push):
-   - Uses `make ci-build MODE=push` with hybrid caching strategy
-   - Platforms: `linux/amd64`, `linux/arm64`
-   - Reuses local cache from test stage (if available/applicable) or registry cache
+2. **Build and Push Image** (MODE=push):
+   - Uses `make ci-build MODE=push`
+   - Platform: `linux/amd64` (arm64 support planned for future)
+   - **Always reads from registry cache** (never writes)
+   - This ensures the pushed image is identical to what was tested
    - Pushes to Docker Hub
-   - Updates registry cache (conditionally)
 
 ### Job 4: `release-latest`
 **Purpose**: Tag successful builds as "latest"
@@ -339,17 +338,18 @@ The workflow uses a **hybrid caching strategy** combining local filesystem cache
 
 ### Two-Stage Build Process
 
-Each matrix job builds the image twice:
+The workflow separates building/testing from pushing to ensure consistency:
 
-1. **Test Stage** (`MODE=test`):
+1. **Test Stage** (`build-and-test-images` job, `MODE=test`):
    - Builds for `linux/amd64` only
    - Loads image locally for testing
+   - May update registry cache (if `REBUILD_FLAG=true` or `CACHE_UPDATE=true`)
 
-2. **Push Stage** (`MODE=push`):
-   - Builds for `linux/amd64,linux/arm64`
-   - Reuses local cache from test stage
+2. **Push Stage** (`build-and-push-images` job, `MODE=push`):
+   - Builds for `linux/amd64` (arm64 planned for future)
+   - **Always reads from registry cache** (never writes)
    - Pushes to Docker Hub
-   - Updates registry cache (conditionally)
+   - Guarantees "what you test = what you push"
 
 ### Cache Layers
 
@@ -371,22 +371,31 @@ Each Python version and runtime combination has its own dedicated cache image:
 - ✓ Each build can safely update its own cache
 
 **Registry Cache Behavior:**
-- **Always reads** from registry cache (with `ignore-error=true`)
-- **Only writes** when `MODE=push` AND (`REBUILD_FLAG=true` OR `CACHE_UPDATE=true`)
-- Uses `mode=max` to cache all layers including intermediate steps
+- **Test job (`MODE=test`)**:
+  - Always reads from registry cache (with `ignore-error=true`)
+  - Writes to cache when `REBUILD_FLAG=true` OR `CACHE_UPDATE=true`
+  - If `REBUILD_FLAG=true`: Uses `--pull --no-cache` to build fresh, then saves to cache
+- **Push job (`MODE=push`)**:
+  - **Read-only**: Always reads from registry cache, never writes
+  - Uses `mode=max` to utilize all cached layers
 
 **Benefits:**
+- ✓ Pushed image is identical to tested image (cache consistency)
 - ✓ Dramatically speeds up the push stage (reuses test build layers)
-- ✓ Reduces build time for multi-platform images
-- ✓ No network overhead between test and push stages
-- ✓ Guaranteed cache hit for the second build
+- ✓ No accidental cache corruption from push job
+- ✓ Guaranteed cache hit for the push build
 
 ### Cache Behavior by Trigger Type
 
-- **Pull Requests**: Read-only from registry cache, local cache used between stages, no cache writes to registry
-- **Tag Pushes**: Full caching enabled (read + write to registry cache)
-- **Scheduled Builds**: Force rebuild with `--pull` flag, updates registry cache
-- **Manual Triggers**: Optionally force rebuild with `REBUILD_BASE=true`
+| Trigger | Test Job (MODE=test) | Push Job (MODE=push) |
+|---------|---------------------|---------------------|
+| **Pull Request** | Read from cache | Does not run |
+| **Tag Push** | Read + Write cache | Read from cache only |
+| **Scheduled** | Fresh build (`--pull --no-cache`) + Write cache | Read from cache only |
+| **Manual (REBUILD_BASE=false)** | Read from cache | Read from cache only |
+| **Manual (REBUILD_BASE=true)** | Fresh build (`--pull --no-cache`) + Write cache | Read from cache only |
+
+**Key principle**: Push job ALWAYS reads from cache, never writes. This ensures the pushed image matches the tested image.
 
 ### When to Force Rebuild
 - Base images have critical security updates
@@ -457,12 +466,14 @@ Each Python version and runtime combination has its own dedicated cache image:
 ### Success Indicators
 - ✓ All 16 matrix jobs complete successfully (8 Python versions × 2 runtimes)
 - ✓ Images pushed to Docker Hub (except for PR builds)
-- ✓ "latest" tags updated (for tag pushes only, Python 3.7-3.12)
+- ✓ "latest" tags updated (for tag pushes only)
+- ✓ Images available for `linux/amd64` platform
 
 ### Failure Handling
 - Individual matrix job failures don't stop other jobs (`fail-fast: false`)
 - Test logs uploaded even if tests fail (`if: always()`)
-- Multi-platform push only happens if tests pass
+- **No partial releases**: Push jobs only run if ALL test jobs succeed
+- If any test fails, no images are pushed to Docker Hub
 
 ### Viewing Results
 1. **GitHub Actions UI**: Real-time progress and logs

@@ -28,87 +28,98 @@ BOLD_ORANGE := \033[1;38;5;214m
 
 # Helper target for CI to strictly check changes against previous commit
 check-dependency-changes:
-	@if (git diff --name-only HEAD~1 HEAD -- 2>/dev/null || true) | grep -E 'pyproject.toml|setup.cfg' > /dev/null; then \
-		echo "true"; \
-	else \
-		echo "false"; \
-	fi
+    @if (git diff --name-only HEAD~1 HEAD -- 2>/dev/null || true) | grep -E 'pyproject.toml|setup.cfg' > /dev/null; then \
+        echo "true"; \
+    else \
+        echo "false"; \
+    fi
 
 
 # This target builds and tests a single Docker image for CI/CD workflows.
 build:
-	CACHE_IMAGE_VAR="$(CACHE_IMAGE_PREFIX):$(RUNTIME)-py$(PYTHON_VERSION)";
+    CACHE_IMAGE_VAR="$(CACHE_IMAGE_PREFIX):$(RUNTIME)-py$(PYTHON_VERSION)";
 
-# 1. Mode Specifics
-	PLATFORM_FLAG="";
-	OUTPUT_ARGS="";
-	if [ "$(MODE)" = "test" ]; then
-		echo -e "$(BOLD_YELLOW)\n======== ● Building local (Test): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)";
-		PLATFORM_FLAG="--platform linux/amd64";
-		OUTPUT_ARGS="--load";
-	elif [ "$(MODE)" = "push" ]; then
-		echo -e "$(BOLD_YELLOW)\n======== ● Building & Pushing (Release): $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)";
-		PLATFORM_FLAG="--platform linux/amd64,linux/arm64";
-		OUTPUT_ARGS="--push";
-	else
-		echo -e "$(BOLD_RED)\n!!!!!!!! ✗ ERROR: Invalid MODE !!!!!!!!$(RESET)\n";
-		exit 1;
-	fi;
+# 1. Mode Specifics (amd64 only for now)
+    PLATFORM_FLAG="--platform linux/amd64";
+    OUTPUT_ARGS="";
+    if [ "$(MODE)" = "test" ]; then
+        echo -e "$(BOLD_YELLOW)\n======== ● Building for Testing: $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)";
+        OUTPUT_ARGS="--load";
+    elif [ "$(MODE)" = "push" ]; then
+        echo -e "$(BOLD_YELLOW)\n======== ● Building for Pushing: $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)";
+        OUTPUT_ARGS="--push";
+    else
+        echo -e "$(BOLD_RED)\n!!!!!!!! ✗ ERROR: Invalid MODE !!!!!!!!$(RESET)\n";
+        exit 1;
+    fi;
 
-# 2. Base Image Pull Logic
-	PULL_FLAG="";
-	if [ "$(REBUILD_FLAG)" = "true" ]; then
-		echo -e "  $(BOLD_ORANGE)! FORCE PULL: Updating base images !$(RESET)";
-		PULL_FLAG="--pull";
-		if [ "$(MODE)" = "test" ]; then
-			echo -e "  $(BOLD_ORANGE)! TEST MODE: Disabling remote cache !$(RESET)";
-			PULL_FLAG="--pull --no-cache";
-		else
-			echo -e "  $(BOLD_ORANGE)! PUSH MODE: Enabling remote cache !$(RESET)";
-		fi;
-	fi;
+# 2. Cache Strategy based on REBUILD_FLAG and MODE
+    PULL_FLAG="";
+    CACHE_ARGS="";
 
-# 3. REGISTRY Cache Logic (Remote)
-# Always read from remote cache to warm the internal builder
-	CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
+    if [ "$(REBUILD_FLAG)" = "true" ]; then
+        # =============================================================
+        # REBUILD MODE: Force fresh build and update cache
+        # =============================================================
+        echo -e "  $(BOLD_ORANGE)! FORCE REBUILD: Pulling fresh base images !$(RESET)";
+        PULL_FLAG="--pull";
 
-# Only push to remote registry if we are PUSHING and (deps changed or forced)
-	if [ "$(MODE)" = "push" ] && { [ "$(CACHE_UPDATE)" = "true" ] || [ "$(REBUILD_FLAG)" = "true" ]; }; then
-		echo -e "  $(BOLD_ORANGE)! CACHE WRITE: Uploading new build layers to $$CACHE_IMAGE_VAR !\n$(RESET)";
-		CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
-	else
-		echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping cache upload ✓\n$(RESET)";
-	fi;
+        if [ "$(MODE)" = "test" ]; then
+            # TEST + REBUILD: Build completely fresh (no cache read), then save to cache
+            echo -e "  $(BOLD_ORANGE)! NO-CACHE: Ignoring all existing cache !$(RESET)";
+            echo -e "  $(BOLD_ORANGE)! CACHE-TO: Will update remote cache with fresh layers !\n$(RESET)";
+            PULL_FLAG="--pull --no-cache";
+            CACHE_ARGS="--cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
+        else
+            # PUSH + REBUILD: Use the fresh cache saved by test job (don't rebuild)
+            echo -e "  $(GREEN)✓ Using fresh cache from test job ✓\n$(RESET)";
+            CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
+        fi;
+    else
+        # =============================================================
+        # NORMAL MODE: Use existing cache, update only if deps changed
+        # =============================================================
+        echo -e "  $(GREEN)✓ Using remote registry cache ✓$(RESET)";
+        CACHE_ARGS="--cache-from type=registry,ref=$$CACHE_IMAGE_VAR,ignore-error=true";
 
-# 4. Execution
-	IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)";
-	DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)";
-	
-	if docker buildx build \
-		$$PLATFORM_FLAG \
-		-f "$$DOCKERFILE_PATH" \
-		-t "$$IMAGE_TAG" \
-		$$OUTPUT_ARGS \
-		$$PULL_FLAG \
-		$$CACHE_ARGS \
-		.; then
-		echo -e "\n$(BOLD_GREEN)======== ✓ Success: $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)\n";
-	else
-		echo -e "\n$(BOLD_RED)!!!!!!!! ✗ FAILED: $(RUNTIME)-py$(PYTHON_VERSION) !!!!!!!!$(RESET)\n";
-		exit 1;
-	fi
+        if [ "$(CACHE_UPDATE)" = "true" ] && [ "$(MODE)" = "test" ]; then
+            # Dependencies changed: update cache in test mode
+            echo -e "  $(BOLD_YELLOW)! Dependencies changed: Will update remote cache !\n$(RESET)";
+            CACHE_ARGS="$$CACHE_ARGS --cache-to type=registry,ref=$$CACHE_IMAGE_VAR,mode=max";
+        else
+            echo -e "  $(GREEN)✓ CACHE READ-ONLY: Skipping cache upload ✓\n$(RESET)";
+        fi;
+    fi;
+
+# 3. Execution
+    IMAGE_TAG="braindotai/opencrate-$(RUNTIME)-py$(PYTHON_VERSION):$(VERSION)";
+    DOCKERFILE_PATH="./docker/dockerfiles/Dockerfile.$(RUNTIME)-py$(PYTHON_VERSION)";
+    
+    if docker buildx build \
+        $$PLATFORM_FLAG \
+        -f "$$DOCKERFILE_PATH" \
+        -t "$$IMAGE_TAG" \
+        $$OUTPUT_ARGS \
+        $$PULL_FLAG \
+        $$CACHE_ARGS \
+        .; then
+        echo -e "\n$(BOLD_GREEN)======== ✓ Success: $(RUNTIME)-py$(PYTHON_VERSION) ========$(RESET)\n";
+    else
+        echo -e "\n$(BOLD_RED)!!!!!!!! ✗ FAILED: $(RUNTIME)-py$(PYTHON_VERSION) !!!!!!!!$(RESET)\n";
+        exit 1;
+    fi
 
 
 # This target pushes the images as the latest tag to the registry.
 release:
-	@echo -e "$(BOLD_YELLOW)\n======== ● Tagging 'latest' for all images with version $(VERSION) ========$(RESET)\n"
-	@set -e; \
-	for python_version in $(PYTHON_VERSIONS_LIST); do \
-		for runtime in cpu cuda; do \
-			IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
-			LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
-			echo -e "  $(BOLD_BLUE)▶ Tagging $$IMAGE_TAG as $$LATEST_TAG$(RESET)"; \
-			docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
-		done; \
-	done; \
-	echo -e "\n$(BOLD_GREEN)======== ✓ All images tagged as latest ========$(RESET)\n";
+    @echo -e "$(BOLD_YELLOW)\n======== ● Tagging 'latest' for all images with version $(VERSION) ========$(RESET)\n"
+    @set -e; \
+    for python_version in $(PYTHON_VERSIONS_LIST); do \
+        for runtime in cpu cuda; do \
+            IMAGE_TAG="braindotai/opencrate-$$runtime-py$$python_version:$(VERSION)"; \
+            LATEST_TAG="braindotai/opencrate-$$runtime-py$$python_version:latest"; \
+            echo -e "  $(BOLD_BLUE)▶ Tagging $$IMAGE_TAG as $$LATEST_TAG$(RESET)"; \
+            docker buildx imagetools create -t "$$LATEST_TAG" "$$IMAGE_TAG"; \
+        done; \
+    done; \
+    echo -e "\n$(BOLD_GREEN)======== ✓ All images tagged as latest ========$(RESET)\n";

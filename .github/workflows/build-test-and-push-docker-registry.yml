@@ -117,25 +117,37 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      # Determine if dependencies changed using the Makefile logic
-      - name: Check for Dependency Changes
+      # Determine build strategy based on event type and dependency changes
+      - name: Determine Build Strategy
         id: check_changes
         run: |
-          CHANGED=$(make ci-check-dependency-changes)
-          echo "Dependencies Changed: $CHANGED"
-
-          # Logic: Update Cache if:
-          # 1. Manual Rebuild Flag is true OR
-          # 2. Dependencies Changed (true)
-
+          EVENT_NAME="${{ github.event_name }}"
           REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
 
-          if [ "$REBUILD_FLAG" = "true" ] || [ "$CHANGED" = "true" ]; then
-            echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-            echo "Build Strategy: FORCE CACHE UPDATE"
-          else
+          # PRs: Always fresh build, never update docker remote cache
+          if [ "$EVENT_NAME" = "pull_request" ]; then
+            echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
             echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-            echo "Build Strategy: READ ONLY CACHE"
+            echo "Build Strategy: Fresh build (--pull --no-cache) with no remote cache updates"
+          else
+            # Non-PR: Check if dependencies changed
+            CHANGED=$(make ci-check-dependency-changes)
+            echo "Dependencies Changed: $CHANGED"
+
+            # Pass through the rebuild flag from generate-dockerfiles
+            echo "REBUILD_FLAG=$REBUILD_FLAG" >> $GITHUB_OUTPUT
+
+            # Update cache if rebuild requested OR dependencies changed
+            if [ "$REBUILD_FLAG" = "true" ]; then
+              echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
+              echo "Build Strategy: Fresh build (--pull --no-cache) with force remote cache updates (REBUILD_FLAG=true)"
+            elif [ "$CHANGED" = "true" ]; then
+              echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
+              echo "Build Strategy: Fresh build (--pull --no-cache) with force remote cache updates (Dependencies changed)"
+            else
+              echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
+              echo "Build Strategy: Using remote cache"
+            fi
           fi
 
       - name: Build local image for testing
@@ -144,7 +156,7 @@ jobs:
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
             VERSION=${{ needs.generate-dockerfiles.outputs.version }} \
-            REBUILD_FLAG=${{ needs.generate-dockerfiles.outputs.rebuild_flag }} \
+            REBUILD_FLAG=${{ steps.check_changes.outputs.REBUILD_FLAG }} \
             CACHE_UPDATE=${{ steps.check_changes.outputs.CACHE_UPDATE }}
 
       # OPTIMIZED CLEANUP: Only clean files, DO NOT prune Docker Buildx cache
@@ -152,8 +164,8 @@ jobs:
         run: |
           sudo apt clean -y
           sudo apt autoremove -y
-          sudo rm -rf /var/lib/apt/lists/*
-          sudo rm -rf ~/.cache/*
+          [ -d /var/lib/apt/lists/ ] && sudo rm -rf /var/lib/apt/lists/*
+          [ -d ~/.cache ] && sudo rm -rf ~/.cache/*
           [ -d /tmp ] && sudo rm -rf /tmp/*
 
       - name: Test local image
@@ -184,8 +196,6 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 2
 
       - name: Download Dockerfiles artifact
         uses: actions/download-artifact@v4
@@ -205,29 +215,13 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
-      - name: Check for Dependency Changes
-        id: check_changes
-        run: |
-          CHANGED=$(make ci-check-dependency-changes)
-          echo "Dependencies Changed: $CHANGED"
-          REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
-
-          if [ "$REBUILD_FLAG" = "true" ] || [ "$CHANGED" = "true" ]; then
-            echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-            echo "Build Strategy: FORCE CACHE UPDATE"
-          else
-            echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-            echo "Build Strategy: READ ONLY CACHE"
-          fi
-
-      - name: Build and push multi-platform image
+      # Push job ALWAYS uses cache from test job - ensuring we push exactly what we tested
+      - name: Build and push image
         run: |
           make ci-build MODE=push \
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
-            VERSION=${{ needs.generate-dockerfiles.outputs.version }} \
-            REBUILD_FLAG=${{ needs.generate-dockerfiles.outputs.rebuild_flag }} \
-            CACHE_UPDATE=${{ steps.check_changes.outputs.CACHE_UPDATE }}
+            VERSION=${{ needs.generate-dockerfiles.outputs.version }}
 
   release-latest:
     name: Tag "latest"
