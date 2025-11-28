@@ -139,13 +139,13 @@ jobs:
             # Update cache if rebuild requested OR dependencies changed
             if [ "$REBUILD_FLAG" = "true" ]; then
               echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (REBUILD_FLAG=true)\033[0m]"
+              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (REBUILD_FLAG=true)\033[0m"
             elif [ "$CHANGED" = "true" ]; then
               echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (Dependencies changed)\033[0m]"
+              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (Dependencies changed)\033[0m"
             else
               echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-              echo "\033[1;38;5;214mBuild Strategy: Using remote cache\033[0m]"
+              echo -e "\033[1;38;5;214mBuild Strategy: Using remote cache\033[0m"
             fi
           fi
 
