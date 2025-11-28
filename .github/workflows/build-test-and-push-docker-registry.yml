@@ -124,15 +124,14 @@ jobs:
           EVENT_NAME="${{ github.event_name }}"
           REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
 
-          # PRs: Always fresh build, never update docker remote cache
           if [ "$EVENT_NAME" = "pull_request" ]; then
-            echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
-            echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-            echo "Build Strategy: Fresh build (--pull --no-cache) with no remote cache updates"
+            # PRs: Always fresh build, never update docker remote cache
+            echo -e "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
+            echo -e "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
+            echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with no remote cache updates\033[0m"
           else
             # Non-PR: Check if dependencies changed
             CHANGED=$(make ci-check-dependency-changes)
-            echo "Dependencies Changed: $CHANGED"
 
             # Pass through the rebuild flag from generate-dockerfiles
             echo "REBUILD_FLAG=$REBUILD_FLAG" >> $GITHUB_OUTPUT
@@ -140,13 +139,13 @@ jobs:
             # Update cache if rebuild requested OR dependencies changed
             if [ "$REBUILD_FLAG" = "true" ]; then
               echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo "Build Strategy: Fresh build (--pull --no-cache) with force remote cache updates (REBUILD_FLAG=true)"
+              echo "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (REBUILD_FLAG=true)\033[0m]"
             elif [ "$CHANGED" = "true" ]; then
               echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo "Build Strategy: Fresh build (--pull --no-cache) with force remote cache updates (Dependencies changed)"
+              echo "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with force remote cache updates (Dependencies changed)\033[0m]"
             else
               echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-              echo "Build Strategy: Using remote cache"
+              echo "\033[1;38;5;214mBuild Strategy: Using remote cache\033[0m]"
             fi
           fi
 
