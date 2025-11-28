@@ -28,8 +28,8 @@ BOLD_ORANGE := \033[1;38;5;214m
 
 # Helper target for CI to strictly check changes against previous commit
 check-dependency-changes:
-    @if (git diff --name-only HEAD~1 HEAD -- 2>/dev/null || true) | grep -E 'pyproject.toml|setup.cfg' > /dev/null; then \
-        echo "true"; \
+	@if (git diff --name-only HEAD~1 HEAD -- 2>/dev/null || true) | grep -E 'pyproject.toml|setup.cfg' > /dev/null; then \
+		echo "true"; \
     else \
         echo "false"; \
     fi
