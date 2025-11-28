@@ -1,4 +1,4 @@
-name: Build, Test, and Push Docker Registry
+name: Docker Build, Test and Push
 
 on:
   push:
@@ -17,7 +17,7 @@ on:
       - "Makefile.ci"
       - "VERSION"
       - "PYTHON_VERSIONS"
-      - ".github/workflows/build-test-and-push-docker-registry.yml"
+      - ".github/workflows/docker-build-test-and-push.yml"
   schedule:
     - cron: "0 3 * * 0" # Weekly on Sunday at 03:00
   workflow_dispatch:
@@ -38,8 +38,27 @@ permissions:
   contents: read
 
 jobs:
+  static-checks:
+    name: Static Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.10"
+
+      - name: Install Development Packages
+        run: |
+          python3.10 -m pip install --upgrade pip --root-user-action=ignore
+          python3.10 -m pip install types-docker ".[ci]" --root-user-action=ignore --extra-index-url https://download.pytorch.org/whl/cpu
+
+      - name: Running tests
+        run: make test
+
   generate-dockerfiles:
     name: Generate Dockerfiles & Matrix
+    needs: [static-checks]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     outputs:
@@ -48,15 +67,13 @@ jobs:
       # Output the python versions as a JSON array for the matrix
       python_versions_json: ${{ steps.set_matrix.outputs.PYTHON_VERSIONS_JSON }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Get the version from VERSION file
         id: get_version
         run: echo "VERSION=$(cat VERSION | tr -d '\n')" >> $GITHUB_OUTPUT
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
+      - uses: actions/setup-python@v5
         with:
           python-version: "3.10"
 
@@ -94,8 +111,7 @@ jobs:
 
     steps:
       # Fetch depth 2 is required for git diff HEAD~1 HEAD to work
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 2
 
@@ -105,11 +121,8 @@ jobs:
           name: generated-dockerfiles
           path: ./docker/dockerfiles
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
         # Skip for fork PRs as they don't need registry access
@@ -187,6 +200,19 @@ jobs:
           name: test-logs-${{ matrix.runtime }}-py${{ matrix.python_version }}
           path: ./tests/logs
 
+      - name: Export Image Digest
+        run: |
+          FULL_IMAGE="braindotai/opencrate-${{ matrix.runtime }}-py${{ matrix.python_version }}:${{ needs.generate-dockerfiles.outputs.version }}"
+          DIGEST=$(docker inspect --format='{{.RootFS.Layers}}' $FULL_IMAGE | sha256sum | cut -d' ' -f1)
+          echo "Computed Digest: $DIGEST"
+          echo "$DIGEST" > digest-${{ matrix.runtime }}-py${{ matrix.python_version }}.txt
+
+      - name: Upload Image Digest Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: digest-${{ matrix.runtime }}-py${{ matrix.python_version }}
+          path: digest-${{ matrix.runtime }}-py${{ matrix.python_version }}.txt
+
   build-and-push-images:
     name: Push ${{ matrix.runtime }}-py${{ matrix.python_version }}
     runs-on: ubuntu-latest
@@ -198,8 +224,7 @@ jobs:
         runtime: [cpu, cuda]
         python_version: ${{ fromJson(needs.generate-dockerfiles.outputs.python_versions_json) }}
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
       - name: Download Dockerfiles artifact
         uses: actions/download-artifact@v4
@@ -207,25 +232,59 @@ jobs:
           name: generated-dockerfiles
           path: ./docker/dockerfiles
 
-      - name: Set up QEMU
-        uses: docker/setup-qemu-action@v3
+      - name: Download Image Digest
+        uses: actions/download-artifact@v4
+        with:
+          name: digest-${{ matrix.runtime }}-py${{ matrix.python_version }}
+          path: .
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Login to Docker Hub
-        uses: docker/login-action@v3
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
 
+      - name: Build and Load for Digest Check
+        # Adding REBUILD_FLAG=false and CACHE_UPDATE=false explicitly ensures the push job only reads from remote cache
+        run: |
+          make ci-build MODE=test \
+            RUNTIME=${{ matrix.runtime }} \
+            PYTHON_VERSION=${{ matrix.python_version }} \
+            VERSION=${{ needs.generate-dockerfiles.outputs.version }} \
+            REBUILD_FLAG=false \
+            CACHE_UPDATE=false
+
+      - name: Verify Integrity
+        run: |
+          # 1. Read Expected Digest from Test Job
+          EXPECTED=$(cat digest-${{ matrix.runtime }}-py${{ matrix.python_version }}.txt)
+
+          # 2. Get Actual Digest from the image we just loaded
+          FULL_IMAGE="braindotai/opencrate-${{ matrix.runtime }}-py${{ matrix.python_version }}:${{ needs.generate-dockerfiles.outputs.version }}"
+          ACTUAL=$(docker inspect --format='{{.RootFS.Layers}}' $FULL_IMAGE | sha256sum | cut -d' ' -f1)
+
+          echo "Expected Digest: $EXPECTED"
+          echo "Actual Digest:   $ACTUAL"
+
+          # 3. Compare and Fail if Mismatch
+          if [ "$EXPECTED" != "$ACTUAL" ]; then
+            echo -e "\033[1;31m✗ Integrity check failed, aborting push to protect registry. ✗\033[0m"
+            echo -e "\033[1;31m! Try rerunning build-and-test-images !\033[0m"
+            exit 1
+          fi
+          echo -e "\033[1;32m✓ Integrity verified, proceeding to push to registry. ✓\033[0m"
+
       # Push job ALWAYS uses cache from test job - ensuring we push exactly what we tested
+      # Adding REBUILD_FLAG=false and CACHE_UPDATE=false explicitly ensures the push job only reads from remote cache
       - name: Build and push image
         run: |
           make ci-build MODE=push \
             RUNTIME=${{ matrix.runtime }} \
             PYTHON_VERSION=${{ matrix.python_version }} \
-            VERSION=${{ needs.generate-dockerfiles.outputs.version }}
+            VERSION=${{ needs.generate-dockerfiles.outputs.version }} \
+            REBUILD_FLAG=false \
+            CACHE_UPDATE=false
 
   release-latest:
     name: Tag "latest"

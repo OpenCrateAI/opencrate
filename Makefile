@@ -60,13 +60,13 @@ kill:
 	@echo -e "$(BOLD_GREEN)✓ Container removed$(RESET)"
 
 
-install-dev-package:
-	@echo -e "$(BOLD_YELLOW)● Installing development package...$(RESET)"
+install-dev-packages:
+	@echo -e "$(BOLD_YELLOW)● Installing development packages...$(RESET)"
 	@echo -e "  $(BOLD_BLUE)▶ Upgrading pip...$(RESET)"
 	@python3.10 -m pip install --upgrade pip --root-user-action=ignore
-	@echo -e "  $(BOLD_BLUE)▶ Installing package in editable mode with dev dependencies...$(RESET)"
+	@echo -e "  $(BOLD_BLUE)▶ Installing packages in editable mode with dev dependencies...$(RESET)"
 	@python3.10 -m pip install -e ".[dev]" --root-user-action=ignore
-	@echo -e "$(BOLD_GREEN)✓ Development package installed$(RESET)"
+	@echo -e "$(BOLD_GREEN)✓ Development packages installed$(RESET)"
 
 
 install-dev-versions:
@@ -114,9 +114,11 @@ test-pytest:
 	@pytest
 	@echo -e "$(BOLD_GREEN)✓ Pytest completed$(RESET)"
 
-test-all: test-ruff test-mypy test-pytest
 
-test-tox:
+test: test-ruff test-mypy test-pytest
+
+
+test-all:
 	@echo -e "\n$(BOLD_YELLOW)● Running tox for multi-version testing...$(RESET)"
 	@tox
 	@echo -e "$(BOLD_GREEN)✓ Tox tests completed$(RESET)"

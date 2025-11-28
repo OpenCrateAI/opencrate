@@ -2,7 +2,26 @@
 
 ## Overview
 
-This GitHub Actions workflow automates the process of building, testing, and publishing OpenCrate Docker images for multiple Python versions (3.7-3.14) and runtime configurations (CPU and CUDA). The workflow ensures that all images are thoroughly tested before being pushed to Docker Hub.
+This GitHub Actions workflow automates the process of building, testing, and publishing OpenCrate Docker images for multiple Python versions (3.7-3.13) and runtime configurations (CPU and CUDA). The workflow ensures that all images are thoroughly tested before being pushed to Docker Hub.
+
+## Branching Strategy (GitHub Flow)
+
+We follow a strict **GitHub Flow** workflow to ensure stability and simplicity.
+
+### 1. The `main` Branch
+- **Role**: The single source of truth.
+- **State**: Always deployable. Must pass all CI tests at all times.
+- **Protection**: Direct pushes are blocked. All changes must come via Pull Requests.
+
+### 2. Feature Branches (`feature/*`, `fix/*`)
+- **Role**: Temporary branches for new features or bug fixes.
+- **Life Cycle**: Created from `main`, worked on, and deleted after merging.
+
+### 3. Releases (Tags `v*.*.*`)
+- **Role**: Triggers for publishing to Docker Hub and PyPI.
+- **Mechanism**: We do **not** use a separate release branch. A release is simply a specific commit on `main` that is tagged.
+
+> **Note for Contributors**: We do **not** use a `dev` or `develop` branch. Please always target your Pull Requests to `main`.
 
 ## Workflow Triggers
 
@@ -33,7 +52,7 @@ pull_request:
     - "Makefile.ci"
     - "VERSION"
     - "PYTHON_VERSIONS"
-    - ".github/workflows/build-test-and-push-docker-registry.yml"
+    - ".github/workflows/docker-build-test-and-push.yml"
 ```
 - **When**: A pull request is opened or updated targeting the main branch, AND changes are detected in relevant files (source code, tests, docker config, dependencies).
 - **Purpose**: Validate changes before merging (CI validation)
@@ -66,10 +85,28 @@ workflow_dispatch:
 
 ## Workflow Architecture
 
-The workflow consists of four sequential jobs:
+The workflow consists of five sequential jobs:
 
-### Job 1: `generate-dockerfiles`
+### Job 1: `static-checks`
+**Purpose**: Run fast linting and type checks before building Docker images
+
+**Timeout**: 5 minutes
+
+**Steps**:
+1. Checkout repository
+2. Set up Python 3.10
+3. Install development packages (`pip install ".[ci]"`)
+4. Run tests (`make test`) - includes ruff, mypy, and pytest
+
+**Why run this first?**
+- ✓ Fails fast on simple errors (typos, import errors, type issues)
+- ✓ Saves CI time by catching issues before expensive Docker builds
+- ✓ Provides quick feedback to contributors
+
+### Job 2: `generate-dockerfiles`
 **Purpose**: Generate Dockerfiles and set up workflow variables
+
+**Depends on**: `static-checks` (only runs if static checks pass)
 
 **Steps**:
 1. Checkout repository
@@ -84,12 +121,12 @@ The workflow consists of four sequential jobs:
 - `rebuild_flag`: Whether to force rebuild base layers (`true` for scheduled builds or manual `REBUILD_BASE=true`)
 - `python_versions_json`: JSON array of Python versions to be used in the matrix
 
-### Job 2: `build-and-test-images`
+### Job 3: `build-and-test-images`
 **Purpose**: Build and test images for all configurations in parallel
 
 **Matrix Strategy**: Runs parallel jobs for each combination of:
 - Runtimes: `cpu`, `cuda`
-- Python versions: Dynamically sourced from `PYTHON_VERSIONS` file (e.g., 3.7 through 3.14)
+- Python versions: Dynamically sourced from `PYTHON_VERSIONS` file (e.g., 3.7 through 3.13)
 
 **Steps**:
 1. **Setup**:
@@ -127,7 +164,7 @@ The workflow consists of four sequential jobs:
 6. **Test Local Image**:
    - Run tests inside the freshly built Docker container
    - Uses `make docker-test` with `DEPS=ci`
-   - Tests include: ruff linting, mypy type checking, pytest
+   - Validates that the library works correctly in the containerized environment
    - Logs are saved to `./tests/logs/test-py{version}-{runtime}.log`
 
 7. **Upload Test Logs**:
@@ -135,7 +172,15 @@ The workflow consists of four sequential jobs:
    - Artifact name: `test-logs-{runtime}-py{version}`
    - Example: `test-logs-cuda-py3.11`
 
-### Job 3: `build-and-push-images`
+8. **Export Image Digest (Atomic Consistency)**:
+   - Computes the SHA256 hash of the image layers (`.RootFS.Layers`)
+   - This "fingerprint" uniquely identifies the exact binary content of the tested image
+   - Saves digest to `digest-{runtime}-py{version}.txt`
+
+9. **Upload Digest Artifact**:
+   - Uploads the digest file to be used by the Push job for verification
+
+### Job 4: `build-and-push-images`
 **Purpose**: Push tested images to Docker Hub using cached layers
 
 **Condition**: Only runs if:
@@ -150,15 +195,23 @@ The workflow consists of four sequential jobs:
    - Download generated Dockerfiles
    - Set up QEMU and Docker Buildx
    - Login to Docker Hub
+   - **Download Digest Artifacts**: Retrieves the "fingerprints" from the Test job
 
-2. **Build and Push Image** (MODE=push):
+2. **Verify Integrity (The "Digest Gate")**:
+   - **Action**: Rebuilds the image from the registry cache (without pushing yet)
+   - **Check**: Computes the layer digest of this new build and compares it against the downloaded digest from the Test job
+   - **Logic**:
+     - If `Digest_Test == Digest_Push`: The cache is consistent. Proceed.
+     - If `Digest_Test != Digest_Push`: **STOP**. The cache upload likely failed or a race condition occurred. The workflow fails to prevent pushing an untested image.
+
+3. **Build and Push Image** (MODE=push):
    - Uses `make ci-build MODE=push`
+   - **Explicit Flags**: `REBUILD_FLAG=false`, `CACHE_UPDATE=false`
    - Platform: `linux/amd64` (arm64 support planned for future)
    - **Always reads from registry cache** (never writes)
-   - This ensures the pushed image is identical to what was tested
    - Pushes to Docker Hub
 
-### Job 4: `release-latest`
+### Job 5: `release-latest`
 **Purpose**: Tag successful builds as "latest"
 
 **Condition**: Only runs if:
@@ -341,20 +394,22 @@ braindotai/opencrate-{runtime}-py{python_version}:{version}
 
 The workflow uses a **hybrid caching strategy** combining local filesystem cache and remote registry cache to optimize build performance and reliability.
 
-### Two-Stage Build Process
+### Atomic Release Consistency (The "Digest Gate")
 
-The workflow separates building/testing from pushing to ensure consistency:
+The workflow implements a strict **Atomic Release Consistency** model to solve the "ephemeral runner" problem. Since the Test job and Push job run on different machines, we must ensure they use the exact same image binary.
 
-1. **Test Stage** (`build-and-test-images` job, `MODE=test`):
-   - Builds for `linux/amd64` only
-   - Loads image locally for testing
-   - May update registry cache (if `REBUILD_FLAG=true` or `CACHE_UPDATE=true`)
+1. **Test Stage** (`build-and-test-images`):
+   - Builds image $\rightarrow$ Computes `Digest A` (Layer Hash) $\rightarrow$ Pushes Cache to Registry.
+   - Passes `Digest A` to the next job via artifact.
 
-2. **Push Stage** (`build-and-push-images` job, `MODE=push`):
-   - Builds for `linux/amd64` (arm64 planned for future)
-   - **Always reads from registry cache** (never writes)
-   - Pushes to Docker Hub
-   - Guarantees "what you test = what you push"
+2. **Verification Stage** (Start of `build-and-push-images`):
+   - Pulls Cache from Registry $\rightarrow$ Rebuilds image $\rightarrow$ Computes `Digest B`.
+   - **Asserts**: `Digest A == Digest B`.
+   - If they match, we know the registry cache is valid and identical to what was tested.
+
+3. **Push Stage** (`build-and-push-images`):
+   - Pushes the verified image to Docker Hub.
+   - Uses `REBUILD_FLAG=false` and `CACHE_UPDATE=false` to ensure it is strictly a "consumer" of the cache.
 
 ### Cache Layers
 
@@ -363,11 +418,11 @@ Each Python version and runtime combination has its own dedicated cache image:
 - `braindotai/opencrate-build-cache:cpu-py3.7`
 - `braindotai/opencrate-build-cache:cpu-py3.8`
 - ...
-- `braindotai/opencrate-build-cache:cpu-py3.14`
+- `braindotai/opencrate-build-cache:cpu-py3.13`
 - `braindotai/opencrate-build-cache:cuda-py3.7`
 - `braindotai/opencrate-build-cache:cuda-py3.8`
 - ...
-- `braindotai/opencrate-build-cache:cuda-py3.14`
+- `braindotai/opencrate-build-cache:cuda-py3.13`
 
 **Why per-version caches?**
 - ✓ Prevents parallel write conflicts in matrix builds
@@ -473,7 +528,9 @@ Each Python version and runtime combination has its own dedicated cache image:
 ## Monitoring and Notifications
 
 ### Success Indicators
-- ✓ All 16 matrix jobs complete successfully (8 Python versions × 2 runtimes)
+- ✓ Static checks pass (ruff, mypy, pytest)
+- ✓ All 14 matrix jobs complete successfully (7 Python versions × 2 runtimes)
+- ✓ Digest verification passes for all images
 - ✓ Images pushed to Docker Hub (except for PR builds)
 - ✓ "latest" tags updated (for tag pushes only)
 - ✓ Images available for `linux/amd64` platform
@@ -488,6 +545,42 @@ Each Python version and runtime combination has its own dedicated cache image:
 1. **GitHub Actions UI**: Real-time progress and logs
 2. **Docker Hub**: Verify images are pushed
 3. **Artifacts**: Download test logs for debugging
+
+## Developer Workflow (Detailed)
+
+### 1. For Core Maintainers
+Core maintainers have write access to the repository.
+
+1.  **Create a Branch**:
+    ```bash
+    git checkout main
+    git pull origin main
+    git checkout -b feature/new-optimizer
+    ```
+2.  **Work & Test**:
+    ```bash
+    make test        # Run local tests (ruff, mypy, pytest)
+    make docker-test # Run tests in Docker
+    ```
+3.  **Pull Request**:
+    - Push your branch: `git push origin feature/new-optimizer`
+    - Open a PR from `feature/new-optimizer` to `main`.
+4.  **Merge**:
+    - Wait for CI to pass (static checks + Docker build/test).
+    - Squash and merge to `main`.
+
+### 2. For Community Contributors
+Contributors do not have write access and must fork the repository.
+
+1.  **Fork & Clone**: Fork the repo on GitHub, then clone your fork.
+2.  **Create a Branch**:
+    ```bash
+    git checkout -b fix/typo-in-docs
+    ```
+3.  **Pull Request**:
+    - Push to your fork: `git push origin fix/typo-in-docs`
+    - Open a PR from `your-fork:fix/typo-in-docs` to `opencrate:main`.
+    - **Target Branch**: Always select `main`. We do not use a `dev` branch.
 
 ## Additional Resources
 
