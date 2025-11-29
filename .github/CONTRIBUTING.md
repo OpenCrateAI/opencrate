@@ -30,6 +30,22 @@ We follow **GitHub Flow** - a simple, branch-based workflow.
 > **Important**: We do **not** use a `dev` or `develop` branch.  
 > All Pull Requests must target `main` - single source of truth.
 
+Use only the following prefixes for your branches:
+
+| Prefix | Use For |
+|--------|---------|
+| `feature/` | New features |
+| `fix/` | Bug fixes |
+| `docs/` | Documentation |
+| `ci/` | CI/CD changes |
+| `refactor/` | Code cleanup |
+| `test/` | Test changes |
+
+**Examples:**
+- `feature/async-loader`
+- `fix/123-memory-leak` (with issue number)
+- `docs/api-reference`
+
 ---
 
 ## Development Setup
