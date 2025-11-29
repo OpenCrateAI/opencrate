@@ -83,9 +83,15 @@ jobs:
       - name: Set Python Matrix
         id: set_matrix
         run: |
-          VERSIONS=$(python3 -c 'import json; print(json.dumps([line.strip() for line in open("PYTHON_VERSIONS") if line.strip()]))')
-          echo "PYTHON_VERSIONS_JSON=$VERSIONS" >> $GITHUB_OUTPUT
-          echo "Detected Versions: $VERSIONS"
+          if [ "${{ github.event_name }}" == "pull_request" ]; then
+            PR_VERSIONS=$(python3 -c 'lines=[l.strip() for l in open("PYTHON_VERSIONS") if l.strip()]; print(json.dumps([lines[0], lines[-1]]))')
+            echo "Detected PR: Using Bookend Versions only."
+            echo "PYTHON_VERSIONS_JSON=$PR_VERSIONS" >> $GITHUB_OUTPUT
+          else
+            ALL_VERSIONS=$(python3 -c 'import json; print(json.dumps([line.strip() for line in open("PYTHON_VERSIONS") if line.strip()]))')
+            echo "Detected Main/Schedule: Using ALL Versions."
+            echo "PYTHON_VERSIONS_JSON=$ALL_VERSIONS" >> $GITHUB_OUTPUT
+          fi
 
       - name: Generate all Dockerfiles
         run: make docker-generate
@@ -104,7 +110,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime: [cpu, cuda]
+        runtime: ${{ (github.event_name == 'pull_request') && fromJson('["cpu"]') || fromJson('["cpu", "cuda"]') }}
         # Use the JSON array generated in the previous job
         python_version: ${{ fromJson(needs.generate-dockerfiles.outputs.python_versions_json) }}
 

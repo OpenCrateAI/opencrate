@@ -25,7 +25,11 @@ This GitHub Actions workflow automates building, testing, and publishing OpenCra
 - **7 Python versions**: 3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13
 - **2 Runtimes**: CPU and CUDA
 
-The workflow ensures **Atomic Release Consistency** — the exact image that passes tests is the one published to Docker Hub.
+The workflow uses a **tiered testing strategy**:
+- **Pull Requests**: Fast feedback with minimal matrix (2 Python versions × 1 runtime = 2 jobs)
+- **Main/Release**: Full validation with complete matrix (7 Python versions × 2 runtimes = 14 jobs)
+
+The workflow ensures **Atomic Release Consistency** - the exact image that passes tests is the one published to Docker Hub.
 
 ---
 
@@ -85,25 +89,22 @@ workflow_dispatch:
 
 ## Workflow Architecture
 
-The pipeline consists of **5 sequential jobs**:
+The pipeline consists of **5 jobs** with parallel execution:
 
 ```
-┌──────────────────┐
-│  static-checks   │  Job 1: Fast linting & type checks
-└────────┬─────────┘
-         │
-         ▼
-┌────────────────────────┐
-│  generate-dockerfiles  │  Job 2: Create Dockerfiles & matrix
-└────────┬───────────────┘
-         │
-         ▼
+┌──────────────────┐     ┌────────────────────────┐
+│  static-checks   │     │  generate-dockerfiles  │
+│   (parallel)     │     │      (parallel)        │
+└────────┬─────────┘     └───────────┬────────────┘
+         │                           │
+         └─────────────┬─────────────┘
+                       │
+                       ▼
 ┌────────────────────────────────────────────────────────┐
-│            build-and-test-images (14 jobs)             │
-│  ┌─────────────┐ ┌─────────────┐     ┌──────────────┐  │
-│  │ cpu-py3.7   │ │ cpu-py3.8   │ ... │ cuda-py3.13  │  │
-│  └─────────────┘ └─────────────┘     └──────────────┘  │
-│  Job 3: Build, scan, test, export digest               │
+│            build-and-test-images (Matrix)              │
+│                                                        │
+│  For PRs:        cpu-py3.7, cpu-py3.13 (2 jobs)        │
+│  For Main/Tag:   [cpu,cuda] × [3.7-3.13] (14 jobs)     │
 └────────┬───────────────────────────────────────────────┘
          │
          ▼  (Only if NOT a PR)
@@ -122,6 +123,8 @@ The pipeline consists of **5 sequential jobs**:
 
 **Purpose**: Fail fast on simple errors before expensive Docker builds.
 
+**Runs in parallel with**: `generate-dockerfiles`
+
 **Timeout**: 5 minutes
 
 **Steps**:
@@ -134,18 +137,37 @@ The pipeline consists of **5 sequential jobs**:
 
 **Purpose**: Generate Dockerfiles and set up the build matrix.
 
-**Depends on**: `static-checks`
+**Runs in parallel with**: `static-checks`
 
 **Outputs**:
 - `version`: From `VERSION` file
 - `rebuild_flag`: `true` for scheduled/manual rebuilds
-- `python_versions_json`: Matrix of Python versions from `PYTHON_VERSIONS` file
+- `python_versions_json`: Matrix of Python versions (varies by trigger)
+
+**Matrix Selection Logic**:
+| Trigger | Python Versions | Rationale |
+|---------|-----------------|------------|
+| **Pull Request** | First + Last from `PYTHON_VERSIONS` (e.g., 3.7, 3.13) | Fast feedback, edge-version coverage |
+| **Main/Tag/Schedule** | All versions from `PYTHON_VERSIONS` | Full compatibility validation |
 
 ### Job 3: `build-and-test-images`
 
-**Purpose**: Build, scan, and test images for all 14 configurations.
+**Purpose**: Build, scan, and test images.
 
-**Matrix**: `[cpu, cuda]` × `[3.7, 3.8, 3.9, 3.10, 3.11, 3.12, 3.13]`
+**Depends on**: Both `static-checks` AND `generate-dockerfiles` must pass.
+
+**Matrix Strategy by Trigger**:
+
+| Trigger | Runtimes | Python Versions | Total Jobs |
+|---------|----------|-----------------|------------|
+| **Pull Request** | CPU only | 3.7 + 3.13 | **2 jobs** |
+| **Main/Tag/Schedule** | CPU + CUDA | All 7 versions | **14 jobs** |
+
+**Why this strategy?**
+- **PRs**: 86% fewer jobs = faster feedback
+- **Oldest + Newest Python**: Catches "too new" and "deprecated" issues
+- **CPU only for PRs**: Logic bugs are runtime-agnostic; CUDA just adds GPU libraries
+- **Full matrix on merge**: Comprehensive validation before any release
 
 **Steps**:
 1. Setup (checkout, download Dockerfiles, Buildx, Docker Hub login)
@@ -230,15 +252,20 @@ braindotai/opencrate-build-cache:cuda-py3.13
 
 ### Cache Behavior by Trigger
 
-| Trigger | Test Job | Push Job |
-|---------|----------|----------|
-| **Pull Request** | Fresh build (`--no-cache`), NO cache writes | Does not run |
-| **Tag Push** | Read cache (+ write if deps changed) | Read-only |
-| **Scheduled** | Fresh build + Write cache | Read-only |
-| **Manual (REBUILD=false)** | Read cache (+ write if deps changed) | Read-only |
-| **Manual (REBUILD=true)** | Fresh build + Write cache | Read-only |
+There are **two registries** involved in this workflow:
 
-**Key Principle**: Push job is **always read-only**. It never writes to cache.
+1. **Build Cache Registry** (`braindotai/opencrate-build-cache:*`) - Stores intermediate Docker layers to speed up future builds
+2. **Docker Hub** (`braindotai/opencrate-cpu-py*:*`, `braindotai/opencrate-cuda-py*:*`) - The public registry where final images are published
+
+| Trigger | Test Job → Build Cache | Push Job → Build Cache | Push Job → Docker Hub |
+|---------|------------------------|------------------------|----------------------|
+| **Pull Request** | No read, No write | Does not run | Does not run |
+| **Tag Push** | Read + Write (if deps changed) | Read only | ✅ Pushes image |
+| **Scheduled** | Fresh build + Write | Read only | ✅ Pushes image |
+| **Manual (REBUILD=false)** | Read + Write (if deps changed) | Read only | ✅ Pushes image |
+| **Manual (REBUILD=true)** | Fresh build + Write | Read only | ✅ Pushes image |
+
+**Key Principle**: The Push job **never writes to the build cache** - it only reads cached layers from the Test job, then pushes the final image to Docker Hub.
 
 ### PR Isolation
 
@@ -313,7 +340,7 @@ braindotai/opencrate-{runtime}-py{version}:{tag}
 
 ```bash
 # Fix linting
-ruff check --fix .
+make test-ruff
 
 # Check types
 make test-mypy
@@ -324,53 +351,33 @@ make test-pytest
 
 ### Docker Build/Test Failed
 
+Ideally you should locally run `make docker-test` followed by `make docker-test-all` before you make a push to ensure your changes pass CI. But in any case if the CI fails:
+
 1. Download `test-logs-{runtime}-py{version}` from workflow artifacts
-2. Reproduce locally:
+2. Reproduce locally and fix:
    ```bash
-   make docker-test PYTHON_VERSION=3.10 RUNTIME=cpu
+   make docker-test RUNTIME=<runtime> PYTHON_VERSION=<version>
    ```
 
 ### Digest Verification Failed
 
-**Symptom**: "Integrity check failed, aborting push"
+This will happen because the build-test and build-push jobs produced different image digests, which indicates a cache inconsistency.
 
-**Cause**: Cache inconsistency between test and push jobs
-
-**Solution**: Re-run the workflow. If persistent, trigger manual rebuild with `REBUILD_BASE=true`.
-
-### Push Permission Denied
-
-**Cause**: Missing Docker Hub credentials
-
-**Solution**: Verify repository secrets:
-- `DOCKERHUB_USERNAME`
-- `DOCKERHUB_TOKEN`
-
----
+- **Log**: "Integrity check failed, aborting push to protect registry"
+- **Cause**: Cache inconsistency between test and push jobs
+- **Solution**: Re-run the workflow. If persistent, trigger manual rebuild with `REBUILD_BASE=true`.
 
 ## Best Practices
 
-### ✅ DO
+### ✓ DO
 
 - Update `VERSION` file before creating tags
 - Use semantic versioning (`major.minor.patch`)
 - Test locally with `make test` before pushing
-- Monitor workflow runs after pushing tags
-- Use annotated tags with meaningful messages
 
-### ❌ DON'T
+### ✗ DON'T
 
 - Create tags without updating `VERSION` file
 - Push tags for untested code
 - Manually edit files in `docker/dockerfiles/` (auto-generated)
 - Force rebuild unless necessary (wastes CI time)
-- Tag pre-releases as `latest`
-
----
-
-## Additional Resources
-
-- **[CONTRIBUTING.md](../CONTRIBUTING.md)**: Contribution guidelines
-- **Makefile**: Local development commands
-- **Makefile.ci**: CI-specific build targets
-- **docker/dockerfile.py**: Dockerfile generator
