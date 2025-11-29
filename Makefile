@@ -213,15 +213,14 @@ docker-test:
 			pip install pip --quiet --upgrade --root-user-action=ignore && \
 			pip install .[$(DEPS)] --quiet --extra-index-url https://download.pytorch.org/whl/cpu --root-user-action=ignore && \
 			echo "\n$(BOLD_BLUE)▶ Running tests...$(RESET)" && \
-			make test-pytest; \
-			fi' | tee $$LOG_FILE; \
+			make test-pytest; | tee $$LOG_FILE; \
 	if [ $${PIPESTATUS[0]} -ne 0 ]; then \
 		echo -e "\n$(BOLD_RED)======== ✗ Tests failed ========$(RESET)"; \
 		echo -e "$(BOLD_RED)Check log file: $$LOG_FILE$(RESET)\n"; \
 		exit 1; \
 	fi; \
 	echo -e "\n$(GREEN)Log saved to: $$LOG_FILE$(RESET)"
-	echo -e "$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)"; \
+	echo -e "$(BOLD_GREEN)======== ✓ Tests completed successfully ========$(RESET)";
 
 
 docker-test-all: # 'all' suffix is for testing across all runtimes and python versions
