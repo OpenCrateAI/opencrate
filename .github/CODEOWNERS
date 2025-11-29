@@ -5,7 +5,7 @@
 # =============================================================================
 
 # GitHub Actions workflows and configuration
-/.github/* @braindotai
+/.github/ @braindotai
 
-VERSION @braindotai
-PYTHON_VERSIONS @braindotai
+/VERSION @braindotai
+/PYTHON_VERSIONS @braindotai
