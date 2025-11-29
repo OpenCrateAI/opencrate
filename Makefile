@@ -255,147 +255,150 @@ docker-clean:
 
 
 help:
-	@BOLD=$$(printf "\033[1m"); RESET=$$(printf "\033[0m"); BOLD_BLUE=$$(printf "\033[36m"); YELLOW=$$(printf "\033[33m"); GREEN=$$(printf "\033[32m"); \
+	@BOLD=$$(printf "\033[1m"); RESET=$$(printf "\033[0m"); \
+	BOLD_BLUE=$$(printf "\033[1;34m"); BOLD_GREEN=$$(printf "\033[1;32m"); \
+	BOLD_CYAN=$$(printf "\033[1;36m"); YELLOW=$$(printf "\033[33m"); \
+	MAGENTA=$$(printf "\033[35m"); WHITE=$$(printf "\033[37m"); \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "                  $${BOLD_BLUE}$${BOLD} OpenCrate Development Makefile $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
-	printf "$${BOLD} Usage:$${RESET} make [target] [VARIABLE=value]\n"; \
+	printf "$${BOLD} Usage:$${RESET} make $${YELLOW}[target]$${RESET} $${BOLD_CYAN}[VARIABLE=value]$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD} Available Variables:$${RESET}\n"; \
-	printf "  $${BOLD_BLUE} PYTHON_VERSION $${RESET}   Python version to use (default: $${YELLOW}$(PYTHON_VERSION)$${RESET})\n"; \
-	printf "  $${BOLD_BLUE} RUNTIME        $${RESET}   Runtime type: cpu or cuda\n"; \
-	printf "  $${BOLD_BLUE} VERSION        $${RESET}   Project version (default: $${YELLOW}$(VERSION)$${RESET})\n"; \
-	printf "  $${BOLD_BLUE} REBUILD_FLAG   $${RESET}   Force rebuild of base layers: true/false\n"; \
+	printf "  $${BOLD_CYAN} PYTHON_VERSION $${RESET}   Python version to use (default: $${MAGENTA}$(PYTHON_VERSION)$${RESET})\n"; \
+	printf "  $${BOLD_CYAN} RUNTIME        $${RESET}   Runtime type: $${MAGENTA}cpu$${RESET} or $${MAGENTA}cuda$${RESET}\n"; \
+	printf "  $${BOLD_CYAN} VERSION        $${RESET}   Project version (default: $${MAGENTA}$(VERSION)$${RESET})\n"; \
+	printf "  $${BOLD_CYAN} REBUILD_FLAG   $${RESET}   Force rebuild of base layers: $${MAGENTA}true$${RESET}/$${MAGENTA}false$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
-	printf "                    $${GREEN} Development Environment $${RESET}\n"; \
+	printf "                    $${BOLD_GREEN} Development Environment $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} start $${RESET}         Start the development Docker container in detached mode\n"; \
 	printf "                  Uses docker-compose to launch the opencrate_dev service\n"; \
-	printf "                  Example: make start\n"; \
+	printf "                  Example: make $${YELLOW}start$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} enter $${RESET}           Open an interactive shell inside the running container\n"; \
 	printf "                  Provides zsh shell access to the development environment\n"; \
-	printf "                  Example: make enter\n"; \
+	printf "                  Example: make $${YELLOW}enter$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} stop $${RESET}            Stop the running development container gracefully\n"; \
 	printf "                  Preserves container state for later restart\n"; \
-	printf "                  Example: make stop\n"; \
+	printf "                  Example: make $${YELLOW}stop$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} kill $${RESET}            Stop and completely remove the development container\n"; \
 	printf "                  Destroys all container state and volumes\n"; \
-	printf "                  Example: make kill\n"; \
+	printf "                  Example: make $${YELLOW}kill$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
-	printf "                    $${GREEN} Package Installation & Setup $${RESET}\n"; \
+	printf "                    $${BOLD_GREEN} Package Installation & Setup $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} install $${RESET}         Complete development setup: install package + Python versions\n"; \
 	printf "                  Combines install-dev-packages and install-dev-versions\n"; \
-	printf "                  Example: make install\n"; \
+	printf "                  Example: make $${YELLOW}install$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} install-dev-packages $${RESET}\n"; \
 	printf "                  Install the OpenCrate package in editable mode with dev dependencies\n"; \
 	printf "                  Uses pip to install the current project in development mode\n"; \
-	printf "                  Example: make install-dev-packages\n"; \
+	printf "                  Example: make $${YELLOW}install-dev-packages$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} install-dev-versions $${RESET}\n"; \
 	printf "                  Install multiple Python versions (3.7-3.13) using pyenv\n"; \
 	printf "                  Sets up multi-version testing environment\n"; \
-	printf "                  Example: make install-dev-versions\n"; \
+	printf "                  Example: make $${YELLOW}install-dev-versions$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
-	printf "                    $${GREEN} Testing & Code Quality $${RESET}\n"; \
+	printf "                    $${BOLD_GREEN} Testing & Code Quality $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} test $${RESET}            Run complete test suite: ruff + mypy + pytest\n"; \
 	printf "                  Comprehensive testing for the current environment\n"; \
-	printf "                  Example: make test\n"; \
+	printf "                  Example: make $${YELLOW}test$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} test-ruff $${RESET}       Run ruff linter for code style and quality checks\n"; \
 	printf "                  Excludes tests/pipelines directory\n"; \
-	printf "                  Example: make test-ruff\n"; \
+	printf "                  Example: make $${YELLOW}test-ruff$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} test-mypy $${RESET}       Run mypy for static type checking\n"; \
 	printf "                  Validates type annotations and catches type errors\n"; \
-	printf "                  Example: make test-mypy\n"; \
+	printf "                  Example: make $${YELLOW}test-mypy$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} test-pytest $${RESET}     Run unit tests with pytest\n"; \
 	printf "                  Sets PYTHONPATH=src for proper imports\n"; \
-	printf "                  Example: make test-pytest\n"; \
+	printf "                  Example: make $${YELLOW}test-pytest$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} test-all $${RESET}        Run tests across all supported Python versions using tox\n"; \
 	printf "                  Multi-environment testing for compatibility\n"; \
-	printf "                  Example: make test-all\n"; \
+	printf "                  Example: make $${YELLOW}test-all$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} test-clean $${RESET}      Remove all testing cache files and artifacts\n"; \
 	printf "                  Cleans .mypy_cache, .pytest_cache, .ruff_cache, .tox, .coverage\n"; \
-	printf "                  Example: make test-clean\n"; \
+	printf "                  Example: make $${YELLOW}test-clean$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
-	printf "                    $${GREEN} Docker Image Management $${RESET}\n"; \
+	printf "                    $${BOLD_GREEN} Docker Image Management $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} docker-generate $${RESET} Generate Dockerfiles for all supported Python versions and runtimes\n"; \
 	printf "                  Creates dockerfiles in ./docker/dockerfiles/ directory\n"; \
-	printf "                  Example: make docker-generate\n"; \
-	printf "                  Example: make docker-generate PYTHON_VERSIONS=\"3.10 3.11\" RUNTIMES=\"cpu\"\n"; \
+	printf "                  Example: make $${YELLOW}docker-generate$${RESET}\n"; \
+	printf "                  Example: make $${YELLOW}docker-generate$${RESET} $${BOLD_CYAN}PYTHON_VERSIONS$${RESET}=$${MAGENTA}\"3.10 3.11\"$${RESET} $${BOLD_CYAN}RUNTIMES$${RESET}=$${MAGENTA}\"cpu\"$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} docker-build $${RESET}    Build all Docker images locally for all supported configurations\n"; \
 	printf "                  Builds images for all Python versions (3.7-3.13) and runtimes (cpu/cuda)\n"; \
-	printf "                  Example: make docker-build\n"; \
-	printf "                  Example: make docker-build PYTHON_VERSIONS=\"3.11\" RUNTIMES=\"cpu\"\n"; \
+	printf "                  Example: make $${YELLOW}docker-build$${RESET}\n"; \
+	printf "                  Example: make $${YELLOW}docker-build$${RESET} $${BOLD_CYAN}PYTHON_VERSIONS$${RESET}=$${MAGENTA}\"3.11\"$${RESET} $${BOLD_CYAN}RUNTIMES$${RESET}=$${MAGENTA}\"cpu\"$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} docker-test $${RESET}     Run tests inside a Docker container for specific configuration\n"; \
 	printf "                  Tests a specific Python version and runtime combination\n"; \
-	printf "                  Example: make docker-test PYTHON_VERSION=3.11 RUNTIME=cpu\n"; \
-	printf "                  Example: make docker-test PYTHON_VERSION=3.9 RUNTIME=cuda\n"; \
+	printf "                  Example: make $${YELLOW}docker-test$${RESET} $${BOLD_CYAN}PYTHON_VERSION$${RESET}=$${MAGENTA}3.11$${RESET} $${BOLD_CYAN}RUNTIME$${RESET}=$${MAGENTA}cpu$${RESET}\n"; \
+	printf "                  Example: make $${YELLOW}docker-test$${RESET} $${BOLD_CYAN}PYTHON_VERSION$${RESET}=$${MAGENTA}3.9$${RESET} $${BOLD_CYAN}RUNTIME$${RESET}=$${MAGENTA}cuda$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} docker-test-all $${RESET} Run tests inside Docker containers for ALL versions\n"; \
 	printf "                  Iterates through all Python versions and runtimes\n"; \
-	printf "                  Example: make docker-test-all\n"; \
+	printf "                  Example: make $${YELLOW}docker-test-all$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} docker-clean $${RESET}    Clean up Docker build cache, containers, and unused images\n"; \
 	printf "                  Removes dangling containers, build cache, and unused images\n"; \
-	printf "                  Example: make docker-clean\n"; \
+	printf "                  Example: make $${YELLOW}docker-clean$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
-	printf "                    $${GREEN} Documentation & Utilities $${RESET}\n"; \
+	printf "                    $${BOLD_GREEN} Documentation & Utilities $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} mkdocs $${RESET}          Serve project documentation locally using MkDocs\n"; \
 	printf "                  Accessible at http://0.0.0.0:8789\n"; \
-	printf "                  Example: make mkdocs\n"; \
+	printf "                  Example: make $${YELLOW}mkdocs$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${YELLOW} help $${RESET}            Display this comprehensive help message\n"; \
 	printf "                  Shows all available targets with descriptions and examples\n"; \
-	printf "                  Example: make help\n"; \
+	printf "                  Example: make $${YELLOW}help$${RESET}\n"; \
 	printf "\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
-	printf "                    $${GREEN} Common Usage Patterns $${RESET}\n"; \
+	printf "                    $${BOLD_GREEN} Common Usage Patterns $${RESET}\n"; \
 	printf "$${BOLD}====================================================================$${RESET}\n"; \
 	printf "\n"; \
 	printf "  $${BOLD} Development Setup: $${RESET}\n"; \
-	printf "    make start                       # Start development container\n"; \
-	printf "    make enter                       # Enter container for development\n"; \
-	printf "    make install                     # Install entire project requirements for development\n"; \
+	printf "    make $${YELLOW}start$${RESET}                       # Start development container\n"; \
+	printf "    make $${YELLOW}enter$${RESET}                       # Enter container for development\n"; \
+	printf "    make $${YELLOW}install$${RESET}                     # Install entire project requirements for development\n"; \
 	printf "\n"; \
 	printf "  $${BOLD} Local Testing: $${RESET}\n"; \
-	printf "    make test                        # Run all tests locally\n"; \
-	printf "    make test-all                    # Test across Python versions\n"; \
-	printf "    make docker-test PYTHON_VERSION=3.11 RUNTIME=cpu  # Test in container\n"; \
+	printf "    make $${YELLOW}test$${RESET}                        # Run all tests locally\n"; \
+	printf "    make $${YELLOW}test-all$${RESET}                    # Test across Python versions\n"; \
+	printf "    make $${YELLOW}docker-test$${RESET} $${BOLD_CYAN}PYTHON_VERSION$${RESET}=$${MAGENTA}3.11$${RESET} $${BOLD_CYAN}RUNTIME$${RESET}=$${MAGENTA}cpu$${RESET}  # Test in container\n"; \
 	printf "\n"; \
 	printf "  $${BOLD} Docker Operations: $${RESET}\n"; \
-	printf "    make docker-build                # Build all images\n"; \
-	printf "    make docker-clean                # Clean up Docker resources\n"; \
+	printf "    make $${YELLOW}docker-build$${RESET}                # Build all images\n"; \
+	printf "    make $${YELLOW}docker-clean$${RESET}                # Clean up Docker resources\n"; \
 	printf "\n"; \
 	printf "  $${BOLD} CI/CD (GitHub Actions): $${RESET}\n"; \
-	printf "    make ci-build-test RUNTIME=cpu PYTHON_VERSION=3.11 VERSION=main\n"; \
-	printf "    make ci-push RUNTIME=cpu PYTHON_VERSION=3.11 VERSION=main REBUILD_FLAG=true\n"; \
-	printf "    make ci-release VERSION=1.0.0\n"; \
+	printf "    make $${YELLOW}ci-build-test$${RESET} $${BOLD_CYAN}RUNTIME$${RESET}=$${MAGENTA}cpu$${RESET} $${BOLD_CYAN}PYTHON_VERSION$${RESET}=$${MAGENTA}3.11$${RESET} $${BOLD_CYAN}VERSION$${RESET}=$${MAGENTA}main$${RESET}\n"; \
+	printf "    make $${YELLOW}ci-push$${RESET} $${BOLD_CYAN}RUNTIME$${RESET}=$${MAGENTA}cpu$${RESET} $${BOLD_CYAN}PYTHON_VERSION$${RESET}=$${MAGENTA}3.11$${RESET} $${BOLD_CYAN}VERSION$${RESET}=$${MAGENTA}main$${RESET} $${BOLD_CYAN}REBUILD_FLAG$${RESET}=$${MAGENTA}true$${RESET}\n"; \
+	printf "    make $${YELLOW}ci-release$${RESET} $${BOLD_CYAN}VERSION$${RESET}=$${MAGENTA}1.0.0$${RESET}\n"; \
 	printf "\n"; \
 	printf "\n"
 
