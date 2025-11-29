@@ -84,7 +84,7 @@ jobs:
         id: set_matrix
         run: |
           if [ "${{ github.event_name }}" == "pull_request" ]; then
-            PR_VERSIONS=$(python3 -c 'lines=[l.strip() for l in open("PYTHON_VERSIONS") if l.strip()]; print(json.dumps([lines[0], lines[-1]]))')
+            PR_VERSIONS=$(python3 -c 'import json; lines=[l.strip() for l in open("PYTHON_VERSIONS") if l.strip()]; print(json.dumps([lines[0], lines[-1]]))')
             echo "Detected PR: Using Bookend Versions only."
             echo "PYTHON_VERSIONS_JSON=$PR_VERSIONS" >> $GITHUB_OUTPUT
           else
