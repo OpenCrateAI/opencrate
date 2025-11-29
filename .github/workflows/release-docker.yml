@@ -1,23 +1,10 @@
-name: Docker Build, Test and Push
+name: Release Docker
 
 on:
   push:
     tags:
       - "v*.*.*"
-  pull_request:
-    branches: ["main"]
-    paths:
-      - "src/**"
-      - "tests/**"
-      - "docker/**"
-      - "pyproject.toml"
-      - "setup.cfg"
-      - "setup.py"
-      - "Makefile"
-      - "Makefile.ci"
-      - "VERSION"
-      - "PYTHON_VERSIONS"
-      - ".github/workflows/docker-build-test-and-push.yml"
+      - "v*.*.*-rc.*"
   schedule:
     - cron: "0 3 * * 0" # Weekly on Sunday at 03:00
   workflow_dispatch:
@@ -31,7 +18,7 @@ on:
 # 1. Concurrency: Cancel in-progress runs for the same PR
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+  cancel-in-progress: false # Never cancel release builds
 
 # 2. Permissions: Least privilege (Read-only by default)
 permissions:
@@ -65,6 +52,7 @@ jobs:
       rebuild_flag: ${{ github.event_name == 'schedule' || github.event.inputs.REBUILD_BASE }}
       # Output the python versions as a JSON array for the matrix
       python_versions_json: ${{ steps.set_matrix.outputs.PYTHON_VERSIONS_JSON }}
+      is_prerelease: ${{ contains(github.ref, '-rc.') }}
     steps:
       - uses: actions/checkout@v4
 
@@ -83,20 +71,14 @@ jobs:
       - name: Set Python Matrix
         id: set_matrix
         run: |
-          if [ "${{ github.event_name }}" == "pull_request" ]; then
-            PR_VERSIONS=$(python3 -c 'import json; lines=[l.strip() for l in open("PYTHON_VERSIONS") if l.strip()]; print(json.dumps([lines[0], lines[-1]]))')
-            echo "Detected PR: Using Bookend Versions only."
-            echo "PYTHON_VERSIONS_JSON=$PR_VERSIONS" >> $GITHUB_OUTPUT
-          else
-            ALL_VERSIONS=$(python3 -c 'import json; print(json.dumps([line.strip() for line in open("PYTHON_VERSIONS") if line.strip()]))')
-            echo "Detected Main/Schedule: Using ALL Versions."
-            echo "PYTHON_VERSIONS_JSON=$ALL_VERSIONS" >> $GITHUB_OUTPUT
-          fi
+          ALL_VERSIONS=$(python3 -c 'import json; print(json.dumps([line.strip() for line in open("PYTHON_VERSIONS") if line.strip()]))')
+          echo "Detected Main/Schedule: Using ALL Versions."
+          echo "PYTHON_VERSIONS_JSON=$ALL_VERSIONS" >> $GITHUB_OUTPUT
 
-      - name: Generate all Dockerfiles
+      - name: Generate Dockerfiles
         run: make docker-generate
 
-      - name: Upload Dockerfiles as artifact
+      - name: Upload Dockerfiles
         uses: actions/upload-artifact@v4
         with:
           name: generated-dockerfiles
@@ -110,7 +92,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runtime: ${{ (github.event_name == 'pull_request') && fromJson('["cpu"]') || fromJson('["cpu", "cuda"]') }}
+        runtime: [cpu, cuda]
         # Use the JSON array generated in the previous job
         python_version: ${{ fromJson(needs.generate-dockerfiles.outputs.python_versions_json) }}
 
@@ -126,12 +108,9 @@ jobs:
           name: generated-dockerfiles
           path: ./docker/dockerfiles
 
-      - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
 
       - name: Login to Docker Hub
-        # Skip for fork PRs as they don't need registry access
-        if: github.event_name != 'pull_request'
         uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
@@ -144,32 +123,24 @@ jobs:
           EVENT_NAME="${{ github.event_name }}"
           REBUILD_FLAG="${{ needs.generate-dockerfiles.outputs.rebuild_flag }}"
 
-          if [ "$EVENT_NAME" = "pull_request" ]; then
-            # PRs: Always fresh build, never update docker remote cache
-            echo -e "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
-            echo -e "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-            echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) with no remote cache updates\033[0m"
-          else
-            # Non-PR: Check if dependencies changed
-            CHANGED=$(make ci-check-dependency-changes)
+          CHANGED=$(make ci-check-dependency-changes)
 
-            # Fresh build (--pull --no-cache) if REBUILD_FLAG=true OR dependencies changed
-            if [ "$REBUILD_FLAG" = "true" ]; then
-              echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
-              echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) + update remote cache (REBUILD_FLAG=true)\033[0m"
-            elif [ "$CHANGED" = "true" ]; then
-              echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
-              echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
-              echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) + update remote cache (Dependencies changed)\033[0m"
-            else
-              echo "REBUILD_FLAG=false" >> $GITHUB_OUTPUT
-              echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
-              echo -e "\033[1;38;5;214mBuild Strategy: Using remote cache (read-only)\033[0m"
-            fi
+          # Fresh build (--pull --no-cache) if REBUILD_FLAG=true OR dependencies changed
+          if [ "$REBUILD_FLAG" = "true" ]; then
+            echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
+            echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
+            echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) + update remote cache (REBUILD_FLAG=true)\033[0m"
+          elif [ "$CHANGED" = "true" ]; then
+            echo "REBUILD_FLAG=true" >> $GITHUB_OUTPUT
+            echo "CACHE_UPDATE=true" >> $GITHUB_OUTPUT
+            echo -e "\033[1;38;5;214mBuild Strategy: Fresh build (--pull --no-cache) + update remote cache (Dependencies changed)\033[0m"
+          else
+            echo "REBUILD_FLAG=false" >> $GITHUB_OUTPUT
+            echo "CACHE_UPDATE=false" >> $GITHUB_OUTPUT
+            echo -e "\033[1;38;5;214mBuild Strategy: Using remote cache (read-only)\033[0m"
           fi
 
-      - name: Build local image for testing
+      - name: Build Image
         run: |
           make ci-build MODE=test \
             RUNTIME=${{ matrix.runtime }} \
@@ -178,7 +149,7 @@ jobs:
             REBUILD_FLAG=${{ steps.check_changes.outputs.REBUILD_FLAG }} \
             CACHE_UPDATE=${{ steps.check_changes.outputs.CACHE_UPDATE }}
 
-      - name: Test local image
+      - name: Test Image
         run: |
           make docker-test \
             DEPS=ci \
@@ -186,7 +157,7 @@ jobs:
             PYTHON_VERSION=${{ matrix.python_version }} \
             VERSION=${{ needs.generate-dockerfiles.outputs.version }}
 
-      - name: Upload test logs
+      - name: Upload Test Logs
         if: always()
         uses: actions/upload-artifact@v4
         with:
@@ -210,7 +181,6 @@ jobs:
     name: Push ${{ matrix.runtime }}-py${{ matrix.python_version }}
     runs-on: ubuntu-latest
     needs: [generate-dockerfiles, build-and-test-images]
-    if: success() && github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
@@ -233,7 +203,9 @@ jobs:
 
       - uses: docker/setup-qemu-action@v3
       - uses: docker/setup-buildx-action@v3
-      - uses: docker/login-action@v3
+
+      - name: Login to Docker Hub
+        uses: docker/login-action@v3
         with:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
@@ -283,7 +255,7 @@ jobs:
     name: Tag "latest"
     runs-on: ubuntu-latest
     needs: [generate-dockerfiles, build-and-push-images]
-    if: success() && github.event_name == 'push' && github.ref_type == 'tag'
+    if: success() && github.event_name == 'push' && github.ref_type == 'tag' && needs.generate-dockerfiles.outputs.is_prerelease == 'false'
     steps:
       - name: Login to Docker Hub
         uses: docker/login-action@v3
