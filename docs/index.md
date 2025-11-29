@@ -14,7 +14,7 @@
 
 Tired of wrestling with dependencies, container configurations, and all the other "yak shaving" that gets in the way of actual AI development? So were we. That's why we built **OpenCrate**, your new best friend for accelerating the end-to-end AI development lifecycle.
 
-OpenCrate streamlines AI-specific workflows, handles container orchestration like a champ, and ensures seamless integration across any environment—all while keeping you blissfully unaware of dependency hell.
+OpenCrate streamlines AI-specific workflows, handles container orchestration like a champ, and ensures seamless integration across any environment-all while keeping you blissfully unaware of dependency hell.
 
 In short, we handle the grunt work so you can focus on what truly matters: **making that loss curve go down.**
 
