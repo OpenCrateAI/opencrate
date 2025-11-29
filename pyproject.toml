@@ -71,14 +71,10 @@ dev = [
     "uvicorn",
 ]
 ci = [
-    "ruff",
-    "mypy",
     "pytest",
     "pytest-cov",
     "pytest-random-order",
     "torch",
-    "types-requests",
-    "types-PyYAML",
 ]
 
 [project.scripts]
