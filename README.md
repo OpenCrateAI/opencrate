@@ -1,4 +1,4 @@
-<img src="docs/assets/wallpaper.png">
+<img src="https://raw.githubusercontent.com/OpenCrateAI/opencrate/main/docs/assets/wallpaper.png">
 <p align="center">
     <b>Democratizing AI by simplifing DX for everyone</b>
 </p>
