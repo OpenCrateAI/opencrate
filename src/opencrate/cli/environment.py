@@ -759,8 +759,7 @@ def branch(
 
             matching_containers = []
             for container in cli.docker_client.containers.list(all=True):
-                print(f"oc_{cli.config.get('name')}-{name}", container.name)
-                if f"oc_{cli.config.get('name')}-{name}" in container.name:
+                if f"oc_{cli.config.get('name')}-{name}" in (container.name or ""):
                     matching_containers.append(container)
 
             for container in matching_containers:

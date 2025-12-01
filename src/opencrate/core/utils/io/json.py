@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 from pathlib import Path
-from typing import Optional
+from typing import Any, Optional
 
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -23,7 +23,7 @@ class CustomJSONEncoder(json.JSONEncoder):
         return super().default(o)
 
 
-def save(data, path, encoder: Optional[json.JSONEncoder] = None, **kwargs):
+def save(data, path, encoder: Optional[json.JSONEncoder] = None, **kwargs: Any):
     """Saves data to a JSON file with extended support for additional types.
 
     This function serializes a Python object to a JSON-formatted file. It extends
@@ -34,7 +34,7 @@ def save(data, path, encoder: Optional[json.JSONEncoder] = None, **kwargs):
         path (str or Path): The file path where the JSON data will be saved.
             The directory will be created if it does not exist.
         data (Any): The Python object to serialize.
-        **kwargs: Additional keyword arguments to pass to `json.dump()`, such as
+        **kwargs (Any): Additional keyword arguments to pass to `json.dump()`, such as
             `indent` for pretty-printing or `sort_keys`.
 
     Raises:
@@ -81,7 +81,7 @@ def save(data, path, encoder: Optional[json.JSONEncoder] = None, **kwargs):
         json.dump(data, file, **kwargs)
 
 
-def load(path, encoding: str = "utf-8", **kwargs):
+def load(path, encoding: str = "utf-8", **kwargs: Any) -> Any:
     """Loads data from a JSON file.
 
     This function deserializes a JSON file into a Python object. It is a
@@ -95,11 +95,12 @@ def load(path, encoding: str = "utf-8", **kwargs):
     Args:
         path (str or Path): The path to the JSON file to load.
         encoding (str, optional): The file encoding to use. Defaults to "utf-8".
-        **kwargs: Additional keyword arguments to pass to `json.load()`, such
+        **kwargs (Any): Additional keyword arguments to pass to `json.load()`, such
             as `object_hook` for custom deserialization.
 
     Returns:
-        Any: The deserialized Python object from the JSON file.
+        Any: The deserialized Python object from the JSON file. This can be a
+            dict, list, str, int, float, bool, or None depending on the JSON content.
 
     Raises:
         FileNotFoundError: If the specified file path does not exist.

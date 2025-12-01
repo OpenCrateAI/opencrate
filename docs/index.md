@@ -35,7 +35,7 @@ Here are a few things OpenCrate does to make your life easier:
 
 Ready to dive in? It's as easy as pie (the delicious, non-mathematical kind).
 
-1.  **Explore the API**: Head over to our [API Reference](api/opencrate.md) to see what you can do.
-2.  **Check out the Guides**: Our [Guides](guides/example.ipynb) provide hands-on examples to get you up and running in no time.
+1.  **Explore the API**: Head over to our [Reference](reference/opencrate.md) to see what you can do.
+2.  **Check out the Guides**: Our [Guides](guides/1_artifacts_logging_reproducible_workflows.ipynb) provide hands-on examples to get you up and running in no time.
 
 Happy coding, and may your models always converge!
