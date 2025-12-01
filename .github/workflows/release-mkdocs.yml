@@ -4,9 +4,10 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/deploy-docs.yml'
+      - '.github/workflows/release-mkdocs.yml'
       - 'docs/**'
       - 'mkdocs.yml'
+    workflow_dispatch:
 
 permissions:
   contents: read

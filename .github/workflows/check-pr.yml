@@ -14,7 +14,7 @@ on:
       - "Makefile.ci"
       - "VERSION"
       - "PYTHON_VERSIONS"
-      - ".github/workflows/pr-checks.yml"
+      - ".github/workflows/check-pr.yml"
 
 # 1. Concurrency: Cancel in-progress runs for the same PR
 concurrency:
