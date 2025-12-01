@@ -1,4 +1,4 @@
-name: Deploy Docs
+name: Release MkDocs
 on:
   push:
     branches:
