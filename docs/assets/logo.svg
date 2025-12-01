@@ -1,12 +1,12 @@
-<svg width="251" height="226" viewBox="0 0 251 226" fill="none" xmlns="http://www.w3.org/2000/svg">
-<path d="M1.52588e-05 0H251V116.443H1.52588e-05V0Z" fill="#040000"/>
-<path d="M147.495 7.76294H240.649V106.093H147.495V7.76294Z" fill="#FFFB03"/>
-<path d="M31.0516 7.76294H10.3505V106.093H31.0516V7.76294Z" fill="#D5FF03" fill-opacity="0.13"/>
-<path d="M77.6289 7.76294H38.8145V106.093H77.6289V7.76294Z" fill="#D5FF03" fill-opacity="0.23"/>
-<path d="M139.732 7.76294H82.8041V106.093H139.732V7.76294Z" fill="#D5FF03" fill-opacity="0.5"/>
-<path d="M251 108.68H0V225.124H251V108.68Z" fill="#040000"/>
-<path d="M103.505 116.443H10.3506V214.773H103.505V116.443Z" fill="#FFFB03"/>
-<path d="M219.948 116.443H240.649V214.773H219.948V116.443Z" fill="#D5FF03" fill-opacity="0.13"/>
-<path d="M173.371 116.443H212.186V214.773H173.371V116.443Z" fill="#D5FF03" fill-opacity="0.23"/>
-<path d="M111.268 116.443H168.196V214.773H111.268V116.443Z" fill="#D5FF03" fill-opacity="0.5"/>
+<svg width="128" height="115" viewBox="0 0 128 115" fill="none" xmlns="http://www.w3.org/2000/svg">
+<path d="M127.5 0.5V58.8799H0.5V0.5H127.5Z" fill="#040000" stroke="black"/>
+<path d="M122.208 4.45984V53.6034H75.7031V4.45984H122.208Z" fill="#FFEC3D" stroke="black"/>
+<path d="M15.3223 4.45984V53.6034H5.76562V4.45984H15.3223Z" fill="#FFEC3D" fill-opacity="0.13" stroke="black"/>
+<path d="M39.0962 4.45984V53.6034H20.3022V4.45984H39.0962Z" fill="#FFEC3D" fill-opacity="0.23" stroke="black"/>
+<path d="M70.769 4.45984V53.6034H42.7378V4.45984H70.769Z" fill="#FFEC3D" fill-opacity="0.5" stroke="black"/>
+<path d="M0.5 55.3112V113.691H127.5V55.3112H0.5Z" fill="#040000" stroke="black"/>
+<path d="M5.79248 59.2672V108.411H52.2974V59.2672H5.79248Z" fill="#FFEC3D" stroke="black"/>
+<path d="M112.678 59.2672V108.411H122.235V59.2672H112.678Z" fill="#FFEC3D" fill-opacity="0.13" stroke="black"/>
+<path d="M88.9038 59.2672V108.411H107.698V59.2672H88.9038Z" fill="#FFEC3D" fill-opacity="0.23" stroke="black"/>
+<path d="M57.2314 59.2672V108.411H85.2627V59.2672H57.2314Z" fill="#FFEC3D" fill-opacity="0.5" stroke="black"/>
 </svg>
