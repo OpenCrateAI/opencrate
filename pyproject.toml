@@ -76,6 +76,12 @@ ci = [
     "pytest-random-order",
     "torch",
 ]
+docs = [
+    "mkdocs",
+    "mkdocs-material",
+    "mkdocstrings-python",
+    "mkdocs-jupyter",
+]
 
 [project.scripts]
 oc = "opencrate.cli.main:app"
