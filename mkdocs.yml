@@ -10,19 +10,21 @@ nav:
   - Features:
       - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
   - Reference:
-      - OpenCrate: api/opencrate.md
-      - Snapshot: api/snapshot.md
-      - Configuration: api/config.md
-      - I/O: api/io.md
-      - Concurrency: api/concurrency.md
-      - Decorators: api/decorate.md
-      - Visualization: api/visualize.md
+      - OpenCrate: reference/opencrate.md
+      - Snapshot: reference/snapshot.md
+      - Configuration: reference/config.md
+      - I/O: reference/io.md
+      - Concurrency: reference/concurrency.md
+      - Decorators: reference/decorate.md
+      - Visualization: reference/visualize.md
   - Resources:
       - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
   - About:
       - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
   - Release Notes:
       - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
+  - Contributing:
+      - "Guides": contribution/CONTRIBUTION.md
 
 plugins:
   - search
@@ -58,6 +60,7 @@ markdown_extensions:
 theme:
   name: material
   logo: assets/logo.svg
+  favicon: assets/favicon.ico
   features:
     # - header.autohide
     - navigation.tabs
@@ -77,21 +80,21 @@ theme:
       toggle:
         icon: material/brightness-auto
         name: Light mode
-      primary: black
+      primary: yellow
       accent: yellow
     - media: "(prefers-color-scheme: light)"
       scheme: default
       toggle:
         icon: material/brightness-7
         name: Dark mode
-      primary: black
+      primary: yellow
       accent: yellow
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       toggle:
         icon: material/brightness-4
         name: System Preferences
-      primary: black
+      primary: yellow
       accent: yellow
 
 extra:
