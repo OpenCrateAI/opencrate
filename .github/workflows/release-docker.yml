@@ -27,7 +27,7 @@ permissions:
 jobs:
   static-checks:
     name: Static Checks
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
@@ -45,7 +45,7 @@ jobs:
 
   generate-dockerfiles:
     name: Generate Dockerfiles & Matrix
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     timeout-minutes: 2
     outputs:
       version: ${{ steps.get_version.outputs.VERSION }}
@@ -86,7 +86,7 @@ jobs:
 
   build-and-test-images:
     name: Build & Test ${{ matrix.runtime }}-py${{ matrix.python_version }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [static-checks, generate-dockerfiles]
     timeout-minutes: 10
     strategy:
@@ -179,7 +179,7 @@ jobs:
 
   build-and-push-images:
     name: Push ${{ matrix.runtime }}-py${{ matrix.python_version }}
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [generate-dockerfiles, build-and-test-images]
     strategy:
       fail-fast: false
@@ -253,7 +253,7 @@ jobs:
 
   release-latest:
     name: Tag "latest"
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     needs: [generate-dockerfiles, build-and-push-images]
     if: success() && github.event_name == 'push' && github.ref_type == 'tag' && needs.generate-dockerfiles.outputs.is_prerelease == 'false'
     steps:
