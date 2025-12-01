@@ -8,7 +8,7 @@ description = "Democratizing AI by simplifing DX for everyone"
 authors = [
     {name = "Rishik C. Mourya", email = "braindotai@gmail.ai"}
 ]
-version = "0.1.0-rc"
+version = "0.1.0rc1"
 license = {text = "MIT"}
 requires-python = ">=3.7"
 classifiers = [
