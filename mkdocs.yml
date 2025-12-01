@@ -24,7 +24,7 @@ nav:
   - Release Notes:
       - "Guides": guides/1_artifacts_logging_reproducible_workflows.ipynb
   - Contributing:
-      - "Guides": contribution/CONTRIBUTION.md
+      - "Contributing Guide": contribution/CONTRIBUTION.md
 
 plugins:
   - search
