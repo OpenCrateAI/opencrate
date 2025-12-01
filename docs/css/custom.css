@@ -1,0 +1,15 @@
+/* Custom CSS for pure black and white backgrounds */
+
+/* Light Mode: White Background */
+[data-md-color-scheme="default"] {
+  --md-default-fg-color--light: #000000; /* Main text color */
+  --md-default-bg-color: #ffffff; /* Main page background */
+  --md-typeset-color: rgba(0, 0, 0, 0.87); /* Content text color */
+}
+
+/* Dark Mode: Black Background */
+[data-md-color-scheme="slate"] {
+  --md-default-fg-color--light: #ffffff; /* Main text color */
+  --md-default-bg-color: #000000; /* Main page background */
+  --md-typeset-color: rgba(255, 255, 255, 0.87); /* Content text color */
+}

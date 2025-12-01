@@ -104,3 +104,6 @@ extra:
       name: Opencrate
   generator: false
 copyright: Copyright &copy; 2025 Opencrate
+
+extra_css:
+  - css/custom.css
