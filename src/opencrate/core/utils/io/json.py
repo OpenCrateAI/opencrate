@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Optional
 
 
 class CustomJSONEncoder(json.JSONEncoder):
@@ -81,7 +81,7 @@ def save(data, path, encoder: Optional[json.JSONEncoder] = None, **kwargs: Any):
         json.dump(data, file, **kwargs)
 
 
-def load(path, encoding: str = "utf-8", **kwargs: Any) -> Dict[Any, Any]:
+def load(path, encoding: str = "utf-8", **kwargs: Any) -> Any:
     """Loads data from a JSON file.
 
     This function deserializes a JSON file into a Python object. It is a
@@ -99,7 +99,8 @@ def load(path, encoding: str = "utf-8", **kwargs: Any) -> Dict[Any, Any]:
             as `object_hook` for custom deserialization.
 
     Returns:
-        Dict[Any, Any]: The deserialized Python object from the JSON file.
+        Any: The deserialized Python object from the JSON file. This can be a
+            dict, list, str, int, float, bool, or None depending on the JSON content.
 
     Raises:
         FileNotFoundError: If the specified file path does not exist.
