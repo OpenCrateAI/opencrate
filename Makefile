@@ -61,6 +61,7 @@ kill:
 
 
 install-dev-packages:
+	@git config --global --add safe.directory /home/opencrate
 	@echo -e "$(BOLD_YELLOW)● Installing development packages...$(RESET)"
 	@echo -e "  $(BOLD_BLUE)▶ Upgrading pip...$(RESET)"
 	@python3.10 -m pip install --upgrade pip --root-user-action=ignore
@@ -70,8 +71,7 @@ install-dev-packages:
 
 
 install-dev-versions:
-	@set -e; \
-	PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' '); \
+	@set -e; PYTHON_VERSIONS_LIST=$$(cat PYTHON_VERSIONS | tr '\n' ' ');
 	@echo -e "$(BOLD_YELLOW)● Installing Python versions for testing...$(RESET)"
 	@echo -e "  $(BOLD_BLUE)▶ Target versions: $$PYTHON_VERSIONS_LIST $(RESET)"; \
 	for version in $$PYTHON_VERSIONS_LIST; do \
@@ -88,7 +88,7 @@ install-dev-versions:
 	@echo -e "$(BOLD_GREEN)✓ All Python versions and tools installed$(RESET)"
 
 
-install: install-dev-package install-dev-versions
+install: install-dev-packages install-dev-versions
 
 
 mkdocs:
@@ -242,9 +242,9 @@ docker-test-all: # 'all' suffix is for testing across all runtimes and python ve
 docker-clean:
 	@echo -e "$(BOLD_YELLOW)● Cleaning Docker resources...$(RESET)"
 	@echo -e "  $(BOLD_BLUE)▶ Cleaning container cache...$(RESET)"; \
-	docker container prune -f; \
+	docker container prune -f;
 	@echo -e "  $(BOLD_BLUE)▶ Cleaning buildx cache...$(RESET)"; \
-	docker buildx prune -f; \
+	docker buildx prune -f;
 	@echo -e "  $(BOLD_BLUE)▶ Cleaning image cache...$(RESET)"; \
 	docker image prune -f;
 	@echo -e "$(BOLD_GREEN)✓ Docker cleanup completed$(RESET)"

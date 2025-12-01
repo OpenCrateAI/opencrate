@@ -242,7 +242,7 @@ jobs:
 
       # Push job ALWAYS uses cache from test job - ensuring we push exactly what we tested
       # Adding REBUILD_FLAG=false and CACHE_UPDATE=false explicitly ensures the push job only reads from remote cache
-      - name: Build and push image
+      - name: Build and Push Image
         run: |
           make ci-build MODE=push \
             RUNTIME=${{ matrix.runtime }} \
