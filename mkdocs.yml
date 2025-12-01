@@ -80,21 +80,21 @@ theme:
       toggle:
         icon: material/brightness-auto
         name: Light mode
-      primary: yellow
+      primary: black
       accent: yellow
     - media: "(prefers-color-scheme: light)"
       scheme: default
       toggle:
         icon: material/brightness-7
         name: Dark mode
-      primary: yellow
+      primary: black
       accent: yellow
     - media: "(prefers-color-scheme: dark)"
       scheme: slate
       toggle:
         icon: material/brightness-4
         name: System Preferences
-      primary: yellow
+      primary: black
       accent: yellow
 
 extra:
