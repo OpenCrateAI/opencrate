@@ -6,9 +6,10 @@ build-backend = "setuptools.build_meta"
 name = "opencrate"
 description = "Democratizing AI by simplifing DX for everyone"
 authors = [
-    {name = "Rishik C. Mourya", email = "braindotai@gmail.ai"}
+    {name = "Rishik C. Mourya", email = "braindotai@gmail.com"}
 ]
-version = "0.1.0rc1"
+readme = "README.md"
+version = "0.1.0rc2"
 license = {text = "MIT"}
 requires-python = ">=3.7"
 classifiers = [
@@ -22,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13"
 ]
+keywords = ["docker", "ai", "machine-learning", "deep-learning", "pytorch", "deployment", "developer-tools", "cli", "productivity"]
 dependencies = [
     "pydantic_settings",
     "prompt-toolkit",
@@ -82,6 +84,13 @@ docs = [
     "mkdocstrings-python",
     "mkdocs-jupyter",
 ]
+
+[project.urls]
+Homepage = "https://opencrateai.github.io/opencrate/"
+Documentation = "https://opencrateai.github.io/opencrate/reference/opencrate/"
+Repository = "https://github.com/OpenCrateAI/opencrate"
+Issues = "https://github.com/OpenCrateAI/opencrate/issues"
+Changelog = "https://github.com/OpenCrateAI/opencrate/releases"
 
 [project.scripts]
 oc = "opencrate.cli.main:app"
