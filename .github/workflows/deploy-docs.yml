@@ -3,6 +3,9 @@ on:
   push:
     branches:
       - main
+    paths:
+      - 'docs/**'
+      - 'mkdocs.yml'
 
 permissions:
   contents: read
@@ -31,7 +34,9 @@ jobs:
           path: .cache
           restore-keys: |
             mkdocs-material-
-      - run: pip install .[docs]
+      - run: |
+          pip install tomli
+          pip install $(python -c "import tomli; print(' '.join(tomli.load(open('pyproject.toml', 'rb'))['project']['optional-dependencies']['docs']))")
       - run: mkdocs build
       - uses: actions/upload-pages-artifact@v3
         with:
