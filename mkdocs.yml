@@ -1,5 +1,8 @@
 site_name: Opencrate
 
+site_url: https://OpenCrateAI.github.io/opencrate/
+repo_url: https://github.com/OpenCrateAI/opencrate
+repo_name: OpenCrateAI/opencrate
 nav:
   - Home: index.md
   - Learn:
