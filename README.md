@@ -1,4 +1,4 @@
-<img src="docs/assets/wallpaper.png">
+<img src="docs/assets/wallpaper.svg">
 <p align="center">
     <b>Democratizing AI by simplifing DX for everyone</b>
 </p>

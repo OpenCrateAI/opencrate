@@ -1,7 +1,7 @@
 # __Welcome to OpenCrate!__
 
 <p align="center">
-  <img src="assets/wallpaper.png" alt="OpenCrate Wallpaper"/>
+  <img src="assets/wallpaper.svg" alt="OpenCrate Wallpaper"/>
 </p>
 
 <p align="center">
