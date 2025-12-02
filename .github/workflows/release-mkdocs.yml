@@ -4,10 +4,10 @@ on:
     branches:
       - main
     paths:
-      - '.github/workflows/release-mkdocs.yml'
-      - 'docs/**'
-      - 'mkdocs.yml'
-    workflow_dispatch:
+      - ".github/workflows/release-mkdocs.yml"
+      - "docs/**"
+      - "mkdocs.yml"
+  workflow_dispatch:
 
 permissions:
   contents: read
