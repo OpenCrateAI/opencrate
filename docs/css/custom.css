@@ -2,14 +2,312 @@
 
 /* Light Mode: White Background */
 [data-md-color-scheme="default"] {
-  --md-default-fg-color--light: #14151A; /* Main text color */
-  --md-default-bg-color: #ffffff; /* Main page background */
-  --md-typeset-color: rgba(0, 0, 0, 0.87); /* Content text color */
+  --md-default-fg-color--light: #000000;
+  /* Main text color */
+  --md-default-bg-color: #ffffff;
+  /* Main page background */
+  --md-typeset-color: rgba(0, 0, 0, 0.87);
+  /* Content text color */
+
+  /* Custom Header Colors for Light Mode */
+  --custom-header-bg: rgba(255, 255, 255, 0.397);
+  --custom-header-fg: #000000;
+  --custom-search-bg: rgba(0, 0, 0, 0.07);
+  /* Light gray for search bar */
+  --custom-search-hover: rgba(0, 0, 0, 0.12);
+  --custom-search-active-bg: #ffffff;
+  /* Solid white when active */
+  --custom-search-active-fg: #000000;
+  --custom-content-current-active-shadow: #FFEC3D;
+  --custom-content-current-active-color: #000;
 }
 
 /* Dark Mode: Black Background */
 [data-md-color-scheme="slate"] {
-  --md-default-fg-color--light: #ffffff; /* Main text color */
-  --md-default-bg-color: #14151A; /* Main page background */
-  --md-typeset-color: rgba(255, 255, 255, 0.87); /* Content text color */
+  --md-default-fg-color--light: #ffffff;
+  /* Main text color */
+  --md-default-bg-color: #000000;
+  /* Main page background */
+  --md-typeset-color: rgba(255, 255, 255, 0.87);
+  /* Content text color */
+
+  /* Custom Header Colors for Dark Mode */
+  --custom-header-bg: rgba(0, 0, 0, 0.32);
+  --custom-header-fg: #ffffff;
+  --custom-search-bg: rgba(255, 255, 255, 0.12);
+  /* Dark transparent for search bar */
+  --custom-search-hover: rgba(255, 255, 255, 0.18);
+  --custom-search-active-bg: #000000;
+  /* Solid dark when active */
+  --custom-search-active-fg: #ffffff;
+  --custom-content-current-active-shadow: #000;
+  --custom-content-current-active-color: #FFEC3D;
+}
+
+:root {
+  --custom-navbar-bg: #FFEC3D;
+  /* Vibrant Yellow for Navbar */
+  --custom-navbar-fg: #3c3a1d;
+  /* Black text for Navbar */
+}
+
+/* Adaptive Header Styling */
+/* Adaptive Header Styling */
+.md-header {
+  background-color: transparent !important;
+  box-shadow: none !important;
+}
+
+.md-top {
+  background-color: #FFEC3D;
+  color: #000;
+  border-color: #000;
+}
+
+/* Use pseudo-element for background and blur to avoid breaking fixed-position children (like mobile search) */
+.md-header::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background-color: var(--custom-header-bg);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  z-index: -1;
+}
+
+/* Ensure text and icons contrast correctly with the header background */
+.md-header .md-header__button,
+.md-header .md-header__title,
+.md-header .md-header__topic,
+.md-header .md-header-nav__button,
+.md-header .md-tabs__link,
+.md-header .md-header__source {
+  color: var(--custom-header-fg) !important;
+}
+
+/* Force repo stats (stars, forks) to inherit color */
+.md-header__source * {
+  color: inherit !important;
+}
+
+.md-nav__link[for]:focus,
+.md-nav__link[fox]:hover,
+.md-nav__link[href]:focus,
+.md-nav__link[href]:hover {
+  color: var(--custom-content-current-active-color);
+  text-shadow: 1px 1px 0 var(--custom-content-current-active-shadow) !important;
+}
+
+
+/* Search Bar Styling - Desktop Only (min-width: 60em) */
+/* This prevents interference with the mobile search overlay */
+@media screen and (min-width: 60em) {
+  .md-search__form {
+    background-color: var(--custom-search-bg) !important;
+  }
+
+  .md-search__form:hover {
+    background-color: var(--custom-search-hover) !important;
+  }
+
+  /* When search is active/focused */
+  .md-search__form:focus-within {
+    background-color: var(--custom-search-active-bg) !important;
+  }
+
+  .md-nav--secondary .md-nav__title {
+    box-shadow: none;
+  }
+
+  .md-search__input {
+    color: var(--custom-header-fg) !important;
+  }
+
+  /* When search is active, ensure input text is readable */
+  .md-search__form:focus-within .md-search__input {
+    color: var(--custom-search-active-fg) !important;
+  }
+
+  .md-search__input::placeholder {
+    color: var(--custom-header-fg) !important;
+    opacity: 0.7;
+  }
+
+  /* Search icon color */
+  .md-search__icon {
+    color: var(--custom-header-fg) !important;
+  }
+
+  /* When search is active, ensure icons are readable */
+  .md-search__form:focus-within .md-search__icon {
+    color: var(--custom-search-active-fg) !important;
+  }
+}
+
+/* Mobile Search Styling Adjustments */
+@media screen and (max-width: 59.9375em) {
+
+  /* Ensure the search toggle icon is visible on mobile */
+  .md-header__button.md-logo,
+  .md-header__button.md-icon {
+    color: var(--custom-header-fg) !important;
+  }
+
+  /* We leave the .md-search__form styling to default on mobile 
+     to avoid breaking the full-screen overlay behavior. 
+     The default material theme handles the mobile search overlay well. */
+}
+
+/* For code blocks */
+.md-typeset pre code {
+  font-size: 0.95em;
+}
+
+/* For inline code */
+.md-typeset code {
+  font-size: 1em;
+}
+
+/* Navbar (Tabs) Styling */
+.md-tabs {
+  background-color: var(--custom-navbar-bg) !important;
+  color: var(--custom-navbar-fg) !important;
+}
+
+.md-tabs__link {
+  color: var(--custom-navbar-fg) !important;
+  opacity: 1.0 !important;
+  text-shadow: none !important;
+  transition: text-shadow 0.1s ease-in-out !important;
+}
+
+.md-tabs__link:hover,
+.md-tabs__item--active .md-tabs__link {
+  color: #000 !important;
+  text-shadow: 2.5px 2.5px 0 #0000003b !important;
+}
+
+.md-footer {
+  background-color: var(--custom-navbar-bg) !important;
+  color: var(--custom-navbar-fg) !important;
+}
+
+.md-footer__link:focus,
+.md-footer__link:hover {
+  color: #000 !important;
+  opacity: 1.0 !important;
+}
+
+.md-footer-meta {
+  background-color: #000 !important;
+}
+
+.md-copyright {
+  font-size: 0.9em !important;
+}
+
+/* Text Selection Color */
+::selection {
+  background-color: #FFEC3D;
+  /* Yellow background */
+  color: #000000;
+  /* Black text */
+}
+
+/* For Firefox compatibility */
+::-moz-selection {
+  background-color: #FFEC3D;
+  color: #000000;
+}
+
+/* Text Selection Color */
+::selection {
+  background-color: #FFEC3D;
+  /* Yellow background */
+  color: #000000;
+  /* Black text */
+}
+
+/* For Firefox compatibility */
+::-moz-selection {
+  background-color: #FFEC3D;
+  color: #000000;
+}
+
+.md-nav__item .md-nav__link--active,
+.md-nav__item .md-nav__link--active code {
+  color: var(--custom-content-current-active-color);
+  text-shadow: 1px 1px 0 var(--custom-content-current-active-shadow) !important;
+  text-decoration: none;
+}
+
+.md-nav__link--passed,
+.md-nav__link--passed code {
+  color: #9c9c9c
+}
+
+.md-footer__inner {
+  height: 10rem;
+  align-items: center;
+}
+
+@media screen and (max-width: 76.2344em) {
+  .md-nav--primary .md-nav__title~.md-nav__list {
+    background-color: #FFEC3D;
+  }
+
+  .md-nav--primary .md-nav__item {
+    border-top: .05rem solid var(--md-default-fg-color--lightest);
+  }
+
+  .md-nav__link--passed,
+  .md-nav__link--passed code {
+    text-decoration: line-through;
+    color: #000
+  }
+
+  .md-nav__item .md-nav__link--active,
+  .md-nav__item .md-nav__link--active code {
+    color: #000;
+    text-shadow: 2px 2px 0 #b9ad35 !important;
+  }
+
+  .md-nav--primary .md-nav__item--active>.md-nav__link {
+    color: #000;
+    background-color: #FFEC3D;
+    text-shadow: 0px 0px 0 #0000003b !important;
+  }
+
+  .md-nav--primary .md-nav__title~.md-nav__list {
+    background-color: #000000;
+    color: #000;
+    box-shadow: 0 .05rem 0 var(--md-default-fg-color--lightest) inset;
+    overflow-y: auto;
+    scroll-snap-type: y mandatory;
+    touch-action: pan-y;
+  }
+
+  .md-nav--primary .md-nav__link {
+    margin-top: 0;
+    padding: .6rem .8rem;
+    background-color: #FFEC3D;
+  }
+
+  .md-nav--primary .md-nav__title {
+    background-color: #000000;
+    color: #ffffff;
+    cursor: pointer;
+    height: 5.6rem;
+    line-height: 2.4rem;
+    padding: 3rem .8rem .2rem;
+    position: relative;
+    white-space: nowrap;
+  }
+
+  html [data-md-color-primary=black] .md-nav--primary .md-nav__title[for=__drawer] {
+    background-color: hsl(0deg 0% 0%);
+  }
 }
