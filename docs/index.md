@@ -4,12 +4,13 @@ hide:
   - toc
 ---
 
-# __Welcome to OpenCrate!__
+<style>
+  .md-content__inner h1 { display: none; }
+</style>
 
 <div align="center" markdown="1">
 <img src="assets/wallpaper.png" id="wallpaper" alt="OpenCrate Wallpaper"/>
-<b>True plug-and-play interoperability for orchestrating AI workflows.</b>
-<br>
+<p>True plug-and-play interoperability for orchestrating AI workflows.</p>
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/OpenCrateAI/opencrate/release-pypi.yml?style=flat-square&logo=python&logoColor=%23fff)
 ![PyPI - Version](https://img.shields.io/pypi/v/opencrate?style=flat-square&logo=python&logoColor=%23fff)
@@ -17,13 +18,9 @@ hide:
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/opencrate?style=flat-square&logo=python&logoColor=%23fff)
 </div>
 
----
-
-## What is OpenCrate?
-
 Tired of wrestling with dependencies, container configurations, and all the other "yak shaving" that gets in the way of actual AI development? So were we. That's why we built **OpenCrate**, your new best friend for accelerating the end-to-end AI development lifecycle.
 
-OpenCrate streamlines AI-specific workflows, handles container orchestration like a champ, and ensures seamless integration across any environment-all while keeping you blissfully unaware of dependency hell.
+OpenCrate streamlines AI-specific workflows, handles container orchestration like a champ, and ensures seamless integration "across any environment" while keeping you blissfully unaware of dependency hell.
 
 In short, we handle the grunt work so you can focus on what truly matters: **making that loss curve go down.**
 
@@ -48,3 +45,7 @@ Ready to dive in? It's as easy as pie (the delicious, non-mathematical kind).
 2.  **Check out the Guides**: Our [Guides](guides/1_artifacts_logging_reproducible_workflows.ipynb) provide hands-on examples to get you up and running in no time.
 
 Happy coding, and may your models always converge!
+
+<br>
+<br>
+<br>
