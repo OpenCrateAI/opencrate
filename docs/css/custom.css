@@ -20,6 +20,8 @@
   --custom-search-active-fg: #000000;
   --custom-content-current-active-shadow: #FFEC3D;
   --custom-content-current-active-color: #000;
+  --custom-media-query-side-navbar-bg: #fff;
+  --custom-media-query-side-navbar-color: #000;
 }
 
 /* Dark Mode: Black Background */
@@ -42,6 +44,8 @@
   --custom-search-active-fg: #ffffff;
   --custom-content-current-active-shadow: #000;
   --custom-content-current-active-color: #FFEC3D;
+  --custom-media-query-side-navbar-bg: #000;
+  --custom-media-query-side-navbar-color: #fff;
 }
 
 :root {
@@ -51,7 +55,6 @@
   /* Black text for Navbar */
 }
 
-/* Adaptive Header Styling */
 /* Adaptive Header Styling */
 .md-header {
   background-color: transparent !important;
@@ -149,6 +152,9 @@
 
 /* Mobile Search Styling Adjustments */
 @media screen and (max-width: 59.9375em) {
+  [data-md-color-primary=black] .md-nav__source {
+    background-color: #000;
+  }
 
   /* Ensure the search toggle icon is visible on mobile */
   .md-header__button.md-logo,
@@ -188,6 +194,7 @@
 .md-tabs__item--active .md-tabs__link {
   color: #000 !important;
   text-shadow: 2.5px 2.5px 0 #0000003b !important;
+  background-color: #FFEC3D !important;
 }
 
 .md-footer {
@@ -223,19 +230,7 @@
   color: #000000;
 }
 
-/* Text Selection Color */
-::selection {
-  background-color: #FFEC3D;
-  /* Yellow background */
-  color: #000000;
-  /* Black text */
-}
 
-/* For Firefox compatibility */
-::-moz-selection {
-  background-color: #FFEC3D;
-  color: #000000;
-}
 
 .md-nav__item .md-nav__link--active,
 .md-nav__item .md-nav__link--active code {
@@ -255,12 +250,8 @@
 }
 
 @media screen and (max-width: 76.2344em) {
-  .md-nav--primary .md-nav__title~.md-nav__list {
-    background-color: #FFEC3D;
-  }
-
   .md-nav--primary .md-nav__item {
-    border-top: .05rem solid var(--md-default-fg-color--lightest);
+    border-top: none;
   }
 
   .md-nav__link--passed,
@@ -282,7 +273,6 @@
   }
 
   .md-nav--primary .md-nav__title~.md-nav__list {
-    background-color: #000000;
     color: #000;
     box-shadow: 0 .05rem 0 var(--md-default-fg-color--lightest) inset;
     overflow-y: auto;
@@ -293,21 +283,29 @@
   .md-nav--primary .md-nav__link {
     margin-top: 0;
     padding: .6rem .8rem;
-    background-color: #FFEC3D;
+
   }
 
   .md-nav--primary .md-nav__title {
-    background-color: #000000;
-    color: #ffffff;
-    cursor: pointer;
-    height: 5.6rem;
-    line-height: 2.4rem;
-    padding: 3rem .8rem .2rem;
-    position: relative;
-    white-space: nowrap;
+    background-color: #FFEC3D;
+    text-shadow: 2px 2px 0 #b9ad35 !important;
+    border-bottom: 1px solid #000;
+    color: #000;
+  }
+
+  .md-nav--primary .md-nav__title~.md-nav__list {
+    background-color: var(--custom-media-query-side-navbar-bg);
   }
 
   html [data-md-color-primary=black] .md-nav--primary .md-nav__title[for=__drawer] {
-    background-color: hsl(0deg 0% 0%);
+    background-color: #FFEC3D;
+    color: #000;
+    border-bottom: 1px solid #000;
+  }
+
+  .md-nav--primary .md-nav__link {
+    background-color: var(--custom-media-query-side-navbar-bg);
+    color: var(--custom-media-query-side-navbar-color);
+    border-bottom: 1px solid #404040;
   }
 }

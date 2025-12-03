@@ -94,7 +94,7 @@ install: install-dev-packages install-dev-versions
 mkdocs:
 	@echo -e "$(BOLD_YELLOW)● Starting MkDocs server...$(RESET)"
 	@echo -e "  $(BOLD_BLUE)▶ Server will be available at: $(BOLD)http://0.0.0.0:8789$(RESET)"
-	@python$(PYTHON_VERSION) -m mkdocs serve -a 0.0.0.0:8789
+	@python$(PYTHON_VERSION) -m mkdocs serve -a 0.0.0.0:8789  --livereload
 
 
 test-ruff:

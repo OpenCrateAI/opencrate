@@ -1,3 +1,9 @@
+---
+hide:
+  - navigation
+  - toc
+---
+
 # __Welcome to OpenCrate!__
 
 <p align="center">

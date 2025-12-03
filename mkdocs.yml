@@ -1,4 +1,4 @@
-site_name: Opencrate
+site_name: OpenCrate
 
 site_url: https://OpenCrateAI.github.io/opencrate/
 repo_url: https://github.com/OpenCrateAI/opencrate
@@ -104,9 +104,9 @@ extra:
   social:
     - icon: fontawesome/brands/github
       link: https://fosstodon.org/@squidfunk
-      name: Opencrate
+      name: OpenCrate
   generator: false
-copyright: Copyright &copy; 2025 Opencrate
+copyright: Copyright &copy; 2025 OpenCrate
 
 extra_css:
   - css/custom.css
