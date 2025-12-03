@@ -150,23 +150,6 @@
   }
 }
 
-/* Mobile Search Styling Adjustments */
-@media screen and (max-width: 59.9375em) {
-  [data-md-color-primary=black] .md-nav__source {
-    background-color: #000;
-  }
-
-  /* Ensure the search toggle icon is visible on mobile */
-  .md-header__button.md-logo,
-  .md-header__button.md-icon {
-    color: var(--custom-header-fg) !important;
-  }
-
-  /* We leave the .md-search__form styling to default on mobile 
-     to avoid breaking the full-screen overlay behavior. 
-     The default material theme handles the mobile search overlay well. */
-}
-
 /* For code blocks */
 .md-typeset pre code {
   font-size: 0.95em;
@@ -249,6 +232,15 @@
   align-items: center;
 }
 
+/* Wallpaper styling with responsive image sources */
+#wallpaper {
+  background-image: url('../assets/wallpaper.png');
+  aspect-ratio: 16.9 / 5;
+  background-size: cover; /* Resizes the background image to cover the entire container */
+  background-repeat: no-repeat;
+  background-position: center;
+}
+
 @media screen and (max-width: 76.2344em) {
   .md-nav--primary .md-nav__item {
     border-top: none;
@@ -307,5 +299,32 @@
     background-color: var(--custom-media-query-side-navbar-bg);
     color: var(--custom-media-query-side-navbar-color);
     border-bottom: 1px solid #404040;
+  }
+}
+
+
+/* Mobile Search Styling Adjustments */
+@media screen and (max-width: 59.9375em) {
+  [data-md-color-primary=black] .md-nav__source {
+    background-color: #000;
+  }
+  
+  /* Ensure the search toggle icon is visible on mobile */
+  .md-header__button.md-logo,
+  .md-header__button.md-icon {
+    color: var(--custom-header-fg) !important;
+  }
+}
+
+@media screen and (max-width: 910px) {
+  #wallpaper {
+    background-image: url('../assets/wallpaper-media-query-76.png');
+    aspect-ratio: 8 / 5;
+  }
+}
+@media screen and (max-width: 505px) {
+  #wallpaper {
+    background-image: url('../assets/wallpaper-media-query-59.png');
+    aspect-ratio: 4.49 / 5;
   }
 }

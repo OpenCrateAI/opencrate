@@ -9,7 +9,7 @@ hide:
 </style>
 
 <div align="center" markdown="1">
-<img src="assets/wallpaper.png" id="wallpaper" alt="OpenCrate Wallpaper"/>
+<div id="wallpaper" alt="OpenCrate Wallpaper"></div>
 <p>True plug-and-play interoperability for orchestrating AI workflows.</p>
 
 ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/OpenCrateAI/opencrate/release-pypi.yml?style=flat-square&logo=python&logoColor=%23fff)
