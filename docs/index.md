@@ -6,13 +6,16 @@ hide:
 
 # __Welcome to OpenCrate!__
 
-<p align="center">
-  <img src="assets/wallpaper.png" alt="OpenCrate Wallpaper"/>
-</p>
+<div align="center" markdown="1">
+<img src="assets/wallpaper.png" id="wallpaper" alt="OpenCrate Wallpaper"/>
+<b>True plug-and-play interoperability for orchestrating AI workflows.</b>
+<br>
 
-<p align="center">
-    <b>Democratizing AI by simplifying the developer experience for everyone.</b>
-</p>
+![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/OpenCrateAI/opencrate/release-pypi.yml?style=flat-square&logo=python&logoColor=%23fff)
+![PyPI - Version](https://img.shields.io/pypi/v/opencrate?style=flat-square&logo=python&logoColor=%23fff)
+![GitHub commit activity (branch)](https://img.shields.io/github/commit-activity/w/OpenCrateAI/opencrate/main?style=flat-square&logo=github)
+![PyPI - Python Version](https://img.shields.io/pypi/pyversions/opencrate?style=flat-square&logo=python&logoColor=%23fff)
+</div>
 
 ---
 
