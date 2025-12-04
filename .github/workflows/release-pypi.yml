@@ -8,7 +8,7 @@ on:
 jobs:
   pypi-publish:
     name: Upload release to PyPI
-    runs-on: ubuntu-latest
+    runs-on: blacksmith-2vcpu-ubuntu-2404
     environment:
       name: pypi
       url: https://pypi.org/p/opencrate
