@@ -53,6 +53,10 @@
   /* Black text for Navbar */
 }
 
+html {
+  scroll-behavior: smooth;
+}
+
 /* Adaptive Header Styling */
 .md-header {
   background-color: transparent !important;
