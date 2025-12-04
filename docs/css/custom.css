@@ -103,6 +103,12 @@
   color: var(--custom-content-current-active-color);
   text-shadow: 1px 1px 0 var(--custom-content-current-active-shadow) !important;
 }
+.md-typeset a {
+  word-break: break-word;
+  color: var(--custom-content-current-active-color);
+  text-shadow: 1px 1px 0 var(--custom-content-current-active-shadow) !important;
+  transition: color 0.1s ease, text-shadow 0.1s ease;
+}
 
 
 /* Search Bar Styling - Desktop Only (min-width: 60em) */
@@ -241,6 +247,10 @@
   background-position: center;
 }
 
+.md-content__inner:before {
+  content: none;
+}
+
 @media screen and (max-width: 76.2344em) {
   .md-nav--primary .md-nav__item {
     border-top: none;
@@ -316,10 +326,24 @@
   }
 }
 
+@media screen and (max-width: 1219px) {
+  #wallpaper {
+    position: relative;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 100vw;
+  }
+}
+
 @media screen and (max-width: 910px) {
   #wallpaper {
     background-image: url('../assets/wallpaper-media-query-76.png');
     aspect-ratio: 8 / 5;
+  }
+
+  .md-content__inner {
+    margin: 0 1.2rem;
+    padding-top: 0;
   }
 }
 @media screen and (max-width: 505px) {
