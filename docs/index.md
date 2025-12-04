@@ -17,6 +17,13 @@ hide:
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/opencrate?style=flat-square&logo=python&logoColor=%23fff)
 </div>
 
+OpenCrate is an [open-source](https://github.com/OpenCrateAI/opencrate) framework that lets you easily develop your AI workflows and its modules into isolated, self-contained runtimes and expose them as native, composable building blocks. This enables you, your team, and the open-source community to seamlessly integrate complex, incompatible modules.
+
+You can 'import' a module running on a completely different Python version or dependency stack as if it were a standard library function. This defines true plug-and-play interoperability.
+
+OpenCrate is built with portability at its foundation, designed to make interoperability a solved problem. It abstracts away runtime complexity, allowing you to focus on what actually matters: Loss functions, architectures, metrics, and intelligence.
+
+
 ## **__Storytime__**
 Picture this: You stumble upon the *perfect* research paper or a brilliant GitHub project. It solves exactly the problem you've been banging your head against for a week. You clone the repo, crack your knuckles, and get ready to integrate this new finding directly into your existing workflow.
 
@@ -49,17 +56,7 @@ Let's be real: AI development right now is kind of a mess.
 <img src="assets/with-opencrate.png" width=70%"/>
 </div>
 
-OpenCrate is the build framework designed to make the infrastructure invisible. It abstracts away the runtime complexity, allowing you to focus on what actually matters: Loss functions, architectures, metrics and intelligence.
-
-We don't just manage your dependencies; we orchestrate them. OpenCrate wraps your modules in hermetic, standardized environments but exposes them as native, composable building blocks.
-
-## **__True Plug-and-Play Interoperability__**
-
-Imagine a world where Python versions don't matter.
-
-With OpenCrate, interoperability isn't an afterthought—it's the foundation. You can "import" a module running on a completely different stack as if it were a standard library function. Yep, that's exactly what we mean by true plug-and-play interoperability.
-
-Happy coding, and may your models always converge!
+Yaha pe abhi aur likhna baaki hai...
 
 <br>
 <br>
