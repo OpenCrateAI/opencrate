@@ -69,6 +69,10 @@ html {
   border-color: #000;
 }
 
+.md-content__inner h1 {
+  display: block;
+}
+
 /* Use pseudo-element for background and blur to avoid breaking fixed-position children (like mobile search) */
 .md-header::before {
   content: "";
@@ -377,15 +381,18 @@ html {
     background-image: url('../assets/wallpaper-media-query-76.png');
     aspect-ratio: 8 / 5;
   }
-
   .md-content__inner {
     margin: 0 1.2rem;
     padding-top: 0;
   }
 }
+
 @media screen and (max-width: 505px) {
   #wallpaper {
     background-image: url('../assets/wallpaper-media-query-59.png');
     aspect-ratio: 4.49 / 5;
+  }
+  .md-content__inner {
+    margin: 0 1rem;
   }
 }
