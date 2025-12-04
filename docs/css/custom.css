@@ -1,5 +1,3 @@
-/* Custom CSS for pure black and white backgrounds */
-
 /* Light Mode: White Background */
 [data-md-color-scheme="default"] {
   --md-default-fg-color--light: #000000;
@@ -108,6 +106,34 @@
   color: var(--custom-content-current-active-color);
   text-shadow: 1px 1px 0 var(--custom-content-current-active-shadow) !important;
   transition: color 0.1s ease, text-shadow 0.1s ease;
+}
+/* Make sure header is flex (it already is, this is just to ensure no override broke it) */
+.md-header__inner {
+  display: flex !important;
+  justify-content: flex-start !important;
+}
+
+/* Swap hamburger and logo */
+.md-header__inner > label.md-icon[for="__drawer"] {
+  order: 1 !important;  /* hamburger first */
+}
+
+.md-header__inner > a.md-logo {
+  order: 2 !important;  /* logo second */
+}
+
+/* Keep header title immediately after them (so it doesn't push them apart) */
+.md-header__inner > .md-header__title {
+  order: 3 !important;
+}
+
+/* Everything else (search button, palette, GitHub icon...) */
+.md-header__inner > *:nth-child(n+4) {
+  order: 4 !important;
+}
+
+[dir=ltr] .md-header__title {
+  margin-left: 0;
 }
 
 
@@ -219,8 +245,6 @@
   color: #000000;
 }
 
-
-
 .md-nav__item .md-nav__link--active,
 .md-nav__item .md-nav__link--active code {
   color: var(--custom-content-current-active-color);
@@ -252,6 +276,9 @@
 }
 
 @media screen and (max-width: 76.2344em) {
+  .md-header__button.md-logo {
+      display: block;
+  }
   .md-nav--primary .md-nav__item {
     border-top: none;
   }
@@ -330,8 +357,14 @@
   #wallpaper {
     position: relative;
     left: 50%;
-    transform: translateX(-50%);
+    transform: translate(-50%, -1.475rem);
     width: 100vw;
+  }
+  #wallpaper-tagline {
+    margin-top: 0;
+  }
+  .md-content__inner {
+    padding-top: 0;
   }
 }
 
