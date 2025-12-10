@@ -17,46 +17,79 @@ hide:
 ![PyPI - Python Version](https://img.shields.io/pypi/pyversions/opencrate?style=flat-square&logo=python&logoColor=%23fff)
 </div>
 
-OpenCrate is an [open-source](https://github.com/OpenCrateAI/opencrate) framework that lets you easily develop your AI workflows and its modules into isolated, self-contained runtimes and expose them as native, composable building blocks. This enables you, your team, and the open-source community to seamlessly integrate complex, incompatible modules.
+OpenCrate is an [open-source](https://github.com/OpenCrateAI/opencrate) framework that lets you easily develop your AI workflows and its modules into isolated, self-contained runtimes and expose them as native, composable building blocks. This enables you, your team, and the open-source community to build AI workflows more efficiently and focus on architectures, metrics, and intelligence by seamlessly integrating existing tools and utilities into unified workflows, eliminating dependency conflicts, environment setups, integration headaches.
 
-You can 'import' a module running on a completely different Python version or dependency stack as if it were a standard library function. This defines true plug-and-play interoperability.
+With OpenCrate, your modules become reusable assets that you and your team can grab and plug into any workflow. You can "call a module" running on a completely different Python version or dependency stack as if it were a standard library function.
 
-OpenCrate is built with portability at its foundation, designed to make interoperability a solved problem. It abstracts away runtime complexity, allowing you to focus on what actually matters: Loss functions, architectures, metrics, and intelligence.
+Every tool or utility you build - whether it cleans data, generates embeddings, detect sentiments or runs evaluations - should help you with every project, not just the current one. OpenCrate enables, you, your team, and the open-source community to facilitate each other's progress, creating a truly interoperable ecosystem with turning isolated, one-off scripts into tools that anyone can actually use without the integration failures.
 
 
-## **__Storytime__**
-Picture this: You stumble upon the *perfect* research paper or a brilliant GitHub project. It solves exactly the problem you've been banging your head against for a week. You clone the repo, crack your knuckles, and get ready to integrate this new finding directly into your existing workflow.
+## **__Picture This__**
+You stumble upon **the perfect** research paper or a brilliant GitHub project. It solves exactly the problem you've been banging your head against for a week. You clone the repo, crack your knuckles, and get ready to integrate this new finding directly into your existing workflow.
 
-And here's how the story usually ends:
+And here's how the story usually ends for your integration:
 
 - The new module demands **TensorFlow 1.x** and **Python 3.8**.
 - Your current stack is happily running **PyTorch 2.2** on **Python 3.12**.
-- The CUDA driver dependencies start fighting with your GPU.
-- And the pip installs? It turns into a battle royale where nobody wins.
+- The CUDA driver dependency conflicts start fighting with your GPU.
+- And the pip installs? It turns into a battle royale where no library wins.
 
-You either rage quit (because who rewrites their entire stack "in the hope" that something magical is gonna happen?), or if you're brave enough, you try to force it to work. Instead of making progress, you spend hours—if not days—fixing import errors and **rewriting perfectly good code just to make it fit**. Ugh.
+With this, you're left with one of these *frustratingly common* follow-ups:
 
-<div align="center">
-<img src="assets/without-opencrate.png" width=70%"/>
-</div>
+- You either rage quit because who rewrites their entire stack "in the hope" that something magical is gonna happen?
+- Instead of making actual progress, you spend hours - if not days - fixing environments, dependencies and import errors or even **rewriting perfectly good code just to make it fit**.
 
-
-## **__Current State of AI Development__**
-
-Let's be real: AI development right now is kind of a mess.
-
-- ✗ **The Compatibility Wall**: Great tools are locked away in incompatible ecosystems. You can't easily mix a legacy OCR model with a modern LLM without complex microservices or hacky workarounds.
-- ✗ **Artifact Scavenger Hunts**: Logs, outputs, and checkpoints are scattered everywhere. "Reproducibility" is basically just a nice idea we talk about but rarely actually see. As the project grows, so does the chaos.
-- ✗ **Code Rot**: That project you built a year ago? It's basically a fossil. Trying to integrate it today means rewriting half of it just to make it run.
-- ✗ **Less science, more legwork**: Often instead of focusing on model innovation, you're stuck wrestling with dependencies, conflicts, setups, and environment issues.
-
-## **__What does OpenCrate do?__**
+What you **wanted** to do is below:
 
 <div align="center">
-<img src="assets/with-opencrate.png" width=70%"/>
+<img src="assets/without-opencrate.png" class="mkdocs-img"/>
 </div>
 
-Yaha pe abhi aur likhna baaki hai...
+Yep, this does look a little scary to solve, doesn't it? **If only we could:**
+
+- **Encapsulate each conflicting module** within a self-contained, isolated runtime leveraging containerization to ensure zero conflicts for python or for any system dependency like cuda.
+- **Invoke functions across environments** as if they were native Python calls, completely abstracting away the underlying dependency conflicts.
+- **Auto-orchestrate a microservices architecture** where modules communicate over optimized protocols without us needing to write a single line of networking boilerplate.
+- **Seamlessly transport complex payloads** like Tensors, DataFrames, Texts, Images and more, between services without worrying about serialization and type conversions.
+- **Auto-scale services dynamically based on load** ensuring zero performance bottlenecks by automatically spinning up additional resources for high-demand modules while keeping the rest efficient.
+
+Ahah, that's exactly what we've built.
+
+## **__Working with OpenCrate__**
+
+<div align="center">
+<img src="assets/with-opencrate.png" class="mkdocs-img"/>
+</div>
+
+We're working towards building an ecosystem where every AI workflow you create, you get to spend most time on innovation rather than the legwork. Our approach is quite simple: containarization, orchestration and abstraction. 
+
+### __**Encapsulate each conflicting module**__
+
+```bash
+oc init
+```
+
+### __**Invoke functions across environments**__
+
+```python
+from opencrate import OpenCrateServer, 
+
+my_custom_eda = OpenCrateClient("braindotai/my-custom-eda:v3")
+eda_results = my_custom_eda.perform_eda(dataframe)
+```
+
+### __**Auto-orchestrate a microservices architecture**__
+
+...`
+
+### __**Seamlessly transport complex payloads**__
+
+...
+
+### __**Auto-scale services dynamically based on load**__
+
+...
+
 
 <br>
 <br>

@@ -57,6 +57,10 @@ html {
   scroll-behavior: smooth;
 }
 
+.mkdocs-img {
+  width: 70%;
+}
+
 /* Adaptive Header Styling */
 .md-header {
   background-color: transparent !important;
@@ -85,6 +89,8 @@ html {
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   z-index: -1;
+}.mkdocs-img {
+  width: 70%;
 }
 
 /* Ensure text and icons contrast correctly with the header background */
@@ -384,6 +390,9 @@ html {
   .md-content__inner {
     margin: 0 1.2rem;
     padding-top: 0;
+  }
+  .mkdocs-img {
+    width: 100%;
   }
 }
 
