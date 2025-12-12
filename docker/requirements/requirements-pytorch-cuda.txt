@@ -19,3 +19,7 @@ torchvision
 docker
 
 # nvidia-modelopt[all]==0.15.0 only available for >= python 3.9 to <= python 3.12
+requests>=2.32.4 # not directly required, pinned by Snyk to avoid a vulnerability
+setuptools>=78.1.1 # not directly required, pinned by Snyk to avoid a vulnerability
+urllib3>=2.5.0 # not directly required, pinned by Snyk to avoid a vulnerability
+wheel>=0.38.0 # not directly required, pinned by Snyk to avoid a vulnerability
