@@ -69,6 +69,7 @@ UBUNTU_PACKAGES = [
     "git",
     "speedtest-cli",
     "iputils-ping",
+    "libxcb1",
 ]
 
 CLI_PACKAGES = [

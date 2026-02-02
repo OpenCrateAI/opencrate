@@ -275,12 +275,14 @@ def runtime(
             for image_name in matching_images:
                 try:
                     image = docker.image.inspect(image_name)
-                    history = docker.image.history(image)
+                    # history = docker.image.history(image) # Not implemented in python-on-whales 0.60.0
+                    history_json = utils.run_command(f"docker image history {image_name} --format '{{{{json .}}}}' --no-trunc")
+                    history = [json.loads(line) for line in history_json.strip().split("\n")]
 
                     # Look for human commit (not build commands)
                     human_commit = None
                     for entry in history:
-                        comment = entry.comment.strip()
+                        comment = entry.get("Comment", "").strip()
                         if (
                             comment
                             and not any(
@@ -308,12 +310,13 @@ def runtime(
                     if image_name == cli.config.get("docker_image"):
                         version = f"* {version}"
                     if human_commit:
-                        comment = human_commit.comment or "No commit message"
-                        commit_hash = human_commit.id.replace("sha256:", "")[:12]
-                        size_mb = human_commit.size / (1024**2)
-                        created = human_commit.created_at # python-on-whales returns datetime object
+                        comment = human_commit.get("Comment") or "No commit message"
+                        commit_hash = human_commit.get("ID", "").replace("sha256:", "")[:12]
+                        size_str = human_commit.get("Size", "0B")
+                        created_str = human_commit.get("CreatedAt", "")
+                        created = datetime.datetime.fromisoformat(created_str.replace("Z", "+00:00")) if created_str else datetime.datetime.now()
                         date_str = created.strftime("%d-%m-%Y %H:%M:%S")
-                        logs.append(f"[bold]{version}: {comment}[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]")
+                        logs.append(f"[bold]{version}: {comment}[/bold] -> {commit_hash} [dim][{size_str} - {date_str}][/]")
                     else:
                         # No human commit found, use image info
                         commit_hash = image.id.replace("sha256:", "")[:12] if image.id else "unknown"
@@ -366,7 +369,7 @@ def runtime(
             new_version = f"{current_version.split('-v')[0]}-v{int(version_match) + 1}"
             new_docker_image = current_image.replace(f"-v{version_match}", f"-v{int(version_match) + 1}")
             container.commit(
-                repository=new_docker_image,
+                tag=new_docker_image,
                 author=os.environ["HOST_GIT_NAME"],
                 message=message,
             )
