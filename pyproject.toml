@@ -107,7 +107,7 @@ include = ["opencrate", "opencrate.*"]
 [tool.ruff]
 src = ["src"]
 line-length = 180
-extend-exclude = ["tests/pipelines", "docs"]
+extend-exclude = ["tests/pipelines", "docs", "del_*"]
 
 [tool.ruff.lint]
 select = [
@@ -124,7 +124,7 @@ skip-magic-trailing-comma = false
 
 [tool.mypy]
 files = ["src", "tests"]
-exclude = "(^|/)(tests/pipelines)"
+exclude = "(^|/)(tests/pipelines|del_*)"
 disable_error_code = ["unreachable"]
 warn_return_any = false
 warn_unused_configs = true
