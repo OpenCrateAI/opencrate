@@ -17,7 +17,7 @@ RUN apt update -y && \
     add-apt-repository ppa:zhangsongcui3371/fastfetch -y && \
     apt update -y && \
     apt install -y --no-install-recommends eza fastfetch && \
-    apt install -y zlib1g zlib1g-dev libssl-dev libbz2-dev libsqlite3-dev libedit-dev libffi-dev libreadline-dev && \
+    apt install -y zlib1g zlib1g-dev libxcb1 libssl-dev libbz2-dev libsqlite3-dev libedit-dev libffi-dev libreadline-dev && \
     apt install -y --no-install-recommends zsh && \
     chsh -s $(which zsh) && \
     wget https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh -O - | zsh || true && \
