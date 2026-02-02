@@ -69,6 +69,7 @@ UBUNTU_PACKAGES = [
     "git",
     "speedtest-cli",
     "iputils-ping",
+    "libxcb1",
 ]
 
 CLI_PACKAGES = [
@@ -136,6 +137,9 @@ RUN chsh -s $(which zsh) || true \\
     && git clone https://github.com/zsh-users/zsh-autosuggestions $HOME/.oh-my-zsh/custom/plugins/zsh-autosuggestions \\
     && git clone https://github.com/zsh-users/zsh-syntax-highlighting.git $HOME/.oh-my-zsh/custom/plugins/zsh-syntax-highlighting \\
     && curl --proto '=https' --tlsv1.2 -LsSf https://setup.atuin.sh | sh \\
+    # Fix permissions to avoid zsh compinit insecure directories warning
+    && chmod -R 755 $HOME/.oh-my-zsh \\
+    && find $HOME/.oh-my-zsh -type f -exec chmod 644 {{}} \\; \\
     && mv /home/zsh/.zshrc ~/.zshrc \\
     && mv /home/zsh/.p10k.zsh ~/.p10k.zsh \\
     && mv /home/zsh/.aliases.sh ~/ \\
