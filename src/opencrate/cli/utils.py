@@ -42,10 +42,17 @@ def stream_docker_logs(command, console: Console, is_build=False):
 
             try:
                 for line_data in command:
-                    if "error" in line_data:
-                        raise Exception(line_data["error"])
+                    # python-on-whales returns strings or bytes directly
+                    if isinstance(line_data, bytes):
+                        raw_text = line_data.decode("utf-8")
+                    elif isinstance(line_data, str):
+                        raw_text = line_data
+                    else:
+                        # Fallback if it's still a dict (legacy or different call)
+                        if "error" in line_data:
+                            raise Exception(line_data["error"])
+                        raw_text = line_data.get("stream") or line_data.get("status")
 
-                    raw_text = line_data.get("stream") or line_data.get("status")
                     if not raw_text:
                         continue
 
@@ -150,7 +157,7 @@ def run_command(
             return result.stdout.strip() if not show_output else str(result.returncode)
     except subprocess.CalledProcessError as e:
         if not ignore_error:
-            raise Exception(f"An error occurred: {e.stderr.strip()}")
+            raise Exception(f"An error occurred: {e.stderr}")
         return ""
 
 
@@ -224,6 +231,14 @@ def show_project_structure(console):
     tree.add("📝 train.py              [dark_cyan].........created file")
     tree.add("📝 test.py               [dark_cyan].........created file")
     tree.add("📝 deploy.py             [dark_cyan].........created file")
+    tree.add("📝 infer.py              [dark_cyan].........created file")
+    tree.add("🐳 Dockerfile            [dark_cyan].........created file")
+    tree.add("⚙️ docker-compose.yml    [dark_cyan].........created file")
+    tree.add("📜 requirements.txt      [dark_cyan].........created file")
+    tree.add("📄 README.md         	 [dark_cyan].........created file")
+
+    # Print the tree structure
+    console.print(tree)
     tree.add("📝 infer.py              [dark_cyan].........created file")
     tree.add("🐳 Dockerfile            [dark_cyan].........created file")
     tree.add("⚙️ docker-compose.yml    [dark_cyan].........created file")

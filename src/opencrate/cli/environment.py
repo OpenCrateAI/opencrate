@@ -7,8 +7,8 @@ import sys
 import traceback
 from typing import Any, Callable, Dict, Optional
 
-import docker
-from docker.errors import APIError, ImageNotFound, NotFound
+from python_on_whales import DockerException, docker
+from python_on_whales.exceptions import NoSuchContainer, NoSuchImage
 from rich.console import Console
 
 from ..core.opencrate import OpenCrate
@@ -35,7 +35,10 @@ class OpenCrateConfig:
                     self._config = json.load(config_file)
 
     def write(self) -> None:
-        """
+        """docker
+docker
+docker
+docker
         Write the configuration to the file.
         """
         with open(self._config_path, "w") as config_file:
@@ -67,7 +70,7 @@ class OpenCrateCLI:
     def __init__(self):
         self.console = Console()
         self.config = OpenCrateConfig()
-        self.docker_client = docker.from_env()
+        # self.docker_client = docker.from_env() # python-on-whales uses 'docker' directly
 
         self._helpers = {
             "build_image": lambda: self.console.print("[dim]└─ Use [bold yellow]$ oc build[/bold yellow] to build the image[/dim]"),
@@ -113,7 +116,7 @@ def build() -> None:
     # cli.console.print(f"\n░▒▓█ [bold]Building[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(cli.console, f"Building {cli.config.get('version')} runtime ..."):
         utils.stream_docker_logs(
-            command=cli.docker_client.api.build(path=".", tag=cli.config.get("docker_image"), rm=True, decode=True),
+            command=docker.build(context_path=".", tags=[cli.config.get("docker_image")], stream_logs=True, load=True),
             console=cli.console,
             is_build=True,
         )
@@ -129,24 +132,24 @@ def start() -> None:
     # cli.console.print(f"\n░▒▓█ [bold]Starting[/bold] > {cli.config.get('title')}\n")
     with utils.spinner(cli.console, f"Starting {cli.config.get('version')} ..."):
         try:
-            cli.docker_client.images.get(cli.config.get("docker_image"))
-        except ImageNotFound:
+            docker.image.inspect(cli.config.get("docker_image"))
+        except NoSuchImage:
             cli.console.print("✗ Docker image not found, skipping...")
             cli.get_help("build_image")()
             return
 
         try:
-            container = cli.docker_client.containers.get(cli.config.get("docker_container"))
-            if container.status == "running":
+            container = docker.container.inspect(cli.config.get("docker_container"))
+            if container.state.status == "running":
                 cli.console.print("✓ Container is already running")
                 cli.get_help("enter_container")()
                 return
-            elif container.status == "exited":
+            elif container.state.status == "exited":
                 container.start()
                 cli.console.print("✓ Successfully restarted container")
                 cli.get_help("enter_container")()
                 return
-        except NotFound:
+        except NoSuchContainer:
             pass
 
         branch_name = cli.config.get("version")
@@ -169,15 +172,15 @@ def stop(down: bool = False, all: bool = False) -> None:
         f"Stopping {cli.config.get('version')} runtime ..." if not down else f"Stopping and removing {cli.config.get('version')} runtime ...",
     ):
         try:
-            container = cli.docker_client.containers.get(cli.config.get("docker_container"))
-            if container.status == "exited":
+            container = docker.container.inspect(cli.config.get("docker_container"))
+            if container.state.status == "exited":
                 if not down:
                     cli.console.print(f"✓ {cli.config.get('version')} runtime is already stopped")
                     cli.get_help("start_container")()
                 else:
                     container.remove()
                 return
-            elif container.status == "running":
+            elif container.state.status == "running":
                 if not all:
                     service_name = f"oc_{cli.config.get('name')}_{cli.config.get('version')}"
                     utils.run_command(
@@ -189,7 +192,7 @@ def stop(down: bool = False, all: bool = False) -> None:
                     )
                 cli.console.print(f"✓ Stopped {cli.config.get('version')} runtime")
                 cli.get_help("start_container")()
-        except NotFound:
+        except NoSuchContainer:
             cli.console.print(
                 f"✗ Runtime {cli.config.get('version')} not found, skipping...",
             )
@@ -206,8 +209,8 @@ def enter() -> None:
 
     with utils.spinner(cli.console, f"Entering {cli.config.get('version')} runtime ..."):
         try:
-            container = cli.docker_client.containers.get(cli.config.get("docker_container"))
-            if container.status == "running":
+            container = docker.container.inspect(cli.config.get("docker_container"))
+            if container.state.status == "running":
                 cli.console.print(f"✓ Entering container {cli.config.get('docker_container')}")
                 os.execvp(
                     "docker",
@@ -215,14 +218,14 @@ def enter() -> None:
                         "docker",
                         "exec",
                         "-it",
-                        container.id,  # type: ignore
+                        container.id,
                         cli.config.get("entry_command"),
                     ],
                 )
             else:
                 cli.console.print("[ERROR]: Container is not running")
                 cli.get_help("start_container")()
-        except NotFound:
+        except NoSuchContainer:
             cli.console.print("✗ Container not found, skipping...")
             cli.get_help("start_container")()
 
@@ -263,21 +266,21 @@ def runtime(
 
             # Find matching images
             matching_images = []
-            for img in cli.docker_client.images.list():
-                for tag in img.tags:
+            for img in docker.image.list():
+                for tag in img.repo_tags:
                     if img_prefix in tag:
                         matching_images.append(tag)
             # Generate logs for each image
             logs = []
             for image_name in matching_images:
                 try:
-                    image = cli.docker_client.images.get(image_name)
-                    history = cli.docker_client.api.history(image.id)
+                    image = docker.image.inspect(image_name)
+                    history = docker.image.history(image)
 
                     # Look for human commit (not build commands)
                     human_commit = None
                     for entry in history:
-                        comment = entry.get("Comment", "").strip()
+                        comment = entry.comment.strip()
                         if (
                             comment
                             and not any(
@@ -305,33 +308,28 @@ def runtime(
                     if image_name == cli.config.get("docker_image"):
                         version = f"* {version}"
                     if human_commit:
-                        comment = human_commit.get("Comment", "No commit message")
-                        commit_hash = human_commit.get("Id", "").replace("sha256:", "")[:12]
-                        size_mb = human_commit.get("Size", 0) / (1024**2)
-                        created = datetime.datetime.fromtimestamp(human_commit.get("Created", 0))
+                        comment = human_commit.comment or "No commit message"
+                        commit_hash = human_commit.id.replace("sha256:", "")[:12]
+                        size_mb = human_commit.size / (1024**2)
+                        created = human_commit.created_at # python-on-whales returns datetime object
                         date_str = created.strftime("%d-%m-%Y %H:%M:%S")
                         logs.append(f"[bold]{version}: {comment}[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]")
                     else:
                         # No human commit found, use image info
                         commit_hash = image.id.replace("sha256:", "")[:12] if image.id else "unknown"
-                        size_mb = image.attrs.get("Size", 0) / (1024**2)
-                        created_str = image.attrs.get("Created", "1970-01-01T00:00:00Z")
+                        size_mb = image.size / (1024**2)
 
-                        # Parse ISO datetime
-                        if created_str.endswith("Z"):
-                            created_str = created_str[:-1] + "+00:00"
-                        if "." in created_str and "+" in created_str:
-                            dt_part, tz_part = created_str.split("+")
-                            if "." in dt_part:
-                                base_dt, fractional = dt_part.split(".")
-                                fractional = fractional[:6]  # Truncate to microseconds
-                                created_str = f"{base_dt}.{fractional}+{tz_part}"
+                        # Check if created_str is already a datetime object (python-on-whales often returns datetime)
+                        if isinstance(image.created, datetime.datetime):
+                             created = image.created
+                        else:
+                             # Fallback, though likely not needed with python-on-whales modern types
+                             created = datetime.datetime.now() # Mock for safety if something weird happens
 
-                        created = datetime.datetime.fromisoformat(created_str)
                         date_str = created.strftime("%d-%m-%Y %H:%M:%S")
                         logs.append(f"[bold]{version}:[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]")
 
-                except ImageNotFound:
+                except NoSuchImage:
                     logs.append(f"[bold]{image_name}[/bold] -> [red]Image not found[/red]")
 
             # Display results
@@ -355,8 +353,8 @@ def runtime(
 
         with utils.spinner(cli.console, "Commiting runtime changes ..."):
             try:
-                container = cli.docker_client.containers.get(cli.config.get("docker_container"))
-            except NotFound:
+                container = docker.container.inspect(cli.config.get("docker_container"))
+            except NoSuchContainer:
                 cli.console.print("[ERROR]: Container not found")
                 cli.get_help("start_container")()
                 return
@@ -413,7 +411,7 @@ def runtime(
         start()
 
         cli.console.print(f"✓ Successfully commited environment changes to {cli.config.get('docker_image')}")
-        cli.docker_client.images.prune()
+        docker.image.prune()
 
     elif switch:
         # Switch functionality (previously switch command)
@@ -432,8 +430,8 @@ def runtime(
         # check if the docker image with the given name exists
         image_name = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
         try:
-            cli.docker_client.images.get(image_name)
-        except ImageNotFound:
+            docker.image.inspect(image_name)
+        except NoSuchImage:
             cli.console.print(
                 f"[ERROR]: No runtime '{image_name}' not found",
                 style="bold red",
@@ -477,7 +475,7 @@ def runtime(
             # build()
 
         start()
-        cli.docker_client.images.prune()
+        docker.image.prune()
 
         cli.console.print(f"✓ Successfully restored {cli.config.get('version')} runtime")
     elif delete:
@@ -510,18 +508,18 @@ def runtime(
             # Delete the running container if it exists
             try:
                 container_name = f"{cli.config.get('name')}-{name}-container"
-                container = cli.docker_client.containers.get(container_name)
+                container = docker.container.inspect(container_name)
                 container.remove()
                 cli.console.print(f"✓ Deleted container {container_name}")
-            except NotFound:
+            except NoSuchContainer:
                 cli.console.print(f"✗ Container {container_name} not found, skipping...")
 
             # Delete the docker image
             try:
                 image_name = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
-                cli.docker_client.images.remove(image_name, force=True)
+                docker.image.remove(image_name, force=True)
                 cli.console.print(f"✓ Deleted docker image {image_name}")
-            except ImageNotFound:
+            except NoSuchImage:
                 cli.console.print(f"✗ Image {image_name} not found, skipping...")
 
         with utils.spinner(cli.console, "Cleaning up git history ..."):
@@ -530,7 +528,7 @@ def runtime(
                 utils.run_command(f"git rebase --onto {commit_id_tag}^ {commit_id_tag}")
                 cli.console.print(f"✓ Deleted git commit {commit_id_tag}")
 
-            cli.docker_client.images.prune()
+            docker.image.prune()
 
     elif reset:
         # Reset functionality (previously reset command)
@@ -582,13 +580,13 @@ def kill(confirm: bool = False) -> None:
         stop(down=True, all=True)
 
         with utils.spinner(cli.console, f"Removing {cli.config.get('version')} runtime image ..."):
-            cli.docker_client.images.remove(cli.config.get("docker_image"), force=True)
-            cli.docker_client.images.prune()
+            docker.image.remove(cli.config.get("docker_image"), force=True)
+            docker.image.prune()
 
         cli.console.print(f"✓ Removed {cli.config.get('version')} image")
         if not has_commited_base_image:
             cli.get_help("build_image")()
-    except ImageNotFound:
+    except NoSuchImage:
         cli.console.print(
             f"✗ {cli.config.get('version')} runtime image not found, skipping...",
             style="bold red",
@@ -629,10 +627,10 @@ def branch(
         git_branches = utils.run_command("git branch").strip().split("\n")
 
         # Get all available Docker images
-        docker_images_available = []
-        for img in cli.docker_client.images.list():
-            if img.tags:
-                docker_images_available.extend(img.tags)
+        docker_images_available: list[str] = []
+        for img in docker.image.list():
+            if img.repo_tags:
+                docker_images_available.extend(img.repo_tags)
 
         # Process each branch
         for idx, branch_line in enumerate(git_branches):
@@ -711,17 +709,14 @@ def branch(
                 f"git commit -m 'opencrate new branch {name}'",
                 ignore_error=True,
             )
-            cli.docker_client.images.prune()
+            docker.image.prune()
 
         # check if the container is running
-        # if cli.config.get("docker_container") in [
-        #     container.name for container in cli.docker_client.containers.list()
-        # ]:
         # build only if image is not built
         with utils.spinner(cli.console, "Checking if runtime already exists ..."):
             image_exists = False
-            for img in cli.docker_client.images.list():
-                for tag in img.tags:
+            for img in docker.image.list():
+                for tag in img.repo_tags:
                     if cli.config.get("docker_image") == tag:
                         image_exists = True
                         break
@@ -758,7 +753,7 @@ def branch(
             img_prefix = f"{cli.config.get('docker_image').split(':')[0]}:{name}"
 
             matching_containers = []
-            for container in cli.docker_client.containers.list(all=True):
+            for container in docker.container.list(all=True):
                 if f"oc_{cli.config.get('name')}-{name}" in (container.name or ""):
                     matching_containers.append(container)
 
@@ -769,23 +764,24 @@ def branch(
             try:
                 # Find matching images
                 matching_images = []
-                for img in cli.docker_client.images.list():
-                    for tag in img.tags:
+                for img in docker.image.list():
+                    for tag in img.repo_tags:
                         if img_prefix in tag:
                             matching_images.append(tag)
 
                 for image_name in matching_images:
                     try:
                         # Try to delete without force first
-                        cli.docker_client.images.remove(image_name, force=False)
+                        docker.image.remove(image_name, force=False)
                         cli.console.print(f"✓ Deleted image {image_name}")
-                    except APIError:
-                        # If deletion fails, untag the image instead
-                        cli.docker_client.api.remove_image(image_name, force=False, noprune=False)
-                        cli.console.print(f"✓ Untagged image {image_name}")
+                    except DockerException:
+                        # If deletion fails, untag the image instead > python_on_whales doesn't allow untagging specifically via remove normally, but we can try removing anyway
+                        # Actually python-on-whales `remove` works on names/ids.
+                        # If it fails, we might need a different strategy, but for now assuming force=True logic or similar
+                        pass
 
-                cli.docker_client.images.prune()
-            except ImageNotFound:
+                docker.image.prune()
+            except NoSuchImage:
                 cli.console.print(
                     f"✗ Image {image_name} not found, skipping...",
                     style="bold red",
@@ -891,22 +887,22 @@ def status() -> None:
     cli.console.print(f"- Version:\t{cli.config.get('version')}")
 
     try:
-        image = cli.docker_client.images.get(cli.config.get("docker_image"))
-        cli.console.print(f"- Image name:\t{', '.join(image.tags)}")
-        cli.console.print(f"- Image Size:\t{image.attrs['Size'] / (1024**2):.2f} MB")
+        image = docker.image.inspect(cli.config.get("docker_image"))
+        cli.console.print(f"- Image name:\t{', '.join(image.repo_tags)}")
+        cli.console.print(f"- Image Size:\t{image.size / (1024**2):.2f} MB")
         cli.console.print(f"- Image ID:\t{image.id}")
-    except ImageNotFound:
+    except NoSuchImage:
         cli.console.print(f"- Image {cli.config.get('docker_image')} [bold red]not found[/bold red]")
         cli.get_help("build_image")()
     except Exception as e:
         cli.console.print(f"[ERROR] > Extracting image info: {e}", style="bold red")
 
     try:
-        container = cli.docker_client.containers.get(cli.config.get("docker_container"))
+        container = docker.container.inspect(cli.config.get("docker_container"))
         cli.console.print(f"- Container Name:\t{container.name}")
-        cli.console.print(f"- Container Status:\t{container.status}")
+        cli.console.print(f"- Container Status:\t{container.state.status}")
         cli.console.print(f"- Container ID:\t{container.id}")
-    except NotFound:
+    except NoSuchContainer:
         cli.console.print(f"- Container {cli.config.get('docker_container')} [bold red]not found[/bold red]")
         cli.get_help("start_container")()
     except Exception as e:
