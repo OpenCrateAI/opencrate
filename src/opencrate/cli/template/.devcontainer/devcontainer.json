@@ -31,6 +31,8 @@
                 "ms-python.python",
                 "ms-python.vscode-pylance",
                 "ms-toolsai.jupyter",
+                "bierner.markdown-mermaid",
+                "mermaidchart.vscode-mermaid-chart",
                 "ms-toolsai.jupyter-keymap",
                 "ms-toolsai.jupyter-renderers",
                 "ms-toolsai.vscode-jupyter-cell-tags",
