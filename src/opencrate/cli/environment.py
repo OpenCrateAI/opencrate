@@ -35,10 +35,7 @@ class OpenCrateConfig:
                     self._config = json.load(config_file)
 
     def write(self) -> None:
-        """docker
-docker
-docker
-docker
+        """
         Write the configuration to the file.
         """
         with open(self._config_path, "w") as config_file:
@@ -324,10 +321,10 @@ def runtime(
 
                         # Check if created_str is already a datetime object (python-on-whales often returns datetime)
                         if isinstance(image.created, datetime.datetime):
-                             created = image.created
+                            created = image.created
                         else:
-                             # Fallback, though likely not needed with python-on-whales modern types
-                             created = datetime.datetime.now() # Mock for safety if something weird happens
+                            # Fallback, though likely not needed with python-on-whales modern types
+                            created = datetime.datetime.now()  # Mock for safety if something weird happens
 
                         date_str = created.strftime("%d-%m-%Y %H:%M:%S")
                         logs.append(f"[bold]{version}:[/bold] -> {commit_hash} [dim][{size_mb:.2f} MB - {date_str}][/]")

@@ -17,7 +17,13 @@ from rich.tree import Tree
 
 @contextmanager
 def spinner(console: Console, message: str):
-    with console.status(message, spinner="dots"):
+    if sys.stdout.isatty():
+        with console.status(message, spinner="dots"):
+            try:
+                yield
+            finally:
+                pass
+    else:
         try:
             yield
         finally:

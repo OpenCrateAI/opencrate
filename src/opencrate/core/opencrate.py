@@ -6,7 +6,7 @@ import time
 from copy import deepcopy
 from datetime import datetime
 from glob import glob
-from typing import Any, Callable, Dict, Generator, List, Optional, Tuple, Type, Union
+from typing import Any, Callable, Dict, Generator, List, Optional, Set, Tuple, Type, Union
 
 import lovelyplots  # noqa: F401
 import matplotlib.pyplot as plt
@@ -15,6 +15,12 @@ import pynvml
 from memory_profiler import profile
 from pyinstrument import Profiler
 from pyinstrument.renderers import SpeedscopeRenderer
+from rich.align import Align
+from rich.box import HEAVY, ROUNDED
+from rich.console import Console, Group
+from rich.panel import Panel
+from rich.table import Table
+from rich.text import Text
 
 from .. import _configuration, config, snapshot, snp
 from .utils.progress import progress
@@ -108,7 +114,9 @@ class MemoryProfiler:
             gpu_mem_before = mem_info_before.used
 
         # --- Log Header ---
-        self.log_stream.write(f"[==================== System Memory Profiling for {self.target_function.__name__}() ====================]\n")
+        self.log_stream.write(
+            f"[==================== System Memory Profiling for {self.target_function.__name__}() ====================]\n"
+        )
         # if self.gpu_handle:
         #     self.log_stream.write(f"GPU Memory (Before): {to_mib(gpu_mem_before)}\n")
         # self.log_stream.write(f"{'-' * 80}\n")
@@ -125,13 +133,19 @@ class MemoryProfiler:
         time_profiler.stop()
         text_output = time_profiler.output_text(color=False).split("\n")[10:]
         text_output = [
-            output[9:].replace("|-", "├─").replace("- ", "─ ").replace("|", "│").replace("`─", "└─")
+            output[9:]
+            .replace("|-", "├─")
+            .replace("- ", "─ ")
+            .replace("|", "│")
+            .replace("`─", "└─")
             for output in text_output
             if output.startswith("      ") and "frames hidden" not in output
         ]
         # text_output[0] = text_output[0].replace("└─", "──")
         time_output = "\n".join(text_output)
-        self.log_stream.write(f"[==================== Time Profiling for {self.target_function.__name__}() ====================]\n")
+        self.log_stream.write(
+            f"[==================== Time Profiling for {self.target_function.__name__}() ====================]\n"
+        )
         self.log_stream.write("\n" + time_output)
         time_profiler.write_html(os.path.join(self.output_dir, "time_profile.html"))
         speedscope_json_string = time_profiler.output(renderer=SpeedscopeRenderer())
@@ -143,7 +157,9 @@ class MemoryProfiler:
             gpu_mem_after = mem_info_after.used
             gpu_mem_increment = float(gpu_mem_after) - float(gpu_mem_before)
 
-            self.log_stream.write(f"\n\n\n[==================== GPU Memory Profiling for {self.target_function.__name__}() ====================]\n")
+            self.log_stream.write(
+                f"\n\n\n[==================== GPU Memory Profiling for {self.target_function.__name__}() ====================]\n"
+            )
             self.log_stream.write(f"    Memory Before: {to_mib(gpu_mem_before)}\n")
             self.log_stream.write(f"    Memory After:  {to_mib(gpu_mem_after)}\n")
             self.log_stream.write(f"    Increment:     {to_mib(gpu_mem_increment)}\n")
@@ -155,7 +171,9 @@ class MemoryProfiler:
         Log the profiling data to the log file.
         :param profile_data: Dictionary containing profiling data.
         """
-        self.log_stream.write(f"\n\n[==================== Throughput Profiling for {self.target_function.__name__}() ====================]\n")
+        self.log_stream.write(
+            f"\n\n[==================== Throughput Profiling for {self.target_function.__name__}() ====================]\n"
+        )
         for key, values in profile_data.items():
             if values:
                 avg_time = sum(values) / len(values)
@@ -174,10 +192,14 @@ class MemoryProfiler:
                     return f"{hours:02d} hrs: {minutes:02d} mins: {secs:06.2f} secs"
 
                 self.log_stream.write(f"    {key}:\n")
-                self.log_stream.write(f"        Median Time: {format_time(median_time)}\n")
+                self.log_stream.write(
+                    f"        Median Time: {format_time(median_time)}\n"
+                )
                 self.log_stream.write(f"        Avg Time: {format_time(avg_time)}\n")
                 self.log_stream.write(f"        Std Dev: {format_time(std_time)}\n")
-                self.log_stream.write(f"        Throughput: {throughput_per_sec:.2f}/sec, {throughput_per_min:.2f}/min, {throughput_per_hour:.2f}/hour\n")
+                self.log_stream.write(
+                    f"        Throughput: {throughput_per_sec:.2f}/sec, {throughput_per_min:.2f}/min, {throughput_per_hour:.2f}/hour\n"
+                )
 
 
 class OpenCrate:
@@ -195,6 +217,7 @@ class OpenCrate:
     _original_snapshot_setup: Optional[Callable[..., Any]] = None
     _opencrate_subclass_initialized: bool = False
     jobs_meta_kwargs: Dict[str, Dict[str, Any]] = {}
+    jobs_dag: Dict[str, Dict[str, Any]] = {}
     meta_saved = False
     registered_checkpoint_configs_list: List[Dict[str, Any]] = []
     available_jobs: List[str] = []
@@ -214,10 +237,28 @@ class OpenCrate:
             job_name = job_func.__name__
             cls.jobs_meta_kwargs[job_name] = meta_kwargs()
 
+            # Store DAG metadata
+            doc = inspect.cleandoc(job_func.__doc__ or "")
+            description_lines = []
+            for line in doc.split("\n"):
+                if line.strip().startswith(
+                    ("Args:", "Arguments:", "Returns:", "Raises:", "Yields:")
+                ):
+                    break
+                description_lines.append(line)
+
+            cls.jobs_dag[job_name] = {
+                "doc": "\n".join(description_lines).strip(),
+                "upstream": upstream_jobs,
+                "downstream": downstream_jobs,
+            }
+
             if job_name not in cls.available_jobs:
                 cls.available_jobs.append(job_name)
             else:
-                cls.snapshot.error(f"Job {job_name}() is already registered. Please use a unique name for each job.")
+                cls.snapshot.error(
+                    f"Job {job_name}() is already registered. Please use a unique name for each job."
+                )
 
             def wrapper(
                 self,
@@ -242,13 +283,21 @@ class OpenCrate:
                         if upstream_jobs:
                             for up_job in upstream_jobs:
                                 if up_job not in self.available_jobs:
-                                    raise ValueError(f"Upstream job {up_job}() is not registered.")
+                                    raise ValueError(
+                                        f"Upstream job {up_job}() is not registered."
+                                    )
 
-                                params = upstream_params.get(up_job, {}) if upstream_params else {}
+                                params = (
+                                    upstream_params.get(up_job, {})
+                                    if upstream_params
+                                    else {}
+                                )
                                 getattr(self, up_job)(concurrent=False, **params)
 
                         # Main job execution
-                        if (not execute_once) or (not self.jobs_meta_kwargs[job_name]["finished"]):
+                        if (not execute_once) or (
+                            not self.jobs_meta_kwargs[job_name]["finished"]
+                        ):
                             if profile:
                                 self.jobs_meta_kwargs["train"]["profile"] = {
                                     "epoch": [],
@@ -268,7 +317,9 @@ class OpenCrate:
                                     # Run the profile for a specific workload
                                     # job_func(self, *args, **kwargs)
                                     profiler.run(self, *args, **kwargs)
-                                    profiler.log_benchmarks(self.jobs_meta_kwargs["train"]["profile"])
+                                    profiler.log_benchmarks(
+                                        self.jobs_meta_kwargs["train"]["profile"]
+                                    )
                             else:
                                 job_func(self, *args, **kwargs)
 
@@ -292,9 +343,15 @@ class OpenCrate:
                         if downstream_jobs:
                             for down_job in downstream_jobs:
                                 if down_job not in self.available_jobs:
-                                    raise ValueError(f"Downstream job {down_job}() is not registered.")
+                                    raise ValueError(
+                                        f"Downstream job {down_job}() is not registered."
+                                    )
 
-                                params = downstream_params.get(down_job, {}) if downstream_params else {}
+                                params = (
+                                    downstream_params.get(down_job, {})
+                                    if downstream_params
+                                    else {}
+                                )
                                 getattr(self, down_job)(concurrent=False, **params)
 
                     except KeyboardInterrupt:
@@ -312,14 +369,18 @@ class OpenCrate:
                 def run_scheduled_job():
                     # Validate schedule parameters
                     if schedule_timeout is None and schedule_runout is None:
-                        raise ValueError("Scheduled jobs require either `schedule_timeout` or `schedule_runout` parameter")
+                        raise ValueError(
+                            "Scheduled jobs require either `schedule_timeout` or `schedule_runout` parameter"
+                        )
 
                     # Convert timeout to seconds
                     timeout_seconds = None
                     if schedule_timeout:
                         parts = schedule_timeout.split(":")
                         if len(parts) != 3:
-                            raise ValueError("schedule_timeout must be in 'hh:mm:ss' format")
+                            raise ValueError(
+                                "schedule_timeout must be in 'hh:mm:ss' format"
+                            )
                         h, m, s = map(int, parts)
                         timeout_seconds = h * 3600 + m * 60 + s
 
@@ -349,9 +410,13 @@ class OpenCrate:
 
                         # Add timeout/runout info
                         if timeout_seconds:
-                            self.snapshot.info(f"{job_name}() will timeout after {schedule_timeout}")
+                            self.snapshot.info(
+                                f"{job_name}() will timeout after {schedule_timeout}"
+                            )
                         if schedule_runout:
-                            self.snapshot.info(f"{job_name}() will run at most {schedule_runout} times")
+                            self.snapshot.info(
+                                f"{job_name}() will run at most {schedule_runout} times"
+                            )
 
                         self.snapshot.info("Waiting for schedule trigger...")
                         last_run_time = None
@@ -363,12 +428,19 @@ class OpenCrate:
                             current_time = time.time()
 
                             # Check termination conditions
-                            if timeout_seconds and (current_time - start_time) > timeout_seconds:
-                                self.snapshot.info(f"Schedule timeout reached after {schedule_timeout}")
+                            if (
+                                timeout_seconds
+                                and (current_time - start_time) > timeout_seconds
+                            ):
+                                self.snapshot.info(
+                                    f"Schedule timeout reached after {schedule_timeout}"
+                                )
                                 break
 
                             if schedule_runout and run_count >= schedule_runout:
-                                self.snapshot.info(f"Schedule runout reached after {run_count} executions")
+                                self.snapshot.info(
+                                    f"Schedule runout reached after {run_count} executions"
+                                )
                                 break
 
                             # For continuous mode, skip time matching logic
@@ -378,13 +450,19 @@ class OpenCrate:
                                     time.sleep(0.5)
                                     continue
 
-                                is_match = (h_str == "*" or now.hour == int(h_str)) and (m_str == "*" or now.minute == int(m_str)) and (s_str == "*" or now.second == int(s_str))
+                                is_match = (
+                                    (h_str == "*" or now.hour == int(h_str))
+                                    and (m_str == "*" or now.minute == int(m_str))
+                                    and (s_str == "*" or now.second == int(s_str))
+                                )
                             else:
                                 is_match = True  # Always run in continuous mode
 
                             if is_match:
                                 self.snapshot.info("")
-                                self.snapshot.info(f"Executing scheduled {job_name}() at {now.strftime('%Y-%m-%d %H:%M:%S')}")
+                                self.snapshot.info(
+                                    f"Executing scheduled {job_name}() at {now.strftime('%Y-%m-%d %H:%M:%S')}"
+                                )
                                 self.jobs_meta_kwargs[job_name]["finished"] = False
 
                                 execute_job_sequence()
@@ -409,7 +487,9 @@ class OpenCrate:
 
                 # Master concurrency decision
                 if master_concurrent:
-                    self.snapshot.info(f"{job_name}() running concurrently in background...")
+                    self.snapshot.info(
+                        f"{job_name}() running concurrently in background..."
+                    )
                     thread = threading.Thread(target=run_job)
                     thread.daemon = True
                     thread.start()
@@ -454,7 +534,9 @@ class OpenCrate:
         self.meta_saved = True
         # self.jobs_meta_kwargs["current_epoch"], self.current_batch_idx,
 
-    def register_checkpoint_config(self, module_name, module, get_params, update_params) -> None:
+    def register_checkpoint_config(
+        self, module_name, module, get_params, update_params
+    ) -> None:
         setattr(self, module_name, module)
         if self.use_config == "custom":
             self.registered_checkpoint_configs_list.append(
@@ -483,8 +565,12 @@ class OpenCrate:
         def new_init(self, *args, **kwargs):
             # self.script_name = cls.__module__.split(".")[-1]
             self.script_name = cls.__name__
-            self.script_name = re.sub(r"([A-Z]+)([A-Z][a-z])", r"\1_\2", self.script_name)
-            self.script_name = re.sub(r"([a-z])([A-Z])", r"\1_\2", self.script_name).lower()
+            self.script_name = re.sub(
+                r"([A-Z]+)([A-Z][a-z])", r"\1_\2", self.script_name
+            )
+            self.script_name = re.sub(
+                r"([a-z])([A-Z])", r"\1_\2", self.script_name
+            ).lower()
 
             # Setup snapshot
             _configuration.snapshot = self.snapshot
@@ -503,7 +589,9 @@ class OpenCrate:
             if self.finetune is not None:
                 prefix = "Finetuning"
             else:
-                meta_list = glob(os.path.join(self.snapshot.path.checkpoint(), "meta_*.json"))
+                meta_list = glob(
+                    os.path.join(self.snapshot.path.checkpoint(), "meta_*.json")
+                )
                 checkpoint_exists = len(meta_list) > 0
                 prefix = "Resuming" if checkpoint_exists else "Creating"
             config_path = f"config/{self.script_name}:{self.use_config}.yml"
@@ -516,7 +604,10 @@ class OpenCrate:
                 if len(configs) == 0:
                     message = "\n\nCannot use `config='resume'` when creating a new snapshot, as there is no existing snapshot to resume."
                     if os.path.exists("config"):
-                        available_configs = [os.path.splitext(name)[0].split(":")[-1] for name in os.listdir("config")]
+                        available_configs = [
+                            os.path.splitext(name)[0].split(":")[-1]
+                            for name in os.listdir("config")
+                        ]
                         if available_configs:
                             message += f"\nPlease use `config='default'` or one of the available configs: {', '.join(available_configs)}."
                     else:
@@ -537,7 +628,9 @@ class OpenCrate:
 
                 _configuration.write(config_name)
                 if prefix != "Finetuning":
-                    _configuration.display(f"[bold]{prefix}[/bold] [bold]{self.snapshot.version_name}[/bold] with {self.use_config} config")
+                    _configuration.display(
+                        f"[bold]{prefix}[/bold] [bold]{self.snapshot.version_name}[/bold] with {self.use_config} config"
+                    )
                 else:
                     if self.finetune is not None:
                         if self.finetune == "dev":
@@ -545,9 +638,13 @@ class OpenCrate:
                         else:
                             finetune_from_version = f"v{self.finetune}"
                         if self.finetune_tag:
-                            finetune_from_version = f"{finetune_from_version}:{self.finetune_tag}"
+                            finetune_from_version = (
+                                f"{finetune_from_version}:{self.finetune_tag}"
+                            )
 
-                    _configuration.display(f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with custom config")
+                    _configuration.display(
+                        f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with custom config"
+                    )
                 use_existing_config = True
             elif self.use_config == "resume" and self.start not in ("reset", "new"):
                 # Use resume config from checkpoint
@@ -557,11 +654,16 @@ class OpenCrate:
                 # )
 
                 _configuration.write(config_name)
-                _configuration.display(f"[bold]{prefix} {self.snapshot.version_name}[/bold] with resume config")
+                _configuration.display(
+                    f"[bold]{prefix} {self.snapshot.version_name}[/bold] with resume config"
+                )
                 use_existing_config = True
             else:
                 if os.path.exists("config") and self.use_config != "default":
-                    available_config_names = [os.path.splitext(name)[0].split(":")[-1] for name in os.listdir("config")]
+                    available_config_names = [
+                        os.path.splitext(name)[0].split(":")[-1]
+                        for name in os.listdir("config")
+                    ]
                     if len(available_config_names) == 1:
                         assert self.use_config in available_config_names, (
                             f"\n\nNo config found with name '{self.use_config}'.\nThe only available config in your `config/` folder is '{available_config_names[0]}'.\n"
@@ -586,8 +688,12 @@ class OpenCrate:
 
             # If we didn't use an existing config or if starting new with resume config,
             # write the default config
-            if not use_existing_config or (self.start == "new" and self.use_config == "resume"):
-                _configuration.write(f"{self.script_name}:{self.use_config}", replace_config=True)
+            if not use_existing_config or (
+                self.start == "new" and self.use_config == "resume"
+            ):
+                _configuration.write(
+                    f"{self.script_name}:{self.use_config}", replace_config=True
+                )
                 if self.finetune:
                     if self.finetune is not None:
                         if self.finetune == "dev":
@@ -595,18 +701,34 @@ class OpenCrate:
                         else:
                             finetune_from_version = f"v{self.finetune}"
                         if self.finetune_tag:
-                            finetune_from_version = f"{finetune_from_version}:{self.finetune_tag}"
+                            finetune_from_version = (
+                                f"{finetune_from_version}:{self.finetune_tag}"
+                            )
 
-                    _configuration.display(f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with default config")
+                    _configuration.display(
+                        f"[bold]{prefix}[/bold] from [bold]{finetune_from_version}[/bold] to [bold]{self.snapshot.version_name}[/bold] with default config"
+                    )
                 else:
                     config_type = "default"
                     if not use_existing_config and self.use_config == "custom":
-                        config_type += f" (as no custom config found at '{config_path}')"
-                    _configuration.display(f"[bold]{prefix}[/bold] [bold]{self.snapshot.version_name}[/bold] with {config_type} config")
+                        config_type += (
+                            f" (as no custom config found at '{config_path}')"
+                        )
+                    _configuration.display(
+                        f"[bold]{prefix}[/bold] [bold]{self.snapshot.version_name}[/bold] with {config_type} config"
+                    )
 
             # get list of all methods that start with "save_" prefix
-            save_methods_names = [method_name for method_name in dir(self) if method_name.startswith("save_")]
-            load_methods_names = [method_name for method_name in dir(self) if method_name.startswith("load_")]
+            save_methods_names = [
+                method_name
+                for method_name in dir(self)
+                if method_name.startswith("save_")
+            ]
+            load_methods_names = [
+                method_name
+                for method_name in dir(self)
+                if method_name.startswith("load_")
+            ]
 
             for save_method_name in save_methods_names:
                 setattr(
@@ -624,7 +746,63 @@ class OpenCrate:
 
         setattr(cls, "__init__", new_init)
         super().__init_subclass__(**kwargs)
-        # self.save_meta() # have this here run by default, make it optional from the user side, user will only need to call this if they need to add new meta variables
+        cls._validate_dag()
+
+    @classmethod
+    def _validate_dag(cls) -> None:
+        """
+        Validates the job dependency graph for recursive call loops.
+        Raises RuntimeError if a loop is detected.
+        """
+        if not cls.jobs_dag:
+            return
+
+        # Build call graph: A -> B if job A triggers job B
+        adj: dict[str, set[str]] = {job: set() for job in cls.available_jobs}
+        for job, dag in cls.jobs_dag.items():
+            # A calls its upstream jobs
+            for up in dag.get("upstream") or []:
+                if up in adj:
+                    adj[job].add(up)
+            # A calls its downstream jobs
+            for down in dag.get("downstream") or []:
+                if down in adj:
+                    adj[job].add(down)
+
+        visited = set()
+        stack = set()
+        path = []
+
+        def find_cycle(v):
+            visited.add(v)
+            stack.add(v)
+            path.append(v)
+
+            for neighbor in adj.get(v, []):
+                if neighbor in stack:
+                    # Found a cycle
+                    cycle_start_idx = path.index(neighbor)
+                    cycle_path = path[cycle_start_idx:] + [neighbor]
+                    arrow_path = " -> ".join(f"{j}()" for j in cycle_path)
+
+                    raise RuntimeError(
+                        f"\nInfinite execution loop detected: {arrow_path}.\n"
+                        "Check your @pipeline.job decorators. A job cannot trigger another job "
+                        "that eventually triggers it back (via upstream or downstream dependencies).\n"
+                        "Example: If 'train' has 'evaluate' as downstream, and 'evaluate' has 'train' as upstream, "
+                        "they will call each other forever."
+                    )
+                if neighbor not in visited:
+                    if find_cycle(neighbor):
+                        return True
+
+            stack.remove(v)
+            path.pop()
+            return False
+
+        for job in cls.available_jobs:
+            if job not in visited:
+                find_cycle(job)
 
     def _save_checkpoint_decorator(self, func) -> Callable[..., None]:
         def wrapper(*args, **kwargs):
@@ -669,27 +847,39 @@ class OpenCrate:
                     else:
                         self.snapshot.version_name = f"v{self.finetune}"
                     if self.finetune_tag:
-                        self.snapshot.version_name = f"{self.snapshot.version_name}:{self.finetune_tag}"
+                        self.snapshot.version_name = (
+                            f"{self.snapshot.version_name}:{self.finetune_tag}"
+                        )
                         self.snapshot.tag = self.finetune_tag
                     else:
                         self.snapshot.tag = None
 
                     self.snapshot.version = self.finetune
-                    self.snapshot.debug(f"Loading checkpoint for finetuning from '{self.snapshot.version_name}'")
+                    self.snapshot.debug(
+                        f"Loading checkpoint for finetuning from '{self.snapshot.version_name}'"
+                    )
                 else:
                     job_name = func.__name__.replace("load_", "")
-                    meta_path = self.snapshot.path.checkpoint(f"meta_{job_name}.json", check_exists=False)
+                    meta_path = self.snapshot.path.checkpoint(
+                        f"meta_{job_name}.json", check_exists=False
+                    )
                     # if self.finetune is not None:
                     #     assert os.path.isfile(
                     #         meta_path
                     #     ), f"\n\nUnable to find checkpoint for finetuning at '{meta_path}'\n"
                     if not os.path.isfile(meta_path):
-                        self.snapshot.debug(f"Skipping checkpoint loading, '{meta_path}' not found")
+                        self.snapshot.debug(
+                            f"Skipping checkpoint loading, '{meta_path}' not found"
+                        )
                         return  # handle this return better, right now it just skips the job if the meta file is not found
                     # self.snapshot.debug(f"Loading meta variables from '{meta_path}'")
                     try:
-                        assert _has_torch, "\n\nPyTorch is not installed. Please install PyTorch to load a checkpoint.\n\n"
-                        loaded_job_meta_kwargs = torch.load(meta_path, weights_only=False)
+                        assert _has_torch, (
+                            "\n\nPyTorch is not installed. Please install PyTorch to load a checkpoint.\n\n"
+                        )
+                        loaded_job_meta_kwargs = torch.load(
+                            meta_path, weights_only=False
+                        )
                         # new_meta_kwargs = {}
                         # for key, value in meta.items():
                         #     setattr(self, key, value)
@@ -725,7 +915,9 @@ class OpenCrate:
                             getattr(self, module["module_name"]),
                             module["custom_config"],
                         )
-                        self.snapshot.debug(f"Updated checkpoint config for '{module['module_name']}' to '{module['custom_config']}'")
+                        self.snapshot.debug(
+                            f"Updated checkpoint config for '{module['module_name']}' to '{module['custom_config']}'"
+                        )
 
                 self.snapshot.debug("Loaded checkpoint successfully!")
             except Exception as e:
@@ -734,26 +926,38 @@ class OpenCrate:
 
         return wrapper
 
-    def epoch_progress(self, num_epochs, title: str = "Epoch") -> Generator[Any, Any, None]:
+    def epoch_progress(
+        self, num_epochs, title: str = "Epoch"
+    ) -> Generator[Any, Any, None]:
         job_name = inspect.stack()[1].function
 
-        assert self.meta_saved, "Meta variables not saved. Please call `save_meta()` in `__init__` method."
+        assert self.meta_saved, (
+            "Meta variables not saved. Please call `save_meta()` in `__init__` method."
+        )
 
         self.jobs_meta_kwargs[job_name]["epoch_title"] = title
         self.num_epochs = num_epochs
 
         do_profile = self.jobs_meta_kwargs[job_name]["profile"] is not None
 
-        for self.jobs_meta_kwargs[job_name]["current_epoch"] in range(self.jobs_meta_kwargs[job_name]["start_epoch"], self.num_epochs):
+        for self.jobs_meta_kwargs[job_name]["current_epoch"] in range(
+            self.jobs_meta_kwargs[job_name]["start_epoch"], self.num_epochs
+        ):
             if do_profile:
                 start_time = time.perf_counter()
 
             yield self.jobs_meta_kwargs[job_name]["current_epoch"]
 
             if do_profile:
-                self.jobs_meta_kwargs[job_name]["profile"]["epoch"].append(time.perf_counter() - start_time)
+                self.jobs_meta_kwargs[job_name]["profile"]["epoch"].append(
+                    time.perf_counter() - start_time
+                )
 
-            for fig_title, fig in self.jobs_meta_kwargs[job_name]["batch_progress"].plot_accumulated_metrics(epoch=f"{self.jobs_meta_kwargs[job_name]['current_epoch'] + 1}"):
+            for fig_title, fig in self.jobs_meta_kwargs[job_name][
+                "batch_progress"
+            ].plot_accumulated_metrics(
+                epoch=f"{self.jobs_meta_kwargs[job_name]['current_epoch'] + 1}"
+            ):
                 # Save epoch-specific version if epoch number is available
                 fig_title = fig_title.replace(", ", "_")
                 fig_path = f"monitored/{job_name}({fig_title})[epochs].jpg"
@@ -764,10 +968,14 @@ class OpenCrate:
             self.jobs_meta_kwargs[job_name]["start_epoch"] += 1
         # TODO: consider automating and standardizing some of such common variable names in ML projects
 
-    def batch_progress(self, dataloader, title="Batch") -> Generator[Tuple[Any, Any, Any], Any, None]:
+    def batch_progress(
+        self, dataloader, title="Batch"
+    ) -> Generator[Tuple[Any, Any, Any], Any, None]:
         job_name = inspect.stack()[1].function
 
-        assert self.meta_saved, "Meta variables not saved. Please call `save_meta()` in `__init__` method."
+        assert self.meta_saved, (
+            "Meta variables not saved. Please call `save_meta()` in `__init__` method."
+        )
 
         if self.jobs_meta_kwargs[job_name]["is_resuming"]:
             self.jobs_meta_kwargs[job_name]["start_batch_idx"] += 1
@@ -780,7 +988,9 @@ class OpenCrate:
 
         do_profile = self.jobs_meta_kwargs[job_name]["profile"] is not None
 
-        for batch_idx, batch, self.jobs_meta_kwargs[job_name]["batch_progress"] in progress(
+        for batch_idx, batch, self.jobs_meta_kwargs[job_name][
+            "batch_progress"
+        ] in progress(
             dataloader,
             title=epoch_title,
             step=title,
@@ -788,10 +998,18 @@ class OpenCrate:
             job_name=job_name,
         ):
             if metrics_are_not_resumed:
-                for metric_name, metric_values in self.jobs_meta_kwargs[job_name]["metrics"].items():
-                    self.jobs_meta_kwargs[job_name]["batch_progress"].metrics[metric_name] = metric_values
-                for metric_name, metrics_accumulated_values in self.jobs_meta_kwargs[job_name]["metrics_accumulated"].items():
-                    self.jobs_meta_kwargs[job_name]["batch_progress"].metrics_accumulated[metric_name] = metrics_accumulated_values
+                for metric_name, metric_values in self.jobs_meta_kwargs[job_name][
+                    "metrics"
+                ].items():
+                    self.jobs_meta_kwargs[job_name]["batch_progress"].metrics[
+                        metric_name
+                    ] = metric_values
+                for metric_name, metrics_accumulated_values in self.jobs_meta_kwargs[
+                    job_name
+                ]["metrics_accumulated"].items():
+                    self.jobs_meta_kwargs[job_name][
+                        "batch_progress"
+                    ].metrics_accumulated[metric_name] = metrics_accumulated_values
                 metrics_are_not_resumed = False
 
             (
@@ -807,7 +1025,9 @@ class OpenCrate:
             yield batch_idx, batch, self.jobs_meta_kwargs[job_name]["batch_progress"]
 
             if do_profile:
-                self.jobs_meta_kwargs[job_name]["profile"]["batch"].append(time.perf_counter() - start_time)
+                self.jobs_meta_kwargs[job_name]["profile"]["batch"].append(
+                    time.perf_counter() - start_time
+                )
             (
                 self.jobs_meta_kwargs[job_name]["is_resuming"],
                 self.jobs_meta_kwargs[job_name]["start_batch_idx"],
@@ -827,17 +1047,183 @@ class OpenCrate:
             for (
                 metric_name,
                 metrics_accumulated_values,
-            ) in self.jobs_meta_kwargs[job_name]["batch_progress"].metrics_accumulated.items():
-                self.jobs_meta_kwargs[job_name]["metrics_accumulated"][metric_name] = metrics_accumulated_values
+            ) in self.jobs_meta_kwargs[job_name][
+                "batch_progress"
+            ].metrics_accumulated.items():
+                self.jobs_meta_kwargs[job_name]["metrics_accumulated"][metric_name] = (
+                    metrics_accumulated_values
+                )
 
-            self.jobs_meta_kwargs[job_name]["start_batch_idx"] = 0
+                self.jobs_meta_kwargs[job_name]["start_batch_idx"] = 0
+
+    @classmethod
+    def inspect(cls) -> None:
+        console = Console()
+
+        # 1. Listing all the jobs in a rich table
+        job_list_table = Table(
+            title="[bold]Available Jobs[/bold]", box=HEAVY, expand=False
+        )
+        job_list_table.add_column("Job Name", style="bold cyan", no_wrap=True)
+        job_list_table.add_column("Description", style="dim")
+
+        for job_name in cls.available_jobs:
+            doc = cls.jobs_dag.get(job_name, {}).get("doc", "")
+            job_list_table.add_row(job_name, doc)
+
+        console.print(job_list_table)
+        # console.print("") # Removed to reduce gap
+
+        # 2. Group jobs by their dependency signature
+        # We store them as a list of dicts for easier indexing
+
+        groups: List[Dict[str, Any]] = []
+        for job_name in cls.available_jobs:
+            dag = cls.jobs_dag.get(job_name, {})
+            upstream: Set[str] = set(dag.get("upstream") or [])
+            downstream: Set[str] = set(dag.get("downstream") or [])
+
+            # Find existing group or create new one
+            found = False
+            for group in groups:
+                # group["jobs"] is always a list by our construction below
+                if (
+                    isinstance(group.get("upstream"), set)
+                    and isinstance(group.get("downstream"), set)
+                    and group["upstream"] == upstream
+                    and group["downstream"] == downstream
+                ):
+                    jobs_list: List[str] = group["jobs"]
+                    jobs_list.append(job_name)
+                    found = True
+                    break
+            if not found:
+                groups.append(
+                    {"jobs": [job_name], "upstream": upstream, "downstream": downstream}
+                )
+
+        # 3. Build meta-graph between groups and calculate levels
+        # A group G1 is a parent of G2 if G2 depends on G1
+        adj: Dict[int, Set[int]] = {i: set() for i in range(len(groups))}
+        in_degree = dict.fromkeys(range(len(groups)), 0)
+
+        for i, g1 in enumerate(groups):
+            for j, g2 in enumerate(groups):
+                if i == j:
+                    continue
+
+                # G1 -> G2 if G2's upstream has jobs from G1
+                is_parent = False
+                if any(job in g2["upstream"] for job in g1["jobs"]):
+                    is_parent = True
+                # G1 -> G2 if G1's downstream has jobs from G2
+                elif any(job in g1["downstream"] for job in g2["jobs"]):
+                    is_parent = True
+
+                if is_parent:
+                    if j not in adj[i]:
+                        adj[i].add(j)
+                        in_degree[j] += 1
+
+        # Calculate levels using Kahn's style BFS
+        levels = {}  # group_idx -> level
+        queue = [i for i, d in in_degree.items() if d == 0]
+        current_level = 0
+
+        while queue:
+            next_queue = []
+            for node in queue:
+                levels[node] = current_level
+                # If this group has NO dependencies at all, we might want to distinguish it?
+                # User said Row 1 is for parents.
+                # Standalone jobs (no UP/DOWN) already listed in table, usually skipped by previous logic.
+                for neighbor in adj[node]:
+                    in_degree[neighbor] -= 1
+                    if in_degree[neighbor] == 0:
+                        next_queue.append(neighbor)
+            queue = next_queue
+            current_level += 1
+
+        # 4. Prepare Panel for each group
+        prepared_panels = {}  # group_idx -> Panel
+        for i, group in enumerate(groups):
+            # Skip standalone jobs (no dependencies)
+            if not group["upstream"] and not group["downstream"]:
+                continue
+
+            parts = []
+            # 1. Upstream
+            if group["upstream"]:
+                up_grid = Table.grid(padding=(0, 0))
+                for job in sorted(group["upstream"]):
+                    up_grid.add_row(f"[dim]{job}[/dim]")
+                parts.append(
+                    Align.center(
+                        Panel(up_grid, border_style="dim", box=ROUNDED, expand=False)
+                    )
+                )
+                parts.append(Align.center(Text("↓", style="bold")))
+
+            # 2. Jobs
+            job_grid = Table.grid(padding=(0, 0))
+            for job in sorted(group["jobs"]):
+                job_grid.add_row(Text(f"{job}", style="bold"))
+            parts.append(Align.center(job_grid))
+
+            # 3. Downstream
+            if group["downstream"]:
+                parts.append(Align.center(Text("↓", style="bold")))
+                down_grid = Table.grid(padding=(0, 0))
+                for job in sorted(group["downstream"]):
+                    down_grid.add_row(f"[dim]{job}[/dim]")
+                parts.append(
+                    Align.center(
+                        Panel(down_grid, border_style="dim", box=ROUNDED, expand=False)
+                    )
+                )
+
+            title_name = ", ".join(sorted(group["jobs"]))
+            panel = Panel(
+                Group(*parts),
+                title=f"[bold]{title_name}[/bold]",
+                box=ROUNDED,
+                expand=False,
+            )
+            prepared_panels[i] = panel
+
+        # 5. Render rows by level
+        max_level = max(levels.values()) if levels else -1
+        for level_idx in range(max_level + 1):
+            level_group_indices = [
+                i
+                for i, level_val in levels.items()
+                if level_val == level_idx and i in prepared_panels
+            ]
+            if not level_group_indices:
+                continue
+
+            # Sub-divide into rows of 5
+            for row_start in range(0, len(level_group_indices), 5):
+                row_indices = level_group_indices[row_start : row_start + 5]
+                row_panels = [prepared_panels[i] for i in row_indices]
+
+                grid = Table.grid(padding=(1, 2))
+                for _ in range(len(row_panels)):
+                    grid.add_column()
+                grid.add_row(*row_panels)
+                console.print(grid)
+
+            # Spacer between different levels if desired?
+            # console.print("")
 
     @classmethod
     def launch(cls, *args, **kwargs) -> Any:
         from ..cli.environment import launch
 
         workflow: Union[str, Type[OpenCrate]] = cls.__module__.split(".")[-1]
-        if isinstance(workflow, str) and (workflow == "__main__" or "." not in workflow):
+        if isinstance(workflow, str) and (
+            workflow == "__main__" or "." not in workflow
+        ):
             workflow = cls
         if "workflow" in kwargs:
             del kwargs["workflow"]
